@@ -13,9 +13,9 @@ jobs:
         with:
           node-version: '24'
       - name: Install dependencies
-        run: cd backend && npm install
+        run: npm install
       - name: Run scraper
-        run: cd backend && node scraper.js
+        run: node scraper.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
