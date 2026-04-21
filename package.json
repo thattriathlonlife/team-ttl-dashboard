@@ -1,0 +1,16 @@
+{
+  "name": "triteam-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "TriTeam race scraper and WhatsApp notifier",
+  "main": "scraper.js",
+  "scripts": {
+    "scrape": "node scraper.js",
+    "dev": "node --watch scraper.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.3.1"
+  }
+}
