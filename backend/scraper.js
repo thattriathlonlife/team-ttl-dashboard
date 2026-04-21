@@ -238,6 +238,66 @@ function parseDateStr(str) {
 }
 
 // ---------------------------------------------------------------
+// GEOCODER — OpenStreetMap Nominatim (free, no API key required)
+// Adds lat/lon and city to a race based on its location string
+// ---------------------------------------------------------------
+async function geocodeRaces(races) {
+  console.log(`[Geocode] Geocoding ${races.length} races...`);
+  const results = [];
+
+  for (const race of races) {
+    // Skip if already has coordinates
+    if (race.latitude && race.longitude) {
+      results.push(race);
+      continue;
+    }
+
+    try {
+      const query = encodeURIComponent(race.location);
+      const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`;
+
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'TriTeamDashboard/1.0 (team race tracker)',
+          'Accept': 'application/json',
+        }
+      });
+
+      if (!res.ok) {
+        results.push(race);
+        continue;
+      }
+
+      const data = await res.json();
+
+      if (data.length > 0) {
+        const place = data[0];
+        results.push({
+          ...race,
+          latitude: parseFloat(place.lat),
+          longitude: parseFloat(place.lon),
+          city: place.address?.city || place.address?.town || place.address?.village || race.city || null,
+        });
+        console.log(`[Geocode] ${race.name} → ${place.lat}, ${place.lon}`);
+      } else {
+        console.log(`[Geocode] No result for: ${race.location}`);
+        results.push(race);
+      }
+
+      // Nominatim rate limit: max 1 request/second
+      await new Promise(r => setTimeout(r, 1100));
+
+    } catch (err) {
+      console.error(`[Geocode] Error for ${race.name}:`, err.message);
+      results.push(race);
+    }
+  }
+
+  console.log(`[Geocode] Done — geocoded ${results.filter(r => r.latitude).length}/${races.length} races`);
+  return results;
+}
+
+// ---------------------------------------------------------------
 // UPSERT RACES — insert new, update existing (by external_id)
 // ---------------------------------------------------------------
 async function upsertRaces(races) {
@@ -374,14 +434,17 @@ async function main() {
   console.log('=== TriTeam Scraper/Notifier ===', new Date().toISOString());
 
   try {
-    // 1. Fetch from triathlon.org API (Olympic, Sprint, WTS, and some IRONMAN events)
+    // 1. Fetch from triathlon.org API (Olympic, Sprint, WTS events)
     const triEvents = await fetchTriathlonEvents();
 
-    // 2. Scrape ironman.com directly for full IRONMAN & 70.3 race list
+    // 2. Scrape PTO calendar for IRONMAN & 70.3 races
     const ironmanRaces = await scrapeIronmanRaces();
 
-    // 3. Merge — triathlon.org first, ironman.com fills in the gaps
-    const all = [...triEvents, ...ironmanRaces];
+    // 3. Geocode IRONMAN races — adds lat/lon and city via OpenStreetMap
+    const geocodedIronman = await geocodeRaces(ironmanRaces);
+
+    // 4. Merge and upsert
+    const all = [...triEvents, ...geocodedIronman];
     console.log(`[Main] Total combined races: ${all.length}`);
     await upsertRaces(all);
 
