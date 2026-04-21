@@ -62,6 +62,8 @@ async function scrapeIronmanRaces() {
         '[class*="race"]', '[class*="event"]', 'article',
       ];
 
+      console.log('[Scraper] Sample HTML:', html.substring(0, 3000));
+
       for (const sel of selectors) {
         const found = $(sel).length;
         if (found > 0) console.log(`[Scraper] Selector "${sel}" matched ${found} elements`);
