@@ -33,7 +33,7 @@ create table invites (
 create table races (
   id uuid default uuid_generate_v4() primary key,
   name text not null,
-  type text not null check (type in ('IRONMAN','70.3','Other')),
+  type text not null check (type in ('IRONMAN','70.3','Olympic','Sprint','XTERRA','Other')),
   race_date date not null,
   location text not null,
   city text,

@@ -128,8 +128,7 @@ async function fetchTriathlonEvents() {
 
 // ---------------------------------------------------------------
 // PTO RACE CALENDAR SCRAPER — stats.protriathletes.org/pro-race-calendar
-// Server-rendered HTML, no JS required, covers all IRONMAN & 70.3 events
-// plus Challenge, T100, and independent races worldwide
+// Server-rendered HTML, covers all IRONMAN & 70.3 events worldwide
 // ---------------------------------------------------------------
 async function scrapeIronmanRaces() {
   console.log('[PTO] Fetching race calendar from stats.protriathletes.org...');
@@ -147,58 +146,61 @@ async function scrapeIronmanRaces() {
   }
 
   const html = await response.text();
+  console.log(`[PTO] HTML length: ${html.length} chars`);
+
   const $ = cheerio.load(html);
   const races = [];
 
-  // Each race is a card block — extract name, brand, date, location, distance
-  // The page structure has race title links followed by metadata fields
+  // The page has race links like: <a href="/race/im-703-peru/2026/results">Ironman 70.3 Peru</a>
+  // followed by plain text blocks with Country:, Location:, Distance:
+  // We find all race links then walk up to grab the surrounding text block
   $('a[href*="/race/"]').each((_, el) => {
     try {
       const name = $(el).text().trim();
-      if (!name) return;
+      if (!name || name.length < 3) return;
 
-      // Get the parent card container
-      const card = $(el).closest('div, article, section, li').first();
-      const cardText = card.text();
+      // Only process IRONMAN branded races
+      if (!/ironman/i.test(name)) return;
 
-      // Extract brand (Ironman™, Challenge™, T100™, Independent)
-      const brand = card.find('*').filter((_, e) => /ironman|challenge|t100|independent/i.test($(e).text())).first().text().trim();
+      // Get full text of nearest containing block
+      // Walk up until we find a block with Country: in it
+      let container = $(el).parent();
+      let attempts = 0;
+      while (attempts < 8 && !container.text().includes('Country:')) {
+        container = container.parent();
+        attempts++;
+      }
+      const blockText = container.text();
 
-      // Extract date — looks like "26 April 2026" or "25 April 2026"
-      const dateMatch = cardText.match(/(\d{1,2}\s+[A-Z][a-z]+\s+20\d{2})/);
-      const race_date = dateMatch ? parseDateStr(dateMatch[1]) : null;
+      // Extract date — "26 April 2026" or "TBA November 2026"
+      const dateMatch = blockText.match(/(\d{1,2}\s+[A-Z][a-z]+\s+20\d{2})/);
+      if (!dateMatch) {
+        console.log(`[PTO] No date for: ${name}`);
+        return;
+      }
+      const race_date = parseDateStr(dateMatch[1]);
+      if (!race_date) return;
 
-      // Extract country and location from the card metadata
-      const countryMatch = cardText.match(/Country:\s*([^\n]+)/);
-      const locationMatch = cardText.match(/Location:\s*([^\n]+)/);
-      const distanceMatch = cardText.match(/Distance:\s*([^\n]+)/);
+      // Extract Country and Location
+      const countryMatch = blockText.match(/Country:\s*([^\n\r]+)/);
+      const locationMatch = blockText.match(/Location:\s*([^\n\r]+)/);
+      const distanceMatch = blockText.match(/Distance:\s*([^\n\r]+)/);
 
-      const country = countryMatch ? countryMatch[1].trim() : null;
-      const locationCity = locationMatch ? locationMatch[1].trim() : null;
+      const country = countryMatch ? countryMatch[1].trim() : '';
+      const locationCity = locationMatch ? locationMatch[1].trim() : '';
       const distanceStr = distanceMatch ? distanceMatch[1].trim() : '';
       const location = [locationCity, country].filter(Boolean).join(', ') || 'TBD';
 
-      if (!race_date) return;
-
       // Classify type
       let type;
-      if (name.includes('70.3') || distanceStr.includes('70.3') || distanceStr.toLowerCase().includes('half-iron')) {
+      if (name.includes('70.3') || distanceStr.toLowerCase().includes('half')) {
         type = '70.3';
-      } else if (/ironman/i.test(name) && !name.includes('70.3')) {
-        type = 'IRONMAN';
-      } else if (/t100/i.test(name) || /t100/i.test(brand)) {
-        type = 'Other';
-      } else if (/challenge/i.test(name) || /challenge/i.test(brand)) {
-        type = 'Other';
       } else {
-        type = 'Other';
+        type = 'IRONMAN';
       }
 
-      // Only keep IRONMAN and 70.3 — skip T100, Challenge, Independent for now
-      // Remove this filter if you want all races
-      if (type !== 'IRONMAN' && type !== '70.3') return;
-
-      const slug = $(el).attr('href')?.split('/race/')[1]?.split('/')[0] || name.toLowerCase().replace(/\s+/g, '-');
+      const slug = $(el).attr('href')?.split('/race/')[1]?.split('/')[0] || '';
+      const external_id = `pto_${slug || name.toLowerCase().replace(/\s+/g, '-')}_${race_date}`;
 
       races.push({
         name,
@@ -206,14 +208,14 @@ async function scrapeIronmanRaces() {
         race_date,
         location,
         country: country || null,
-        external_id: `pto_${slug}_${race_date}`,
+        external_id,
         source: 'pto_scrape',
         registration_url: `https://www.ironman.com/races`,
       });
 
       console.log(`[PTO] ${name} | ${race_date} | ${location}`);
     } catch (err) {
-      console.error('[PTO] Error parsing race card:', err.message);
+      console.error('[PTO] Error parsing entry:', err.message);
     }
   });
 
