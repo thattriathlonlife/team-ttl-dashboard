@@ -306,14 +306,18 @@ async function geocodeRaces(races) {
       if (data.length > 0) {
         const place = data[0];
         const addr = place.address || {};
+        const placeType = place.type || place.class || '';
 
-        // Extract city from Nominatim address fields
+        // Only accept results that are genuine populated places
+        const validTypes = ['city', 'town', 'village', 'municipality', 'borough', 'suburb', 'quarter'];
+        const isValidPlace = validTypes.includes(placeType) ||
+          addr.city || addr.town || addr.village || addr.municipality;
+
         const geocodedCity = addr.city || addr.town || addr.village || addr.municipality || null;
-        const confirmedCity = geocodedCity || bestCity || null;
+        const confirmedCity = geocodedCity || (isValidPlace ? bestCity : null);
 
-        if (!confirmedCity) {
-          // No city confidence — skip coordinates
-          console.log(`[Geocode] No city confidence for ${race.name} — skipping coords`);
+        if (!confirmedCity || !isValidPlace) {
+          console.log(`[Geocode] "${race.name}" resolved to type "${placeType}" — not a city, skipping coords`);
           results.push({ ...race, city: null, latitude: null, longitude: null });
         } else {
           results.push({
