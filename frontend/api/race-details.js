@@ -41,7 +41,16 @@ export default async function handler(req, res) {
     let description = null
     const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']{20,400})["']/i)
       || html.match(/<meta[^>]*content=["']([^"']{20,400})["'][^>]*name=["']description["']/i)
-    if (descMatch) description = descMatch[1].trim()
+    if (descMatch) {
+      description = descMatch[1].trim()
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&apos;/g, "'")
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
+    }
 
     // ── Extract swim/bike/run course details ─────────────────────
     // IRONMAN pages include course info in text near keywords
