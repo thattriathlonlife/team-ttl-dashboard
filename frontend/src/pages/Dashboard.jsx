@@ -141,9 +141,11 @@ export default function Dashboard({ session }) {
     if (!existing) {
       const email = session.user.email
       const fullName = session.user.user_metadata?.full_name || email.split('@')[0]
-      await supabase.from('profiles').insert({
+      const { error } = await supabase.from('profiles').insert({
         id: userId, full_name: fullName, email, role: 'athlete',
       })
+      if (error) console.error('[ensureProfile] Failed to create profile:', error.message)
+      else console.log('[ensureProfile] Profile created for', email)
     }
   }
 
@@ -296,6 +298,7 @@ export default function Dashboard({ session }) {
             allEntries={allEntries}
             profiles={profiles}
             onToggle={toggleEntry}
+            session={session}
           />
         </>
       )}

@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import RaceDetail from './RaceDetail'
+
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const MEMBER_COLORS = ['#00C4B4','#FF3D8B','#E8B84B','#FF5A1F','#a78bfa','#34d399','#f472b6','#60a5fa']
 
@@ -8,7 +11,8 @@ const S = {
     borderRadius: '8px', padding: '1rem 1.25rem',
     display: 'grid', gridTemplateColumns: '72px 1fr auto auto',
     alignItems: 'center', gap: '1rem',
-    transition: 'border-color 0.15s', cursor: 'default',
+    transition: 'border-color 0.15s, background 0.15s',
+    cursor: 'pointer',
   },
   rowMine: { borderLeft: '3px solid #00C4B4' },
   dateBlock: { textAlign: 'center' },
@@ -33,7 +37,7 @@ const S = {
   },
   badgeFull: { background: 'rgba(0,196,180,0.12)', color: '#00C4B4', border: '1px solid rgba(0,196,180,0.25)' },
   badge703: { background: 'rgba(255,61,139,0.12)', color: '#FF3D8B', border: '1px solid rgba(255,61,139,0.25)' },
-  badgeOther: { background: 'rgba(232,184,75,0.12)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.25)' },
+  badgeOther: { background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.2)' },
   right: { display: 'flex', alignItems: 'center', gap: '10px' },
   avatars: { display: 'flex' },
   avatar: {
@@ -41,8 +45,7 @@ const S = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'Barlow Condensed, sans-serif',
     fontSize: '10px', fontWeight: 700,
-    border: '2px solid #161616',
-    marginLeft: '-6px', color: '#000',
+    border: '2px solid #161616', color: '#000',
   },
   btn: {
     fontFamily: 'Barlow Condensed, sans-serif',
@@ -56,7 +59,8 @@ const S = {
   empty: {
     textAlign: 'center', padding: '3rem',
     fontFamily: 'Barlow Condensed, sans-serif',
-    letterSpacing: '2px', color: '#444', textTransform: 'uppercase', fontSize: '14px',
+    letterSpacing: '2px', color: '#444',
+    textTransform: 'uppercase', fontSize: '14px',
   },
 }
 
@@ -66,61 +70,87 @@ function getBadgeStyle(type) {
   return { ...S.badge, ...S.badgeOther }
 }
 
-export default function RaceList({ races, myEntries, allEntries, profiles, onToggle }) {
+export default function RaceList({ races, myEntries, allEntries, profiles, onToggle, session }) {
+  const [selectedRace, setSelectedRace] = useState(null)
+
   if (races.length === 0) return <div style={S.empty}>No upcoming races found</div>
 
   return (
-    <div style={S.list}>
-      {races.map((race, i) => {
-        const d = new Date(race.race_date + 'T12:00:00')
-        const isMine = myEntries.includes(race.id)
-        const raceEntries = allEntries.filter(e => e.race_id === race.id)
+    <>
+      <div style={S.list}>
+        {races.map((race) => {
+          const d = new Date(race.race_date + 'T12:00:00')
+          const isMine = myEntries.includes(race.id)
+          const raceEntries = allEntries.filter(e => e.race_id === race.id)
 
-        return (
-          <div key={race.id} style={{ ...S.row, ...(isMine ? S.rowMine : {}) }}>
-            <div style={S.dateBlock}>
-              <div style={S.dateMonth}>{MONTHS[d.getMonth()]}</div>
-              <div style={S.dateDay}>{d.getDate()}</div>
-              <div style={{ ...S.dateMonth, marginTop: '2px' }}>{d.getFullYear()}</div>
-            </div>
-
-            <div>
-              <div style={S.raceName}>{race.name}</div>
-              <div style={S.raceLoc}>{race.location}</div>
-            </div>
-
-            <span style={getBadgeStyle(race.type)}>{race.type}</span>
-
-            <div style={S.right}>
-              <div style={S.avatars}>
-                {raceEntries.slice(0, 5).map((entry, idx) => {
-                  const initials = (entry.profiles?.full_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2)
-                  return (
-                    <div
-                      key={entry.id}
-                      style={{ ...S.avatar, background: MEMBER_COLORS[idx % MEMBER_COLORS.length], marginLeft: idx === 0 ? 0 : '-6px' }}
-                      title={entry.profiles?.full_name}
-                    >
-                      {initials}
-                    </div>
-                  )
-                })}
-                {raceEntries.length > 5 && (
-                  <div style={{ ...S.avatar, background: '#2a2a2a', color: '#888', marginLeft: '-6px' }}>
-                    +{raceEntries.length - 5}
-                  </div>
-                )}
+          return (
+            <div
+              key={race.id}
+              style={{ ...S.row, ...(isMine ? S.rowMine : {}) }}
+              onClick={() => setSelectedRace(race)}
+              onMouseEnter={e => e.currentTarget.style.background = '#1a1a1a'}
+              onMouseLeave={e => e.currentTarget.style.background = '#161616'}
+            >
+              <div style={S.dateBlock}>
+                <div style={S.dateMonth}>{MONTHS[d.getMonth()]}</div>
+                <div style={S.dateDay}>{d.getDate()}</div>
+                <div style={{ ...S.dateMonth, marginTop: '2px' }}>{d.getFullYear()}</div>
               </div>
-              <button
-                style={{ ...S.btn, ...(isMine ? S.btnJoined : {}) }}
-                onClick={() => onToggle(race.id)}
-              >
-                {isMine ? '✓ Entered' : 'Enter'}
-              </button>
+
+              <div>
+                <div style={S.raceName}>{race.name}</div>
+                <div style={S.raceLoc}>{race.location}</div>
+              </div>
+
+              <span style={getBadgeStyle(race.type)}>{race.type}</span>
+
+              <div style={S.right}>
+                <div style={S.avatars}>
+                  {raceEntries.slice(0, 4).map((entry, idx) => {
+                    const initials = (entry.profiles?.full_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2)
+                    return (
+                      <div
+                        key={entry.id}
+                        style={{
+                          ...S.avatar,
+                          background: MEMBER_COLORS[idx % MEMBER_COLORS.length],
+                          marginLeft: idx === 0 ? 0 : '-6px',
+                        }}
+                        title={entry.profiles?.full_name}
+                      >
+                        {initials}
+                      </div>
+                    )
+                  })}
+                  {raceEntries.length > 4 && (
+                    <div style={{ ...S.avatar, background: '#2a2a2a', color: '#888', marginLeft: '-6px' }}>
+                      +{raceEntries.length - 4}
+                    </div>
+                  )}
+                </div>
+                <button
+                  style={{ ...S.btn, ...(isMine ? S.btnJoined : {}) }}
+                  onClick={e => { e.stopPropagation(); onToggle(race.id) }}
+                >
+                  {isMine ? '✓ Entered' : 'Enter'}
+                </button>
+              </div>
             </div>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+
+      {selectedRace && (
+        <RaceDetail
+          race={selectedRace}
+          session={session}
+          isEntered={myEntries.includes(selectedRace.id)}
+          onClose={() => setSelectedRace(null)}
+          onToggleEntry={async (raceId) => {
+            await onToggle(raceId)
+          }}
+        />
+      )}
+    </>
   )
 }
