@@ -46,18 +46,24 @@ function RaceMap({ races }) {
     )
   }
 
-  // If one race — centre on it. If multiple — use midpoint
-  const avgLat = racesWithCoords.reduce((s, r) => s + r.latitude, 0) / racesWithCoords.length
-  const avgLon = racesWithCoords.reduce((s, r) => s + r.longitude, 0) / racesWithCoords.length
-  const zoom = racesWithCoords.length === 1 ? 10 : 4
-
   // Build marker string for each race location
   const markers = racesWithCoords.map(r =>
     `marker=${r.latitude},${r.longitude}`
   ).join('&')
 
-  // Use OpenStreetMap embed (no API key needed)
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${avgLon - 3},${avgLat - 2},${avgLon + 3},${avgLat + 2}&layer=mapnik&${markers}`
+  // Calculate bounding box from actual coordinates with padding
+  const minLat = Math.min(...racesWithCoords.map(r => r.latitude))
+  const maxLat = Math.max(...racesWithCoords.map(r => r.latitude))
+  const minLon = Math.min(...racesWithCoords.map(r => r.longitude))
+  const maxLon = Math.max(...racesWithCoords.map(r => r.longitude))
+
+  // Add padding — at least 2 degrees so a single point isn't too zoomed in
+  const latPad = Math.max((maxLat - minLat) * 0.4, 2)
+  const lonPad = Math.max((maxLon - minLon) * 0.4, 3)
+
+  const bbox = `${minLon - lonPad},${minLat - latPad},${maxLon + lonPad},${maxLat + latPad}`
+
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&${markers}`
 
   return (
     <div style={{
