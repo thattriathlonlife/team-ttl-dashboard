@@ -97,6 +97,35 @@ const S = {
     fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase',
     color: '#333', marginRight: '2px',
   },
+  searchWrap: {
+    position: 'relative', marginBottom: '10px',
+  },
+  searchIcon: {
+    position: 'absolute', left: '12px', top: '50%',
+    transform: 'translateY(-50%)',
+    color: '#555', fontSize: '15px', pointerEvents: 'none',
+  },
+  searchInput: {
+    width: '100%', background: '#1a1a1a',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '6px', color: '#fff',
+    padding: '10px 36px 10px 36px',
+    fontSize: '14px', fontFamily: 'Barlow, sans-serif',
+    outline: 'none', transition: 'border-color 0.15s',
+  },
+  searchClear: {
+    position: 'absolute', right: '10px', top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'none', border: 'none',
+    color: '#555', fontSize: '16px',
+    cursor: 'pointer', padding: '2px 4px',
+    lineHeight: 1,
+  },
+  searchResults: {
+    fontFamily: 'Barlow Condensed, sans-serif',
+    fontSize: '11px', letterSpacing: '1px',
+    color: '#555', marginBottom: '8px',
+  },
 }
 
 const TABS = ['Races', 'Calendar', 'Team']
@@ -130,6 +159,7 @@ export default function Dashboard({ session }) {
   const [banner, setBanner] = useState(null)
   const [orgFilter, setOrgFilter] = useState('pto_scrape')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const userId = session.user.id
 
@@ -212,7 +242,14 @@ export default function Dashboard({ session }) {
   const filteredRaces = races.filter(r => {
     const orgMatch = orgFilter === 'all' || r.source === orgFilter
     const typeMatch = typeFilter === 'all' || r.type === typeFilter
-    return orgMatch && typeMatch
+    const q = searchQuery.toLowerCase().trim()
+    const searchMatch = !q || 
+      r.name?.toLowerCase().includes(q) ||
+      r.location?.toLowerCase().includes(q) ||
+      r.city?.toLowerCase().includes(q) ||
+      r.country?.toLowerCase().includes(q) ||
+      r.type?.toLowerCase().includes(q)
+    return orgMatch && typeMatch && searchMatch
   })
 
   const myRaceCount = myEntries.length
@@ -273,6 +310,26 @@ export default function Dashboard({ session }) {
             <div style={S.sectionTitle}>Upcoming <span style={S.sectionTitleSpan}>Races</span></div>
             <button style={S.btnGhost} onClick={() => setShowAddRace(true)}>+ Add Race</button>
           </div>
+
+          {/* Search */}
+          <div style={S.searchWrap}>
+            <span style={S.searchIcon}>🔍</span>
+            <input
+              style={S.searchInput}
+              type="text"
+              placeholder="Search by name, location or type..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button style={S.searchClear} onClick={() => setSearchQuery('')}>×</button>
+            )}
+          </div>
+          {searchQuery && (
+            <div style={S.searchResults}>
+              {filteredRaces.length} result{filteredRaces.length !== 1 ? 's' : ''} for "{searchQuery}"
+            </div>
+          )}
 
           <div style={S.filters}>
             <span style={S.filterLabel}>Org</span>
