@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 function getWeekRange() {
@@ -19,102 +19,9 @@ function getDayName(dateStr) {
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
-// Render an OpenStreetMap iframe centred on the race location
-function RaceMap({ races }) {
-  const racesWithCoords = races.filter(r => r.latitude && r.longitude)
-
-  if (racesWithCoords.length === 0) {
-    return (
-      <div style={{
-        background: '#161616',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '12px',
-        height: '340px',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: '12px',
-      }}>
-        <div style={{ fontSize: '32px' }}>🗺️</div>
-        <div style={{
-          fontFamily: 'Barlow Condensed, sans-serif',
-          fontSize: '14px', letterSpacing: '2px',
-          textTransform: 'uppercase', color: '#555',
-        }}>
-          No location data for this week's races
-        </div>
-      </div>
-    )
-  }
-
-  // Build marker string for each race location
-  const markers = racesWithCoords.map(r =>
-    `marker=${r.latitude},${r.longitude}`
-  ).join('&')
-
-  // Calculate bounding box from actual coordinates with padding
-  const minLat = Math.min(...racesWithCoords.map(r => r.latitude))
-  const maxLat = Math.max(...racesWithCoords.map(r => r.latitude))
-  const minLon = Math.min(...racesWithCoords.map(r => r.longitude))
-  const maxLon = Math.max(...racesWithCoords.map(r => r.longitude))
-
-  // Add padding — at least 2 degrees so a single point isn't too zoomed in
-  const latPad = Math.max((maxLat - minLat) * 0.4, 2)
-  const lonPad = Math.max((maxLon - minLon) * 0.4, 3)
-
-  const bbox = `${minLon - lonPad},${minLat - latPad},${maxLon + lonPad},${maxLat + latPad}`
-
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&${markers}`
-
-  return (
-    <div style={{
-      borderRadius: '12px',
-      overflow: 'hidden',
-      border: '1px solid rgba(255,255,255,0.08)',
-      position: 'relative',
-    }}>
-      {/* Race location labels above the map */}
-      <div style={{
-        background: '#161616',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding: '10px 16px',
-        display: 'flex', gap: '16px', flexWrap: 'wrap',
-      }}>
-        {racesWithCoords.map(race => (
-          <div key={race.id} style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            fontSize: '13px', color: '#ccc',
-            fontFamily: 'Barlow Condensed, sans-serif',
-            letterSpacing: '0.5px',
-          }}>
-            <span style={{ color: '#00C4B4', fontSize: '16px' }}>📍</span>
-            <span style={{ fontWeight: 600, color: '#fff' }}>{race.city || race.location}</span>
-            <span style={{ color: '#999' }}>— {race.name}</span>
-          </div>
-        ))}
-      </div>
-      <iframe
-        title="Race locations"
-        src={src}
-        style={{ width: '100%', height: '320px', border: 'none', display: 'block' }}
-        loading="lazy"
-      />
-      <div style={{
-        position: 'absolute', bottom: '8px', right: '8px',
-        background: 'rgba(0,0,0,0.6)',
-        borderRadius: '4px', padding: '3px 8px',
-        fontSize: '10px', color: '#999',
-        fontFamily: 'Barlow, sans-serif',
-      }}>
-        © OpenStreetMap contributors
-      </div>
-    </div>
-  )
-}
-
 function RaceRow({ race }) {
   const [expanded, setExpanded] = useState(false)
   const names = race.race_entries.map(e => e.profiles?.full_name).filter(Boolean)
-
   return (
     <div style={{ marginBottom: '8px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
@@ -134,7 +41,7 @@ function RaceRow({ race }) {
           </span>
         </div>
         <button
-          onClick={() => setExpanded(e => !e)}
+          onClick={() => setExpanded(prev => !prev)}
           style={{
             fontFamily: 'Barlow Condensed, sans-serif',
             fontSize: '11px', letterSpacing: '1px',
@@ -159,7 +66,82 @@ function RaceRow({ race }) {
   )
 }
 
+function RaceMap({ races }) {
+  const racesWithCoords = races.filter(r => r.latitude && r.longitude)
 
+  if (racesWithCoords.length === 0) {
+    return (
+      <div style={{
+        background: '#161616',
+        border: '1px solid rgba(255,255,255,0.06)',
+        borderRadius: '12px', height: '340px',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: '12px',
+      }}>
+        <div style={{ fontSize: '32px' }}>🗺️</div>
+        <div style={{
+          fontFamily: 'Barlow Condensed, sans-serif',
+          fontSize: '14px', letterSpacing: '2px',
+          textTransform: 'uppercase', color: '#555',
+        }}>
+          No location data for this week's races
+        </div>
+      </div>
+    )
+  }
+
+  const markers = racesWithCoords.map(r => `marker=${r.latitude},${r.longitude}`).join('&')
+  const minLat = Math.min(...racesWithCoords.map(r => r.latitude))
+  const maxLat = Math.max(...racesWithCoords.map(r => r.latitude))
+  const minLon = Math.min(...racesWithCoords.map(r => r.longitude))
+  const maxLon = Math.max(...racesWithCoords.map(r => r.longitude))
+  const latPad = Math.max((maxLat - minLat) * 0.4, 2)
+  const lonPad = Math.max((maxLon - minLon) * 0.4, 3)
+  const bbox = `${minLon - lonPad},${minLat - latPad},${maxLon + lonPad},${maxLat + latPad}`
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&${markers}`
+
+  return (
+    <div style={{
+      borderRadius: '12px', overflow: 'hidden',
+      border: '1px solid rgba(255,255,255,0.08)',
+      position: 'relative',
+    }}>
+      <div style={{
+        background: '#161616',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '10px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap',
+      }}>
+        {racesWithCoords.map(race => (
+          <div key={race.id} style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            fontSize: '13px', color: '#ccc',
+            fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px',
+          }}>
+            <span style={{ color: '#00C4B4', fontSize: '16px' }}>📍</span>
+            <span style={{ fontWeight: 600, color: '#fff' }}>{race.city || race.location}</span>
+            <span style={{ color: '#999' }}>— {race.name}</span>
+          </div>
+        ))}
+      </div>
+      <iframe
+        title="Race locations"
+        src={src}
+        style={{ width: '100%', height: '320px', border: 'none', display: 'block' }}
+        loading="lazy"
+      />
+      <div style={{
+        position: 'absolute', bottom: '8px', right: '8px',
+        background: 'rgba(0,0,0,0.6)', borderRadius: '4px',
+        padding: '3px 8px', fontSize: '10px', color: '#999',
+        fontFamily: 'Barlow, sans-serif',
+      }}>
+        © OpenStreetMap contributors
+      </div>
+    </div>
+  )
+}
+
+export default function Home({ session }) {
   const [weekRaces, setWeekRaces] = useState([])
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -168,15 +150,11 @@ function RaceRow({ race }) {
 
   async function ensureProfile() {
     const userId = session.user.id
-    const { data: existing } = await supabase
-      .from('profiles').select('id').eq('id', userId).single()
+    const { data: existing } = await supabase.from('profiles').select('id').eq('id', userId).single()
     if (!existing) {
       const email = session.user.email
       const fullName = session.user.user_metadata?.full_name || email.split('@')[0]
-      const { error } = await supabase.from('profiles').insert({
-        id: userId, full_name: fullName, email, role: 'athlete',
-      })
-      if (error) console.error('[ensureProfile] Failed to create profile:', error.message)
+      await supabase.from('profiles').insert({ id: userId, full_name: fullName, email, role: 'athlete' })
     }
   }
 
@@ -184,28 +162,22 @@ function RaceRow({ race }) {
     const { start, end } = getWeekRange()
     const userId = session.user.id
     await ensureProfile()
-
     const [racesRes, profileRes] = await Promise.all([
       supabase
         .from('races')
-        .select(`*, race_entries(athlete_id, profiles(full_name, id))`)
+        .select('*, race_entries(athlete_id, profiles(full_name, id))')
         .gte('race_date', start)
         .lte('race_date', end)
         .order('race_date'),
       supabase.from('profiles').select('*').eq('id', userId).single(),
     ])
-
-    if (racesRes.data) {
-      setWeekRaces(racesRes.data.filter(r => r.race_entries?.length > 0))
-    }
+    if (racesRes.data) setWeekRaces(racesRes.data.filter(r => r.race_entries?.length > 0))
     if (profileRes.data) setProfile(profileRes.data)
     setLoading(false)
   }
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Athlete'
-  const totalRacers = [...new Set(
-    weekRaces.flatMap(r => r.race_entries.map(e => e.athlete_id))
-  )].length
+  const totalRacers = [...new Set(weekRaces.flatMap(r => r.race_entries.map(e => e.athlete_id)))].length
 
   const greeting = () => {
     const h = new Date().getHours()
@@ -247,12 +219,9 @@ function RaceRow({ race }) {
       </div>
 
       {weekRaces.length === 0 ? (
-        /* No races this week */
         <div style={{
-          background: '#161616',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '12px',
-          padding: '3rem', textAlign: 'center',
+          background: '#161616', border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px', padding: '3rem', textAlign: 'center',
         }}>
           <div style={{ fontSize: '40px', marginBottom: '16px' }}>🤙</div>
           <div style={{
@@ -273,10 +242,8 @@ function RaceRow({ race }) {
           <div style={{
             background: 'linear-gradient(135deg, rgba(0,196,180,0.06) 0%, rgba(255,61,139,0.06) 100%)',
             border: '1px solid rgba(0,196,180,0.2)',
-            borderRadius: '12px',
-            padding: '1.75rem 2rem',
-            marginBottom: '1.25rem',
-            position: 'relative', overflow: 'hidden',
+            borderRadius: '12px', padding: '1.75rem 2rem',
+            marginBottom: '1.25rem', position: 'relative', overflow: 'hidden',
           }}>
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
@@ -296,23 +263,20 @@ function RaceRow({ race }) {
               lineHeight: 1.2, marginBottom: '16px',
             }}>
               {totalRacers === 1
-                ? `1 teammate is racing this week 🏁`
-                : `${totalRacers} teammates are racing this week 🏁`
-              }
+                ? '1 teammate is racing this week 🏁'
+                : `${totalRacers} teammates are racing this week 🏁`}
             </div>
-            <div style={{ fontSize: '14px', color: '#bbb', lineHeight: 1.7 }}>
+            <div>
               {weekRaces.map(race => (
                 <RaceRow key={race.id} race={race} />
               ))}
             </div>
           </div>
 
-          {/* 2 — Good luck message */}
+          {/* 2 — Good luck */}
           <div style={{
-            background: '#161616',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: '10px',
-            padding: '1.25rem 1.75rem',
+            background: '#161616', border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px', padding: '1.25rem 1.75rem',
             display: 'flex', alignItems: 'center', gap: '16px',
             marginBottom: '1.25rem',
           }}>
