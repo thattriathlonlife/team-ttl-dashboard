@@ -111,7 +111,55 @@ function RaceMap({ races }) {
   )
 }
 
-export default function Home({ session }) {
+function RaceRow({ race }) {
+  const [expanded, setExpanded] = useState(false)
+  const names = race.race_entries.map(e => e.profiles?.full_name).filter(Boolean)
+
+  return (
+    <div style={{ marginBottom: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+        <div style={{ minWidth: 0 }}>
+          <span style={{ color: '#fff', fontWeight: 600 }}>{race.name}</span>
+          <span style={{ color: '#999' }}> — {getDayName(race.race_date)}</span>
+          <span style={{
+            marginLeft: '8px',
+            fontFamily: 'Barlow Condensed, sans-serif',
+            fontSize: '11px', letterSpacing: '1px',
+            background: 'rgba(0,196,180,0.12)', color: '#00C4B4',
+            border: '1px solid rgba(0,196,180,0.25)',
+            borderRadius: '3px', padding: '1px 7px',
+            verticalAlign: 'middle', whiteSpace: 'nowrap',
+          }}>
+            {names.length} {names.length === 1 ? 'athlete' : 'athletes'}
+          </span>
+        </div>
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            fontFamily: 'Barlow Condensed, sans-serif',
+            fontSize: '11px', letterSpacing: '1px',
+            textTransform: 'uppercase', color: '#00C4B4',
+            background: 'none', border: 'none', cursor: 'pointer',
+            whiteSpace: 'nowrap', padding: 0, flexShrink: 0,
+          }}
+        >
+          {expanded ? 'Hide' : 'Show all'}
+        </button>
+      </div>
+      {expanded && (
+        <div style={{
+          marginTop: '6px', paddingLeft: '12px',
+          borderLeft: '2px solid rgba(0,196,180,0.2)',
+          fontSize: '13px', color: '#aaa', lineHeight: 1.8,
+        }}>
+          {names.join(', ')}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
   const [weekRaces, setWeekRaces] = useState([])
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -253,15 +301,9 @@ export default function Home({ session }) {
               }
             </div>
             <div style={{ fontSize: '14px', color: '#bbb', lineHeight: 1.7 }}>
-              {weekRaces.map(race => {
-                const names = race.race_entries.map(e => e.profiles?.full_name).filter(Boolean)
-                return (
-                  <div key={race.id} style={{ marginBottom: '4px' }}>
-                    <span style={{ color: '#fff', fontWeight: 500 }}>{names.join(', ')}</span>
-                    {' '}— {race.name} on {getDayName(race.race_date)}
-                  </div>
-                )
-              })}
+              {weekRaces.map(race => (
+                <RaceRow key={race.id} race={race} />
+              ))}
             </div>
           </div>
 
