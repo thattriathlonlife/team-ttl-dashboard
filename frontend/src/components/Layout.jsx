@@ -19,8 +19,8 @@ const S = {
     fontFamily: 'Barlow Condensed, sans-serif',
     fontSize: '26px', fontWeight: 900, letterSpacing: '3px', color: '#fff',
     display: 'flex', alignItems: 'center', gap: '6px',
-    marginRight: '24px', cursor: 'pointer',
-    userSelect: 'none',
+    marginRight: '24px', cursor: 'pointer', userSelect: 'none',
+    background: 'none', border: 'none', padding: 0,
   },
   logoAccent: { color: '#00C4B4' },
   navLink: {
@@ -28,44 +28,51 @@ const S = {
     fontSize: '13px', letterSpacing: '2px', textTransform: 'uppercase',
     padding: '0 16px', height: '56px',
     display: 'flex', alignItems: 'center',
-    color: '#999', cursor: 'pointer',
-    transition: 'all 0.15s',
+    color: '#888', cursor: 'pointer',
     background: 'none', border: 'none',
     borderBottom: '2px solid transparent',
+    transition: 'all 0.15s',
   },
   navLinkActive: {
-    color: '#fff',
-    borderBottom: '2px solid #00C4B4',
+    color: '#fff', borderBottom: '2px solid #00C4B4',
   },
   navRight: { display: 'flex', alignItems: 'center', gap: '12px' },
+  avatarWrap: { position: 'relative' },
   avatar: {
     width: '32px', height: '32px', borderRadius: '50%',
-    background: 'linear-gradient(135deg, #00C4B4, #FF3D8B)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'Barlow Condensed, sans-serif',
-    fontSize: '13px', fontWeight: 700, color: '#fff', cursor: 'pointer',
-    position: 'relative',
+    fontSize: '13px', fontWeight: 700, color: '#000',
+    cursor: 'pointer', overflow: 'hidden', flexShrink: 0,
+  },
+  avatarImg: {
+    width: '32px', height: '32px', borderRadius: '50%',
+    objectFit: 'cover', cursor: 'pointer',
   },
   dropdown: {
-    position: 'absolute', top: '40px', right: 0,
+    position: 'absolute', top: '42px', right: 0,
     background: '#1f1f1f', border: '1px solid rgba(255,255,255,0.12)',
     borderRadius: '8px', padding: '6px', minWidth: '180px',
-    zIndex: 200,
+    zIndex: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
   },
   dropEmail: {
     padding: '8px 12px 6px',
-    fontSize: '11px', color: '#444',
-    letterSpacing: '0.5px',
-    fontFamily: 'Barlow, sans-serif',
+    fontSize: '11px', color: '#555',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
     marginBottom: '4px',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    fontFamily: 'Barlow, sans-serif',
   },
   dropItem: {
-    padding: '8px 12px', borderRadius: '4px', fontSize: '13px',
-    color: '#ccc', cursor: 'pointer',
-    fontFamily: 'Barlow, sans-serif',
-    transition: 'background 0.1s',
+    padding: '8px 12px', borderRadius: '4px',
+    fontSize: '13px', color: '#ccc', cursor: 'pointer',
+    fontFamily: 'Barlow, sans-serif', transition: 'background 0.1s',
+    background: 'none', border: 'none', width: '100%',
+    textAlign: 'left', display: 'block',
+  },
+  dropDivider: {
+    height: '1px', background: 'rgba(255,255,255,0.06)',
+    margin: '4px 0',
   },
   main: { flex: 1 },
 }
@@ -73,17 +80,26 @@ const S = {
 const NAV_LINKS = [
   { label: 'Home', path: '/' },
   { label: 'Races', path: '/races' },
+  { label: 'My Races', path: '/my-races' },
 ]
 
-export default function Layout({ children, session }) {
+export default function Layout({ children, session, profile, onNavigateProfile }) {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const email = session?.user?.email || ''
-  const initials = email.slice(0, 2).toUpperCase()
+  const initials = (profile?.full_name || email).split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  const avatarColor = profile?.avatar_color || '#00C4B4'
+  const avatarUrl = profile?.avatar_url || null
 
   const signOut = async () => {
     await supabase.auth.signOut()
+    setOpen(false)
+  }
+
+  const goToProfile = () => {
+    setOpen(false)
+    onNavigateProfile()
   }
 
   return (
@@ -91,16 +107,13 @@ export default function Layout({ children, session }) {
       <div style={S.stripeBar} />
       <nav style={S.nav}>
         <div style={S.navLeft}>
-          <div style={S.logo} onClick={() => navigate('/')}>
+          <button style={S.logo} onClick={() => navigate('/')}>
             <span style={S.logoAccent}>TEAM</span> TTL
-          </div>
+          </button>
           {NAV_LINKS.map(link => (
             <button
               key={link.path}
-              style={{
-                ...S.navLink,
-                ...(location.pathname === link.path ? S.navLinkActive : {}),
-              }}
+              style={{ ...S.navLink, ...(location.pathname === link.path ? S.navLinkActive : {}) }}
               onClick={() => navigate(link.path)}
             >
               {link.label}
@@ -109,25 +122,41 @@ export default function Layout({ children, session }) {
         </div>
 
         <div style={S.navRight}>
-          <div style={{ ...S.avatar, position: 'relative' }} onClick={() => setOpen(!open)}>
-            {initials}
+          <div style={S.avatarWrap}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="avatar" style={S.avatarImg} onClick={() => setOpen(!open)} />
+            ) : (
+              <div style={{ ...S.avatar, background: avatarColor }} onClick={() => setOpen(!open)}>
+                {initials}
+              </div>
+            )}
+
             {open && (
-              <div style={S.dropdown} onClick={e => e.stopPropagation()}>
+              <div style={S.dropdown}>
                 <div style={S.dropEmail}>{email}</div>
-                <div
+                <button
                   style={S.dropItem}
                   onMouseEnter={e => e.currentTarget.style.background = '#2a2a2a'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  onClick={goToProfile}
+                >
+                  Profile Settings
+                </button>
+                <div style={S.dropDivider} />
+                <button
+                  style={{ ...S.dropItem, color: '#FF3D8B' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#2a2a2a'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
                   onClick={signOut}
                 >
                   Sign out
-                </div>
+                </button>
               </div>
             )}
           </div>
         </div>
       </nav>
-      <main style={S.main}>{children}</main>
+      <main style={S.main} onClick={() => open && setOpen(false)}>{children}</main>
     </div>
   )
 }
