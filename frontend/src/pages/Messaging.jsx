@@ -224,18 +224,36 @@ function MentionsView({ session, profile, isMobile, channels, onBack, onOpenChan
   useEffect(() => { loadMentions() }, [])
 
   async function loadMentions() {
-    const { data, error } = await supabase
+    // Step 1 — get all mentions for this user
+    const { data: mentionData, error: mentionError } = await supabase
       .from('message_mentions')
-      .select(`
-        *,
-        messages(id, content, created_at, athlete_id, profiles(full_name, avatar_color, avatar_url)),
-        channels(id, name, type, races(name))
-      `)
+      .select('*, channels(id, name, type, races(name))')
       .eq('mentioned_user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50)
-    if (error) console.error('[Mentions]', error.message)
-    if (data) setMentions(data)
+
+    if (mentionError) { console.error('[Mentions] mention query error:', mentionError.message); setLoading(false); return }
+    if (!mentionData?.length) { setLoading(false); return }
+
+    // Step 2 — fetch the actual messages separately
+    const messageIds = mentionData.map(m => m.message_id).filter(Boolean)
+    const { data: messageData, error: messageError } = await supabase
+      .from('messages')
+      .select('id, content, created_at, athlete_id, profiles(full_name, avatar_color, avatar_url)')
+      .in('id', messageIds)
+
+    if (messageError) console.error('[Mentions] message query error:', messageError.message)
+
+    const messageMap = {}
+    messageData?.forEach(m => { messageMap[m.id] = m })
+
+    // Merge
+    const merged = mentionData.map(m => ({
+      ...m,
+      message: messageMap[m.message_id] || null,
+    }))
+
+    setMentions(merged)
     setLoading(false)
   }
 
@@ -253,7 +271,7 @@ function MentionsView({ session, profile, isMobile, channels, onBack, onOpenChan
             </div>
           ) : mentions.map(m => {
             const ch = m.channels
-            const msg = m.messages
+            const msg = m.message
             const chName = ch?.type === 'race' ? (ch.races?.name || ch.name) : ch?.name
             return (
               <div key={m.id} onClick={() => onOpenChannel(ch)} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid #FF3D8B', borderRadius: '8px', padding: '12px', marginBottom: '8px', cursor: 'pointer' }}>
