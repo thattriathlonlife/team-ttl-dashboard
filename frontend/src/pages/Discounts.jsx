@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 function CopyButton({ code }) {
@@ -41,9 +41,13 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
 
       {/* Brand header */}
       <div style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: discount.color || 'rgba(0,196,180,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
-          {discount.brand.slice(0, 2).toUpperCase()}
-        </div>
+        {discount.logo_url ? (
+          <img src={discount.logo_url} alt={discount.brand} style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'contain', background: '#fff', padding: '4px', flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: discount.color || 'rgba(0,196,180,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+            {discount.brand.slice(0, 2).toUpperCase()}
+          </div>
+        )}
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', marginBottom: '2px' }}>{discount.brand}</div>
           <div style={{ fontSize: '12px', color: '#999' }}>{discount.category}</div>
@@ -88,10 +92,28 @@ function DiscountModal({ discount, onSave, onClose }) {
     code: discount.code || '',
     amount: discount.amount || '',
     color: discount.color || '#00C4B4',
-  } : EMPTY_FORM)
+    logo_url: discount.logo_url || '',
+  } : { ...EMPTY_FORM, logo_url: '' })
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [error, setError] = useState('')
+  const logoFileRef = useRef()
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  async function handleLogoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 1 * 1024 * 1024) { setError('Logo must be under 1MB'); return }
+    setUploadingLogo(true)
+    const ext = file.name.split('.').pop()
+    const slug = (form.brand || 'brand').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    const path = `${slug}-${Date.now()}.${ext}`
+    const { error: uploadError } = await supabase.storage.from('logos').upload(path, file, { upsert: true })
+    if (uploadError) { setError('Upload failed — ' + uploadError.message); setUploadingLogo(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
+    set('logo_url', publicUrl)
+    setUploadingLogo(false)
+  }
 
   const inputStyle = { width: '100%', background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', padding: '10px 12px', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', boxSizing: 'border-box' }
   const labelStyle = { display: 'block', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#999', marginBottom: '5px' }
@@ -112,6 +134,7 @@ function DiscountModal({ discount, onSave, onClose }) {
       note: form.note.trim() || null,
       active: form.active,
       sort_order: parseInt(form.sort_order) || 0,
+      logo_url: form.logo_url.trim() || null,
     }
     const { error: err } = discount?.id
       ? await supabase.from('discounts').update(payload).eq('id', discount.id)
@@ -147,6 +170,25 @@ function DiscountModal({ discount, onSave, onClose }) {
           <div style={groupStyle}>
             <label style={labelStyle}>Amount</label>
             <input style={inputStyle} value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="20% off" />
+          </div>
+        </div>
+
+        <div style={groupStyle}>
+          <label style={labelStyle}>Brand Logo</label>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {form.logo_url && (
+              <img src={form.logo_url} alt="logo" style={{ width: '44px', height: '44px', borderRadius: '6px', objectFit: 'contain', background: '#fff', padding: '4px', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }} />
+            )}
+            <div style={{ flex: 1 }}>
+              <input ref={logoFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+              <button onClick={() => logoFileRef.current.click()} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#ccc', cursor: 'pointer', display: 'block', marginBottom: '5px' }}>
+                {uploadingLogo ? 'Uploading...' : form.logo_url ? 'Change Logo' : 'Upload Logo'}
+              </button>
+              <div style={{ fontSize: '11px', color: '#555' }}>PNG or SVG recommended, max 1MB</div>
+            </div>
+            {form.logo_url && (
+              <button onClick={() => set('logo_url', '')} style={{ background: 'none', border: 'none', color: '#FF3D8B', fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
+            )}
           </div>
         </div>
 
