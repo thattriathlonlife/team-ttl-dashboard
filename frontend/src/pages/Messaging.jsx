@@ -49,7 +49,7 @@ function MessageContent({ content, currentUserId, profiles }) {
   )
 }
 
-export default function Messaging({ session, profile }) {
+export default function Messaging({ session, profile, onReadChannel }) {
   const [channels, setChannels] = useState([])
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [unreadCounts, setUnreadCounts] = useState({})
@@ -117,6 +117,7 @@ export default function Messaging({ session, profile }) {
       { onConflict: 'channel_id,athlete_id' }
     )
     setUnreadCounts(prev => ({ ...prev, [channel.id]: 0 }))
+    onReadChannel?.()
   }
 
   async function openMentions() {
@@ -223,12 +224,17 @@ function MentionsView({ session, profile, isMobile, channels, onBack, onOpenChan
   useEffect(() => { loadMentions() }, [])
 
   async function loadMentions() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('message_mentions')
-      .select('*, messages(id, content, created_at, profiles(full_name, avatar_color, avatar_url)), channels(id, name, type, races(name))')
+      .select(`
+        *,
+        messages(id, content, created_at, athlete_id, profiles(full_name, avatar_color, avatar_url)),
+        channels(id, name, type, races(name))
+      `)
       .eq('mentioned_user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50)
+    if (error) console.error('[Mentions]', error.message)
     if (data) setMentions(data)
     setLoading(false)
   }

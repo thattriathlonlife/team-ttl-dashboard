@@ -14,7 +14,12 @@ function AppRoutes({ session, profile, setProfile }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const navigate = useNavigate()
 
-  useEffect(() => { loadUnreadCount() }, [])
+  useEffect(() => { 
+    loadUnreadCount()
+    // Refresh every 30 seconds
+    const interval = setInterval(loadUnreadCount, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   async function loadUnreadCount() {
     const userId = session.user.id
@@ -50,7 +55,7 @@ function AppRoutes({ session, profile, setProfile }) {
         <Route path="/login" element={<Navigate to="/" />} />
         <Route path="/" element={<Home session={session} />} />
         <Route path="/races" element={<Dashboard session={session} />} />
-        <Route path="/messages" element={<Messaging session={session} profile={profile} />} />
+        <Route path="/messages" element={<Messaging session={session} profile={profile} onReadChannel={loadUnreadCount} />} />
         <Route path="/discounts" element={<Discounts profile={profile} />} />
         <Route path="/profile" element={<ProfilePage session={session} profile={profile} onSave={handleProfileSave} />} />
         <Route path="*" element={<Navigate to="/" />} />
