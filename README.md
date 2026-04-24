@@ -8,7 +8,7 @@ A private, invite-only race tracking and team coordination platform for ThatTria
 
 **Home** — Greets each athlete by name and shows who on the team is racing this week, which race they're in, and where in the world it is on an interactive map.
 
-**Races** — A live calendar of upcoming IRONMAN, 70.3, Olympic, Sprint and other triathlon events pulled automatically from global race databases. Filter by organisation and race type. Click any race to see course profile (swim/bike/run), teammates entered, race description, and a direct registration link. Enter or withdraw from races in one tap.
+**Races** — A live calendar of upcoming IRONMAN, 70.3, Olympic, Sprint and other triathlon events pulled automatically from global race databases. Filter by organisation and race type, or search by name, location or type. Click any race to see the course profile (swim/bike/run), teammates entered, race description, and a direct registration link. Enter or withdraw from races in one tap.
 
 **My Races** — Your personal race schedule for the season, grouped by month with a countdown to your next race. Export your full schedule to Google Calendar or Apple Calendar in one click.
 
@@ -16,7 +16,9 @@ A private, invite-only race tracking and team coordination platform for ThatTria
 
 **Team** — Roster of all active team members and their entered races.
 
-**Profile** — Upload a profile photo, pick an avatar colour, and update your contact details.
+**Messages** — Built-in team messaging to replace WhatsApp. Channels include a General channel, topic channels created by admins, and race-specific threads auto-created when athletes discuss a race. Supports text, image sharing, emoji reactions on messages, Discord-style replies, and @mentions with a dedicated Mentions view and unread badge. Messages are real-time via Supabase subscriptions.
+
+**Profile** — Upload a profile photo, pick an avatar colour, and update your name and contact details.
 
 ---
 
@@ -29,7 +31,7 @@ Invite-only. Contact your team admin to request access. You'll receive a magic l
 ## Architecture
 
 ```
-Frontend (React + Vite)  ←→  Supabase (Auth + PostgreSQL)
+Frontend (React + Vite)  ←→  Supabase (Auth + PostgreSQL + Storage + Realtime)
                                       ↑
                              Node.js Scraper
                              (GitHub Actions, daily 6am UTC)
@@ -42,7 +44,7 @@ Frontend (React + Vite)  ←→  Supabase (Auth + PostgreSQL)
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 18, Vite, React Router |
-| Backend / Auth / DB | Supabase (PostgreSQL + Auth + Storage) |
+| Backend / Auth / DB | Supabase (PostgreSQL + Auth + Storage + Realtime) |
 | Hosting | Vercel |
 | Race Data | triathlon.org API, PTO Race Calendar (scraped) |
 | Race Details | Vercel Serverless Function (`/api/race-details`) |
@@ -57,39 +59,40 @@ Frontend (React + Vite)  ←→  Supabase (Auth + PostgreSQL)
 
 ```
 /
-├── frontend/                  # React + Vite web app
+├── frontend/                    # React + Vite web app
 │   ├── api/
-│   │   └── race-details.js    # Vercel serverless function
+│   │   └── race-details.js      # Vercel serverless function — fetches course info
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Home.jsx       # Landing page — this week's races
-│   │   │   ├── Dashboard.jsx  # Race list with filters
-│   │   │   ├── MyRaces.jsx    # Personal race schedule
-│   │   │   ├── Login.jsx      # Magic link auth
+│   │   │   ├── Home.jsx         # Landing page — this week's races + map
+│   │   │   ├── Dashboard.jsx    # Race list with filters and search
+│   │   │   ├── MyRaces.jsx      # Personal race schedule + iCal export
+│   │   │   ├── Messaging.jsx    # Team messaging — channels, replies, mentions
+│   │   │   ├── Login.jsx        # Magic link auth
 │   │   │   ├── CompleteProfile.jsx  # First-login onboarding
 │   │   │   └── ProfileSettings.jsx  # Profile editing
 │   │   ├── components/
-│   │   │   ├── Layout.jsx     # Nav + page wrapper
-│   │   │   ├── RaceList.jsx   # Race rows with entry toggle
-│   │   │   ├── RaceDetail.jsx # Bottom sheet — course info, teammates
+│   │   │   ├── Layout.jsx       # Nav + page wrapper + unread badge
+│   │   │   ├── RaceList.jsx     # Race rows with entry toggle
+│   │   │   ├── RaceDetail.jsx   # Bottom sheet — course info, teammates, discuss
 │   │   │   ├── CalendarView.jsx
 │   │   │   ├── TeamRoster.jsx
 │   │   │   ├── AddRaceModal.jsx
 │   │   │   └── InviteModal.jsx
 │   │   └── lib/
-│   │       └── supabase.js    # Supabase client
+│   │       └── supabase.js      # Supabase client
 │   ├── index.html
 │   ├── package.json
 │   ├── vite.config.js
 │   └── vercel.json
 ├── backend/
-│   ├── scraper.js             # Race scraper + WhatsApp notifier
+│   ├── scraper.js               # Race scraper + WhatsApp notifier (notifications disabled)
 │   └── package.json
 ├── supabase/
-│   └── schema.sql             # Full database schema
+│   └── schema.sql               # Full database schema
 ├── .github/
 │   └── workflows/
-│       └── scrape.yml         # Daily GitHub Actions cron
+│       └── scrape.yml           # Daily GitHub Actions cron
 ├── .env.example
 └── README.md
 ```
@@ -193,9 +196,14 @@ Key tables in Supabase:
 | `profiles` | Team members — name, email, avatar, role, WhatsApp number |
 | `races` | All races — name, type, date, location, coordinates, source, registration URL |
 | `race_entries` | Junction table — which athlete is entered in which race |
+| `channels` | Messaging channels — general, topic, and race threads |
+| `messages` | Messages — content, image URL, reply_to reference |
+| `message_reactions` | Emoji reactions on messages |
+| `message_mentions` | @mention tracking — for unread badges and mentions view |
+| `channel_reads` | Last-read timestamps per user per channel — for unread counts |
 | `notification_log` | Log of WhatsApp notifications sent |
 
-Row Level Security is enabled. Users can only modify their own data. Race data is readable by all authenticated users.
+Row Level Security is enabled. Users can only modify their own data. Race and message data is readable by all authenticated users.
 
 ---
 
@@ -210,14 +218,22 @@ Races are upserted daily — existing entries are preserved when race details up
 
 ---
 
+## Messaging Architecture
+
+Messages use Supabase Realtime (WebSocket subscriptions) for instant delivery. Key design decisions:
+
+- **Optimistic UI** — messages appear immediately on send, confirmed once the database insert completes, with a "Sending..." indicator while in flight
+- **Deduplication** — the real-time subscription skips messages already added optimistically by the current user
+- **Race threads** — created automatically when an athlete clicks "Discuss This Race" on any race detail, no admin action required
+- **@mentions** — parsed client-side from message content, stored in `message_mentions` table, surfaced in the Mentions sidebar view
+
+---
+
 ## Roadmap
 
 ### In Progress / Planned
-- Race search
-- Race history (past races)
+- Race history (past races the team has completed)
 - Leaderboard
-- Comments / reactions on races
-- Built-in team messaging (WhatsApp replacement)
 - Admin member management
 - CSV race import
 
