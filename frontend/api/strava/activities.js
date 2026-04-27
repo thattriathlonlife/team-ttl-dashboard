@@ -83,7 +83,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ activities: [], connectedCount: 0 })
     }
 
-    const after = Math.floor((Date.now() - 14 * 24 * 60 * 60 * 1000) / 1000)
+    const after = Math.floor((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000)
     const allActivities = []
 
     await Promise.all(profiles.map(async (profile) => {
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
       if (!token) return
 
       const actRes = await fetch(
-        `${STRAVA_API}/athlete/activities?after=${after}&per_page=30`,
+        `${STRAVA_API}/athlete/activities?after=${after}&per_page=100`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
 
