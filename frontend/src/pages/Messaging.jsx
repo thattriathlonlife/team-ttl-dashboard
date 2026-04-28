@@ -83,13 +83,31 @@ export default function Messaging({ session, profile, onReadChannel }) {
     }
   }, [searchParams, channels])
 
+  const [lastMessages, setLastMessages] = useState({})
+
   async function loadChannels() {
     const [channelsRes, readsRes, mentionsRes] = await Promise.all([
       supabase.from('channels').select('*, races(name)').order('type').order('name'),
       supabase.from('channel_reads').select('*').eq('athlete_id', userId),
       supabase.from('message_mentions').select('*', { count: 'exact', head: true }).eq('mentioned_user_id', userId).is('seen_at', null),
     ])
-    if (channelsRes.data) setChannels(channelsRes.data)
+    if (channelsRes.data) {
+      setChannels(channelsRes.data)
+
+      // Fetch last message for each channel
+      const lastMsgs = {}
+      await Promise.all(channelsRes.data.map(async ch => {
+        const { data } = await supabase
+          .from('messages')
+          .select('content, image_url, created_at, profiles(full_name)')
+          .eq('channel_id', ch.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+        if (data) lastMsgs[ch.id] = data
+      }))
+      setLastMessages(lastMsgs)
+    }
     setMentionCount(mentionsRes.count || 0)
 
     if (channelsRes.data && readsRes.data) {
@@ -141,23 +159,33 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
       {/* Sidebar */}
       {(showSidebar || !isMobile) && (
-        <div style={{ width: isMobile ? '100%' : '260px', background: '#111', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-          <div style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '18px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff' }}>Messages</div>
-            {isAdmin && <button onClick={() => setShowNewChannel(true)} style={{ background: 'none', border: 'none', color: '#00C4B4', fontSize: '22px', cursor: 'pointer', padding: '0', lineHeight: 1 }}>+</button>}
+        <div style={{ width: isMobile ? '100%' : '280px', background: '#111', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff' }}>Messages</div>
+            {isAdmin && <button onClick={() => setShowNewChannel(true)} style={{ background: 'rgba(0,196,180,0.1)', border: '1px solid rgba(0,196,180,0.3)', borderRadius: '6px', color: '#00C4B4', fontSize: '18px', cursor: 'pointer', padding: '2px 10px', lineHeight: 1 }}>+</button>}
           </div>
 
-          <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
-            {/* Mentions */}
-            <button onClick={openMentions} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 16px', background: showMentions ? 'rgba(255,61,139,0.1)' : 'none', border: 'none', borderLeft: showMentions ? '2px solid #FF3D8B' : '2px solid transparent', cursor: 'pointer', textAlign: 'left' }}>
-              <span style={{ fontSize: '13px', color: showMentions ? '#FF3D8B' : '#555' }}>@</span>
-              <span style={{ flex: 1, fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', color: showMentions ? '#fff' : mentionCount > 0 ? '#fff' : '#888', fontWeight: mentionCount > 0 ? 600 : 400 }}>Mentions</span>
-              {mentionCount > 0 && <div style={{ background: '#FF3D8B', color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '10px', padding: '1px 6px' }}>{mentionCount}</div>}
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            {/* Mentions row */}
+            <button onClick={openMentions} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '14px 20px', background: showMentions ? 'rgba(255,61,139,0.08)' : 'none', border: 'none', borderLeft: showMentions ? '3px solid #FF3D8B' : '3px solid transparent', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: showMentions ? 'rgba(255,61,139,0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0, color: showMentions ? '#FF3D8B' : '#666' }}>@</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 600, color: showMentions ? '#fff' : mentionCount > 0 ? '#fff' : '#888' }}>Mentions</div>
+                <div style={{ fontSize: '12px', color: '#555', marginTop: '1px' }}>Messages where you're tagged</div>
+              </div>
+              {mentionCount > 0 && <div style={{ background: '#FF3D8B', color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, borderRadius: '10px', padding: '2px 8px', flexShrink: 0 }}>{mentionCount}</div>}
             </button>
 
-            <ChannelGroup label="General" channels={generalChannels} selected={selectedChannel} unread={unreadCounts} onSelect={openChannel} />
-            {topicChannels.length > 0 && <ChannelGroup label="Topics" channels={topicChannels} selected={selectedChannel} unread={unreadCounts} onSelect={openChannel} />}
-            {raceChannels.length > 0 && <ChannelGroup label="Race Threads" channels={raceChannels} selected={selectedChannel} unread={unreadCounts} onSelect={openChannel} />}
+            <ChannelGroup label="General" channels={generalChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} />
+            {topicChannels.length > 0 && <ChannelGroup label="Topics" channels={topicChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} />}
+            {raceChannels.length > 0 && <ChannelGroup label="Race Threads" channels={raceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} />}
+
+            {/* Bottom hint when no channel selected on mobile */}
+            {isMobile && !selectedChannel && !showMentions && (
+              <div style={{ padding: '2rem 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: '13px', color: '#444' }}>Tap a channel to open it</div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -196,19 +224,58 @@ export default function Messaging({ session, profile, onReadChannel }) {
   )
 }
 
-function ChannelGroup({ label, channels, selected, unread, onSelect }) {
+function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelect }) {
   return (
-    <div style={{ marginBottom: '8px' }}>
-      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', color: '#555', padding: '6px 16px 4px' }}>{label}</div>
-      {channels.map(ch => {
+    <div>
+      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#444', padding: '14px 20px 6px' }}>{label}</div>
+      {channels.map((ch, idx) => {
         const isSelected = selected?.id === ch.id
         const unreadCount = unread[ch.id] || 0
-        const displayName = ch.type === 'race' ? (ch.races?.name?.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '') || ch.name) : ch.name
+        const last = lastMessages?.[ch.id]
+        const displayName = ch.type === 'race'
+          ? (ch.races?.name?.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '') || ch.name)
+          : ch.name
+        const preview = last
+          ? (last.content || (last.image_url ? '📎 Image' : ''))
+          : 'No messages yet'
+        const senderName = last?.profiles?.full_name?.split(' ')[0]
+        const previewText = last && senderName ? `${senderName}: ${preview}` : preview
+
         return (
-          <button key={ch.id} onClick={() => onSelect(ch)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 16px', background: isSelected ? 'rgba(0,196,180,0.1)' : 'none', border: 'none', borderLeft: isSelected ? '2px solid #00C4B4' : '2px solid transparent', cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s' }}>
-            <span style={{ color: isSelected ? '#00C4B4' : '#555', fontSize: '13px', flexShrink: 0 }}>{ch.type === 'race' ? '🏁' : '#'}</span>
-            <span style={{ flex: 1, fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', color: isSelected ? '#fff' : unreadCount > 0 ? '#fff' : '#888', fontWeight: unreadCount > 0 ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</span>
-            {unreadCount > 0 && <div style={{ background: '#00C4B4', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '10px', padding: '1px 6px', flexShrink: 0 }}>{unreadCount > 99 ? '99+' : unreadCount}</div>}
+          <button
+            key={ch.id}
+            onClick={() => onSelect(ch)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              width: '100%', padding: '12px 20px',
+              background: isSelected ? 'rgba(0,196,180,0.08)' : 'none',
+              border: 'none',
+              borderLeft: isSelected ? '3px solid #00C4B4' : '3px solid transparent',
+              borderBottom: idx < channels.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+              cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s',
+            }}
+          >
+            {/* Channel icon */}
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: isSelected ? 'rgba(0,196,180,0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
+              {ch.type === 'race' ? '🏁' : '#'}
+            </div>
+
+            {/* Channel name + preview */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: unreadCount > 0 ? 700 : 500, color: isSelected ? '#fff' : unreadCount > 0 ? '#fff' : '#999', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {displayName}
+              </div>
+              <div style={{ fontSize: '12px', color: unreadCount > 0 ? '#bbb' : '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: unreadCount > 0 ? 500 : 400 }}>
+                {previewText}
+              </div>
+            </div>
+
+            {/* Unread badge */}
+            {unreadCount > 0 && (
+              <div style={{ background: '#00C4B4', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, borderRadius: '10px', padding: '2px 8px', flexShrink: 0 }}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </div>
+            )}
           </button>
         )
       })}
