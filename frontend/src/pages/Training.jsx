@@ -1,4 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component } from 'react'
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{ background: 'rgba(255,61,139,0.1)', border: '1px solid rgba(255,61,139,0.2)', borderRadius: '8px', padding: '1.5rem', color: '#FF3D8B' }}>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, marginBottom: '8px' }}>Training page error</div>
+          <div style={{ fontSize: '13px', opacity: 0.8 }}>{this.state.error.message}</div>
+        </div>
+      </div>
+    )
+    return this.props.children
+  }
+}
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -365,7 +381,8 @@ function ActivityCard({ activity }) {
 
 // ── Connect Banner ────────────────────────────────────────────────
 function ConnectBanner({ userId }) {
-  const connectUrl = `https://www.strava.com/oauth/authorize?client_id=${import.meta.env.VITE_STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/api/strava/callback')}&response_type=code&approval_prompt=auto&scope=activity:read&state=${userId}`
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const connectUrl = `https://www.strava.com/oauth/authorize?client_id=${import.meta.env.VITE_STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(origin + '/api/strava/callback')}&response_type=code&approval_prompt=auto&scope=activity:read&state=${userId}`
   return (
     <div style={{ background: 'rgba(252,76,2,0.08)', border: '1px solid rgba(252,76,2,0.2)', borderRadius: '10px', padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
       <div>
@@ -382,7 +399,7 @@ function ConnectBanner({ userId }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────
-export default function Training({ session, profile }) {
+function TrainingInner({ session, profile }) {
   const [activities, setActivities] = useState([])
   const [upcomingRaces, setUpcomingRaces] = useState([])
   const [loading, setLoading] = useState(true)
@@ -444,7 +461,7 @@ export default function Training({ session, profile }) {
     if (!confirm('Disconnect Strava? Your activities will no longer appear in the team feed.')) return
     setDisconnecting(true)
     await fetch('/api/strava/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
-    window.location.reload()
+    if (typeof window !== 'undefined') window.location.reload()
   }
 
   // Only show last 14 days in feed
@@ -543,5 +560,13 @@ export default function Training({ session, profile }) {
         </>
       )}
     </div>
+  )
+}
+
+export default function Training(props) {
+  return (
+    <ErrorBoundary>
+      <TrainingInner {...props} />
+    </ErrorBoundary>
   )
 }
