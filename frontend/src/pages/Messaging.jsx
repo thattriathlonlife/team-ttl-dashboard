@@ -261,7 +261,7 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
           >
             {/* Channel icon */}
             <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: isSelected ? 'rgba(0,196,180,0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
-              {ch.category === 'race' ? '🏁' : ch.category === 'training' ? '💪' : ch.category === 'regions' ? '📍' : ch.category === 'interest' ? '👥' : '#'}
+              {ch.is_readonly ? '📢' : ch.category === 'race' ? '🏁' : ch.category === 'training' ? '💪' : ch.category === 'regions' ? '📍' : ch.category === 'interest' ? '👥' : '#'}
             </div>
 
             {/* Channel name + preview */}
@@ -697,7 +697,13 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         <div ref={bottomRef} />
       </div>
 
-      {/* Input area */}
+      {/* Input area — hidden for readonly channels unless admin */}
+      {channel.is_readonly && profile?.role !== 'admin' ? (
+        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#111', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '16px' }}>📢</span>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', color: '#555', textTransform: 'uppercase' }}>Announcements — admin posts only</span>
+        </div>
+      ) : (
       <div style={{ padding: '8px 16px 12px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#111', flexShrink: 0 }}>
         {/* Reply banner */}
         {replyTo && (
@@ -752,6 +758,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }
