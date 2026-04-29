@@ -1,6 +1,2 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
-  "crons": [
-    { "path": "/api/strava/sync", "schedule": "0 * * * *" }
-  ]
 }
