@@ -1,214 +1,370 @@
 /**
- * Strava Activity Sync
- * Fetches recent activities for all connected athletes and upserts to Supabase.
- * Run via GitHub Actions cron every 2 hours.
+ * strava-sync.js — TTL Team Dashboard
  *
- * Usage:
- *   node strava-sync.js           -- syncs last 90 days for all athletes
- *   node strava-sync.js <userId>  -- syncs a specific user (manual refresh)
+ * Runs every hour via GitHub Actions.
+ *
+ * For each connected athlete:
+ *   - If bootstrap_status = 'pending'  → historical walk-back to compute initial streak
+ *   - If bootstrap_status = 'complete' → incremental sync (last 2 days, keeps feed fresh)
+ *
+ * Stores:
+ *   - strava_activities  : 14-day rolling window (feed display)
+ *   - profiles           : streak columns only (current, longest, last_active)
+ *
+ * Never stores full history. Streak is computed once at bootstrap then
+ * maintained incrementally on every subsequent sync.
  */
 
-import { createClient } from '@supabase/supabase-js'
-import 'dotenv/config'
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
-)
+);
 
-const STRAVA_API = 'https://www.strava.com/api/v3'
+const STRAVA_BASE = 'https://www.strava.com/api/v3';
+const FEED_DAYS   = 14;   // rolling window kept in strava_activities
+const BUFFER_DAYS = 2;    // incremental sync looks back 2 days to survive a missed run
 
-// ── Token management ──────────────────────────────────────────────
-async function getValidToken(profile) {
-  const now = Math.floor(Date.now() / 1000)
+// ── Strava token refresh ───────────────────────────────────────────────────
 
-  if (profile.strava_token_expires_at > now + 60) {
-    return profile.strava_access_token
-  }
-
-  console.log(`[Strava] Refreshing token for ${profile.full_name}`)
-
+async function refreshStravaToken(profile) {
   const res = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      client_id: process.env.STRAVA_CLIENT_ID,
+      client_id:     process.env.STRAVA_CLIENT_ID,
       client_secret: process.env.STRAVA_CLIENT_SECRET,
+      grant_type:    'refresh_token',
       refresh_token: profile.strava_refresh_token,
-      grant_type: 'refresh_token',
     }),
-  })
+  });
 
-  if (!res.ok) {
-    console.error(`[Strava] Token refresh failed for ${profile.full_name}: ${res.status}`)
-    return null
-  }
+  if (!res.ok) throw new Error(`Token refresh failed for ${profile.id}: ${res.status}`);
 
-  const data = await res.json()
+  const data = await res.json();
 
   await supabase.from('profiles').update({
-    strava_access_token: data.access_token,
-    strava_refresh_token: data.refresh_token,
+    strava_access_token:    data.access_token,
+    strava_refresh_token:   data.refresh_token,
     strava_token_expires_at: data.expires_at,
-  }).eq('id', profile.id)
+  }).eq('id', profile.id);
 
-  return data.access_token
+  return data.access_token;
 }
 
-// ── Activity formatting ───────────────────────────────────────────
-function formatType(type) {
-  const map = {
-    'Swim': 'Swim', 'Ride': 'Bike', 'Run': 'Run',
-    'VirtualRide': 'Bike', 'VirtualRun': 'Run',
-    'TrailRun': 'Run', 'Walk': 'Walk', 'Hike': 'Hike',
-    'WeightTraining': 'Strength', 'Workout': 'Workout',
-    'Yoga': 'Yoga', 'Rowing': 'Row',
+async function getValidToken(profile) {
+  const nowSecs = Math.floor(Date.now() / 1000);
+  // Refresh if token expires within 5 minutes
+  if (profile.strava_token_expires_at - nowSecs < 300) {
+    return await refreshStravaToken(profile);
   }
-  return map[type] || type
+  return profile.strava_access_token;
 }
 
-// ── Sync one athlete ──────────────────────────────────────────────
-async function syncAthlete(profile, days = 90) {
-  const token = await getValidToken(profile)
-  if (!token) {
-    console.error(`[Strava] Skipping ${profile.full_name} — no valid token`)
-    return 0
-  }
+// ── Strava API helpers ────────────────────────────────────────────────────
 
-  const cutoffTimestamp = Date.now() - days * 24 * 60 * 60 * 1000
+async function fetchActivities(token, { after, before, page = 1, perPage = 200 } = {}) {
+  const params = new URLSearchParams({ per_page: perPage, page });
+  if (after)  params.set('after',  after);
+  if (before) params.set('before', before);
 
-  // Paginate without 'after' filter — Strava ignores 'after' when paginating
-  let page = 1
-  let allActivities = []
-  while (true) {
-    const res = await fetch(
-      `${STRAVA_API}/athlete/activities?per_page=100&page=${page}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
+  const res = await fetch(`${STRAVA_BASE}/athlete/activities?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
-    if (!res.ok) {
-      console.error(`[Strava] Failed to fetch page ${page} for ${profile.full_name}: ${res.status}`)
-      break
-    }
+  if (res.status === 429) throw new Error('RATE_LIMITED');
+  if (!res.ok) throw new Error(`Strava API error: ${res.status}`);
 
-    const batch = await res.json()
-    if (!Array.isArray(batch) || !batch.length) {
-      console.log(`[Strava] Page ${page} returned empty — stopping`)
-      break
-    }
-
-    console.log(`[Strava] Page ${page}: got ${batch.length} activities, newest: ${batch[0].start_date}, oldest: ${batch[batch.length-1].start_date}`)
-
-    // Filter to activities within our window
-    const withinWindow = batch.filter(a => new Date(a.start_date).getTime() >= cutoffTimestamp)
-    allActivities = allActivities.concat(withinWindow)
-
-    // If the oldest activity on this page is outside our window, we're done
-    const oldest = batch[batch.length - 1]
-    if (new Date(oldest.start_date).getTime() < cutoffTimestamp) {
-      console.log(`[Strava] Oldest activity ${oldest.start_date} is outside 90-day window — stopping`)
-      break
-    }
-
-    if (batch.length < 100) {
-      console.log(`[Strava] Page ${page} had ${batch.length} results (< 100) — last page`)
-      break
-    }
-    page++
-    await new Promise(r => setTimeout(r, 500))
-  }
-
-  if (!allActivities.length) {
-    console.log(`[Strava] No activities found for ${profile.full_name}`)
-    return 0
-  }
-
-  const rows = allActivities.map(act => ({
-    id: act.id,
-    athlete_id: profile.id,
-    name: act.name,
-    type: formatType(act.sport_type || act.type),
-    raw_type: act.sport_type || act.type,
-    distance_m: act.distance || 0,
-    duration_s: act.moving_time || 0,
-    elevation_m: act.total_elevation_gain || 0,
-    average_heartrate: act.average_heartrate ? Math.round(act.average_heartrate) : null,
-    average_speed: act.average_speed || null,
-    kudos: act.kudos_count || 0,
-    start_date: act.start_date,
-    strava_url: `https://www.strava.com/activities/${act.id}`,
-    synced_at: new Date().toISOString(),
-  }))
-
-  // Upsert in batches of 50
-  const BATCH = 50
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH)
-    const { error } = await supabase
-      .from('strava_activities')
-      .upsert(batch, { onConflict: 'id' })
-    if (error) console.error(`[Strava] Upsert error for ${profile.full_name}:`, error.message)
-  }
-
-  console.log(`[Strava] Synced ${rows.length} activities for ${profile.full_name}`)
-  return rows.length
+  return res.json();
 }
 
-// ── Delete old activities (keep 90 days) ─────────────────────────
-async function pruneOldActivities() {
-  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+// ── Streak helpers ────────────────────────────────────────────────────────
+
+/**
+ * Given a sorted (desc) list of activity dates (YYYY-MM-DD strings),
+ * walk back from today counting consecutive active days.
+ * A "day" counts if the athlete had at least one activity.
+ */
+function computeStreakFromDates(activityDates) {
+  if (!activityDates.length) return 0;
+
+  const unique = [...new Set(activityDates)].sort().reverse(); // most recent first
+  const today  = toDateStr(new Date());
+  const yesterday = toDateStr(new Date(Date.now() - 86400_000));
+
+  // Streak must include today or yesterday to be active
+  if (unique[0] !== today && unique[0] !== yesterday) return 0;
+
+  let streak = 0;
+  let cursor = unique[0] === today ? new Date() : new Date(Date.now() - 86400_000);
+
+  for (const dateStr of unique) {
+    const expected = toDateStr(cursor);
+    if (dateStr === expected) {
+      streak++;
+      cursor = new Date(cursor.getTime() - 86400_000);
+    } else if (dateStr < expected) {
+      // Gap found — streak ends
+      break;
+    }
+    // dateStr > expected shouldn't happen given sort, but skip if so
+  }
+
+  return streak;
+}
+
+function toDateStr(date) {
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * Incrementally update streak given the current profile state
+ * and whether there was activity today or yesterday.
+ */
+function incrementalStreakUpdate(profile, recentActivityDates) {
+  const today     = toDateStr(new Date());
+  const yesterday = toDateStr(new Date(Date.now() - 86400_000));
+
+  const hasToday     = recentActivityDates.includes(today);
+  const hasYesterday = recentActivityDates.includes(yesterday);
+
+  const lastActive = profile.training_streak_last_active; // 'YYYY-MM-DD' or null
+  let current  = profile.training_streak_current  ?? 0;
+  let longest  = profile.training_streak_longest  ?? 0;
+
+  if (hasToday) {
+    if (lastActive === today) {
+      // Already counted — no change needed
+      return null;
+    } else if (lastActive === yesterday || current === 0) {
+      current += 1;
+    } else {
+      // Gap between lastActive and today — streak broken
+      current = 1;
+    }
+    longest = Math.max(current, longest);
+    return { training_streak_current: current, training_streak_longest: longest, training_streak_last_active: today };
+  }
+
+  if (hasYesterday) {
+    if (lastActive === yesterday) return null; // already counted
+    if (lastActive === toDateStr(new Date(Date.now() - 2 * 86400_000)) || current === 0) {
+      current += 1;
+    } else {
+      current = 1;
+    }
+    longest = Math.max(current, longest);
+    return { training_streak_current: current, training_streak_longest: longest, training_streak_last_active: yesterday };
+  }
+
+  // No activity today or yesterday — streak broken if it was active
+  if (lastActive && lastActive < yesterday) {
+    return { training_streak_current: 0 };
+  }
+
+  return null; // nothing to update
+}
+
+// ── Activity upsert ───────────────────────────────────────────────────────
+
+function mapActivity(raw, athleteId) {
+  return {
+    id:                    raw.id,
+    athlete_id:            athleteId,
+    name:                  raw.name,
+    sport_type:            raw.sport_type ?? raw.type,
+    start_date:            raw.start_date,
+    start_date_local:      raw.start_date_local,
+    distance:              raw.distance,
+    moving_time:           raw.moving_time,
+    elapsed_time:          raw.elapsed_time,
+    total_elevation_gain:  raw.total_elevation_gain,
+    average_heartrate:     raw.average_heartrate ?? null,
+    max_heartrate:         raw.max_heartrate ?? null,
+    map_summary_polyline:  raw.map?.summary_polyline ?? null,
+  };
+}
+
+async function upsertActivities(activities, athleteId) {
+  if (!activities.length) return;
+  const rows = activities.map(a => mapActivity(a, athleteId));
   const { error } = await supabase
     .from('strava_activities')
-    .delete()
-    .lt('start_date', cutoff)
-  if (error) console.error('[Strava] Prune error:', error.message)
-  else console.log('[Strava] Pruned activities older than 90 days')
+    .upsert(rows, { onConflict: 'id' });
+  if (error) throw error;
 }
 
-// ── Main ──────────────────────────────────────────────────────────
-async function main() {
-  console.log('=== Strava Sync ===', new Date().toISOString())
+async function pruneOldActivities(athleteId) {
+  const cutoff = new Date(Date.now() - FEED_DAYS * 86400_000).toISOString();
+  await supabase
+    .from('strava_activities')
+    .delete()
+    .eq('athlete_id', athleteId)
+    .lt('start_date', cutoff);
+}
 
-  const specificUserId = process.argv[2] // optional: sync just one user
+// ── Bootstrap: historical walk-back ──────────────────────────────────────
 
-  // Fetch connected profiles
-  let query = supabase
+/**
+ * Fetches activities in reverse chronological order until a gap is found.
+ * Only stores the last FEED_DAYS worth in strava_activities (feed display).
+ * Activities older than FEED_DAYS are fetched, used to compute the streak,
+ * then discarded — never inserted into the database.
+ * Walk-back has no page cap: terminates naturally when a gap is confirmed
+ * or when Strava returns an empty page (beginning of athlete's history).
+ */
+async function bootstrapAthlete(profile, token) {
+  console.log(`  → Bootstrapping ${profile.full_name}...`);
+
+  await supabase
     .from('profiles')
-    .select('id, full_name, strava_athlete_id, strava_access_token, strava_refresh_token, strava_token_expires_at')
-    .not('strava_athlete_id', 'is', null)
+    .update({ strava_bootstrap_status: 'in_progress' })
+    .eq('id', profile.id);
 
-  if (specificUserId) {
-    query = query.eq('id', specificUserId)
+  const feedCutoff  = Math.floor((Date.now() - FEED_DAYS * 86400_000) / 1000);
+  const allDates    = [];   // all activity dates for streak computation
+  const feedActivities = []; // only last FEED_DAYS for storage
+
+  let page = 1;
+  let gapFound = false;
+  let oldestActiveDate = null;
+
+  while (!gapFound) {
+    let activities;
+    try {
+      activities = await fetchActivities(token, { page, perPage: 200 });
+    } catch (err) {
+      if (err.message === 'RATE_LIMITED') {
+        console.warn(`  ⚠ Rate limited during bootstrap for ${profile.full_name} — will retry next run`);
+        await supabase.from('profiles')
+          .update({ strava_bootstrap_status: 'pending' })
+          .eq('id', profile.id);
+        return;
+      }
+      throw err;
+    }
+
+    if (!activities.length) break; // no more history
+
+    for (const activity of activities) {
+      const dateStr = activity.start_date_local.split('T')[0];
+      allDates.push(dateStr);
+
+      const activityTs = new Date(activity.start_date).getTime() / 1000;
+      if (activityTs >= feedCutoff) {
+        feedActivities.push(activity);
+      }
+
+      oldestActiveDate = dateStr;
+    }
+
+    // Check if we've found a gap — walk back day by day from the oldest date
+    // to detect a break. We stop fetching once a gap is confirmed.
+    const streak = computeStreakFromDates(allDates);
+
+    // If the oldest fetched date is further back than our computed streak
+    // would require, we've confirmed the gap — no need to fetch more pages.
+    const streakStartDate = new Date(Date.now() - streak * 86400_000);
+    const oldestFetched   = new Date(oldestActiveDate);
+    if (oldestFetched <= streakStartDate) {
+      gapFound = true;
+    }
+
+    page++;
   }
 
-  const { data: profiles, error } = await query
+  const streakCurrent = computeStreakFromDates(allDates);
+  const lastActive    = allDates.sort().reverse()[0] ?? null;
 
-  if (error) {
-    console.error('[Strava] Failed to load profiles:', error.message)
-    process.exit(1)
+  // Store only feed window activities
+  if (feedActivities.length) {
+    await upsertActivities(feedActivities, profile.id);
   }
 
-  if (!profiles?.length) {
-    console.log('[Strava] No connected athletes found')
-    return
+  await supabase.from('profiles').update({
+    strava_bootstrap_status:    'complete',
+    training_streak_current:    streakCurrent,
+    training_streak_longest:    streakCurrent, // first run — current is longest we know of
+    training_streak_last_active: lastActive,
+    strava_last_synced_at:      new Date().toISOString(),
+  }).eq('id', profile.id);
+
+  console.log(`  ✓ Bootstrap complete: streak = ${streakCurrent} days, feed activities = ${feedActivities.length}`);
+}
+
+// ── Incremental sync ──────────────────────────────────────────────────────
+
+async function incrementalSync(profile, token) {
+  console.log(`  → Incremental sync for ${profile.full_name}...`);
+
+  // Fetch last BUFFER_DAYS to survive a missed hourly run
+  const after = Math.floor((Date.now() - BUFFER_DAYS * 86400_000) / 1000);
+  const activities = await fetchActivities(token, { after });
+
+  if (activities.length) {
+    await upsertActivities(activities, profile.id);
   }
 
-  console.log(`[Strava] Syncing ${profiles.length} athlete(s)...`)
+  // Prune feed to FEED_DAYS rolling window
+  await pruneOldActivities(profile.id);
 
-  let total = 0
-  for (const profile of profiles) {
-    total += await syncAthlete(profile, specificUserId ? 90 : 90)
-    // Rate limit: 100 requests per 15 min — add small delay between athletes
-    if (profiles.length > 1) await new Promise(r => setTimeout(r, 1000))
+  // Compute streak update from recent activity dates
+  const recentDates = activities.map(a => a.start_date_local.split('T')[0]);
+  const streakUpdate = incrementalStreakUpdate(profile, recentDates);
+
+  const profileUpdate = { strava_last_synced_at: new Date().toISOString() };
+  if (streakUpdate) Object.assign(profileUpdate, streakUpdate);
+
+  await supabase.from('profiles').update(profileUpdate).eq('id', profile.id);
+
+  console.log(`  ✓ Synced ${activities.length} recent activities${streakUpdate ? `, streak → ${streakUpdate.training_streak_current ?? profile.training_streak_current}` : ''}`);
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────
+
+async function main() {
+  console.log(`\n🚴 Strava sync — ${new Date().toISOString()}`);
+
+  // Fetch all athletes with Strava connected
+  const { data: athletes, error } = await supabase
+    .from('profiles')
+    .select(`
+      id, full_name,
+      strava_access_token, strava_refresh_token, strava_token_expires_at,
+      strava_bootstrap_status,
+      training_streak_current, training_streak_longest, training_streak_last_active
+    `)
+    .not('strava_access_token', 'is', null);
+
+  if (error) throw error;
+  if (!athletes?.length) {
+    console.log('No athletes with Strava connected.');
+    return;
   }
 
-  // Prune old data on full sync (not single-user refresh)
-  if (!specificUserId) await pruneOldActivities()
+  console.log(`Found ${athletes.length} connected athlete(s)\n`);
 
-  console.log(`=== Strava Sync Complete — ${total} activities synced ===`)
+  for (const profile of athletes) {
+    try {
+      console.log(`Processing: ${profile.full_name} (bootstrap: ${profile.strava_bootstrap_status})`);
+      const token = await getValidToken(profile);
+
+      if (profile.strava_bootstrap_status !== 'complete') {
+        await bootstrapAthlete(profile, token);
+      } else {
+        await incrementalSync(profile, token);
+      }
+    } catch (err) {
+      console.error(`  ✗ Error syncing ${profile.full_name}:`, err.message);
+      // Continue with next athlete — don't let one failure kill the whole run
+    }
+  }
+
+  console.log('\n✅ Sync complete');
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err)
-  process.exit(1)
-})
+  console.error('Fatal sync error:', err);
+  process.exit(1);
+});
