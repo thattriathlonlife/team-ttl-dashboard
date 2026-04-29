@@ -92,7 +92,12 @@ async function syncAthlete(profile, days = 90) {
     }
 
     const batch = await res.json()
-    if (!Array.isArray(batch) || !batch.length) break
+    if (!Array.isArray(batch) || !batch.length) {
+      console.log(`[Strava] Page ${page} returned empty — stopping`)
+      break
+    }
+
+    console.log(`[Strava] Page ${page}: got ${batch.length} activities, newest: ${batch[0].start_date}, oldest: ${batch[batch.length-1].start_date}`)
 
     // Filter to activities within our window
     const withinWindow = batch.filter(a => new Date(a.start_date).getTime() >= cutoffTimestamp)
@@ -100,9 +105,15 @@ async function syncAthlete(profile, days = 90) {
 
     // If the oldest activity on this page is outside our window, we're done
     const oldest = batch[batch.length - 1]
-    if (new Date(oldest.start_date).getTime() < cutoffTimestamp) break
+    if (new Date(oldest.start_date).getTime() < cutoffTimestamp) {
+      console.log(`[Strava] Oldest activity ${oldest.start_date} is outside 90-day window — stopping`)
+      break
+    }
 
-    if (batch.length < 100) break // last page
+    if (batch.length < 100) {
+      console.log(`[Strava] Page ${page} had ${batch.length} results (< 100) — last page`)
+      break
+    }
     page++
     await new Promise(r => setTimeout(r, 500))
   }
