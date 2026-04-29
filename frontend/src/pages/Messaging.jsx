@@ -86,42 +86,60 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const [lastMessages, setLastMessages] = useState({})
 
   async function loadChannels() {
-    const [channelsRes, readsRes, mentionsRes] = await Promise.all([
-      supabase.from('channels').select('*, races(name)').order('category').order('sort_order').order('name'),
+    // 3 parallel queries instead of N+1
+    const [channelsRes, readsRes, mentionsRes, msgsRes] = await Promise.all([
+      supabase.from('channels').select('*, races(name)').order('sort_order').order('name'),
       supabase.from('channel_reads').select('*').eq('athlete_id', userId),
       supabase.from('message_mentions').select('*', { count: 'exact', head: true }).eq('mentioned_user_id', userId).is('seen_at', null),
+      // Fetch last message per channel in one query using a recent window
+      supabase.from('messages').select('channel_id, content, image_url, created_at, profiles(full_name)').order('created_at', { ascending: false }).limit(300),
     ])
-    if (channelsRes.data) {
-      setChannels(channelsRes.data)
 
-      // Fetch last message for each channel
-      const lastMsgs = {}
-      await Promise.all(channelsRes.data.map(async ch => {
-        const { data } = await supabase
-          .from('messages')
-          .select('content, image_url, created_at, profiles(full_name)')
-          .eq('channel_id', ch.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-        if (data) lastMsgs[ch.id] = data
-      }))
-      setLastMessages(lastMsgs)
-    }
     setMentionCount(mentionsRes.count || 0)
+
+    if (channelsRes.data) {
+      // Fix: ensure race-type channels get race category
+      const fixedChannels = channelsRes.data.map(ch =>
+        ch.type === 'race' && ch.category !== 'race' ? { ...ch, category: 'race' } : ch
+      )
+      setChannels(fixedChannels)
+
+      // Build last message map from batched results (first occurrence = most recent per channel)
+      if (msgsRes.data) {
+        const lastMsgs = {}
+        for (const msg of msgsRes.data) {
+          if (!lastMsgs[msg.channel_id]) lastMsgs[msg.channel_id] = msg
+        }
+        setLastMessages(lastMsgs)
+      }
+    }
 
     if (channelsRes.data && readsRes.data) {
       const readsMap = {}
       readsRes.data.forEach(r => { readsMap[r.channel_id] = r.last_read_at })
-      const counts = {}
-      for (const ch of channelsRes.data) {
-        const lastRead = readsMap[ch.id]
-        const q = supabase.from('messages').select('*', { count: 'exact', head: true }).eq('channel_id', ch.id)
-        if (lastRead) q.gt('created_at', lastRead)
-        const { count } = await q
-        counts[ch.id] = count || 0
+      // Use get_unread_count RPC for a single round-trip
+      const { data: unreadData } = await supabase.rpc('get_unread_counts', { p_user_id: userId })
+      if (unreadData) {
+        const counts = {}
+        unreadData.forEach(r => { counts[r.channel_id] = r.unread_count })
+        setUnreadCounts(counts)
+      } else {
+        // Fallback: derive from reads map + message timestamps (approximate)
+        const counts = {}
+        if (msgsRes.data) {
+          const msgsByChannel = {}
+          msgsRes.data.forEach(m => {
+            if (!msgsByChannel[m.channel_id]) msgsByChannel[m.channel_id] = []
+            msgsByChannel[m.channel_id].push(m.created_at)
+          })
+          channelsRes.data.forEach(ch => {
+            const lastRead = readsMap[ch.id]
+            const msgs = msgsByChannel[ch.id] || []
+            counts[ch.id] = lastRead ? msgs.filter(t => t > lastRead).length : msgs.length
+          })
+        }
+        setUnreadCounts(counts)
       }
-      setUnreadCounts(counts)
     }
     setLoading(false)
   }
@@ -228,55 +246,101 @@ export default function Messaging({ session, profile, onReadChannel }) {
   )
 }
 
-function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelect }) {
+function channelInitial(ch) {
+  // For race channels use shortened race name, else channel name
+  const name = ch.type === 'race'
+    ? (ch.races?.name?.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '') || ch.name)
+    : ch.name
+  return name.trim()[0]?.toUpperCase() || '#'
+}
+
+const CATEGORY_COLORS = {
+  general:  '#00C4B4',
+  training: '#E8B84B',
+  interest: '#a78bfa',
+  regions:  '#60a5fa',
+  race:     '#FF5A1F',
+}
+
+function ChannelIcon({ ch, isSelected, size = 36 }) {
+  if (ch.is_readonly) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: '8px', background: isSelected ? 'rgba(255,61,139,0.2)' : 'rgba(255,61,139,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: size * 0.5 }}>
+        📢
+      </div>
+    )
+  }
+  const color = CATEGORY_COLORS[ch.category] || '#00C4B4'
+  const letter = channelInitial(ch)
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '8px', flexShrink: 0,
+      background: isSelected ? `${color}22` : 'rgba(255,255,255,0.05)',
+      border: isSelected ? `1px solid ${color}44` : '1px solid transparent',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800,
+      fontSize: size * 0.44, color: isSelected ? color : '#555',
+      transition: 'all 0.15s',
+    }}>
+      {letter}
+    </div>
+  )
+}
+
+function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelect, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const groupUnread = channels.reduce((sum, ch) => sum + (unread[ch.id] || 0), 0)
+
   return (
     <div>
-      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#444', padding: '14px 20px 6px' }}>{label}</div>
-      {channels.map((ch, idx) => {
+      {/* Collapsible header */}
+      <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', padding: '12px 20px 5px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#444', flex: 1 }}>{label}</span>
+        {!open && groupUnread > 0 && (
+          <span style={{ background: '#00C4B4', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', fontWeight: 700, borderRadius: '8px', padding: '1px 6px' }}>{groupUnread}</span>
+        )}
+        <span style={{ fontSize: '10px', color: '#333', marginLeft: '4px' }}>{open ? '▾' : '▸'}</span>
+      </button>
+
+      {open && channels.map((ch, idx) => {
         const isSelected = selected?.id === ch.id
         const unreadCount = unread[ch.id] || 0
         const last = lastMessages?.[ch.id]
         const displayName = ch.type === 'race'
           ? (ch.races?.name?.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '') || ch.name)
           : ch.name
-        const preview = last
-          ? (last.content || (last.image_url ? '📎 Image' : ''))
-          : 'No messages yet'
+        const preview = last ? (last.content || (last.image_url ? '📎 Image' : '')) : ''
         const senderName = last?.profiles?.full_name?.split(' ')[0]
-        const previewText = last && senderName ? `${senderName}: ${preview}` : preview
+        const previewText = preview ? (senderName ? `${senderName}: ${preview}` : preview) : null
 
         return (
           <button
             key={ch.id}
             onClick={() => onSelect(ch)}
             style={{
-              display: 'flex', alignItems: 'center', gap: '12px',
-              width: '100%', padding: '12px 20px',
-              background: isSelected ? 'rgba(0,196,180,0.08)' : 'none',
+              display: 'flex', alignItems: 'center', gap: '10px',
+              width: '100%', padding: '8px 16px 8px 20px',
+              background: isSelected ? 'rgba(0,196,180,0.07)' : 'none',
               border: 'none',
-              borderLeft: isSelected ? '3px solid #00C4B4' : '3px solid transparent',
-              borderBottom: idx < channels.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+              borderLeft: isSelected ? '2px solid #00C4B4' : '2px solid transparent',
               cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s',
             }}
           >
-            {/* Channel icon */}
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: isSelected ? 'rgba(0,196,180,0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
-              {ch.is_readonly ? '📢' : ch.category === 'race' ? '🏁' : ch.category === 'training' ? '💪' : ch.category === 'regions' ? '📍' : ch.category === 'interest' ? '👥' : '#'}
-            </div>
+            <ChannelIcon ch={ch} isSelected={isSelected} size={32} />
 
-            {/* Channel name + preview */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: unreadCount > 0 ? 700 : 500, color: isSelected ? '#fff' : unreadCount > 0 ? '#fff' : '#999', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: unreadCount > 0 ? 700 : 500, color: isSelected ? '#fff' : unreadCount > 0 ? '#ddd' : '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                 {displayName}
               </div>
-              <div style={{ fontSize: '12px', color: unreadCount > 0 ? '#bbb' : '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: unreadCount > 0 ? 500 : 400 }}>
-                {previewText}
-              </div>
+              {previewText && (
+                <div style={{ fontSize: '11px', color: unreadCount > 0 ? '#999' : '#444', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
+                  {previewText}
+                </div>
+              )}
             </div>
 
-            {/* Unread badge */}
             {unreadCount > 0 && (
-              <div style={{ background: '#00C4B4', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, borderRadius: '10px', padding: '2px 8px', flexShrink: 0 }}>
+              <div style={{ background: '#00C4B4', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '8px', padding: '1px 7px', flexShrink: 0 }}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </div>
             )}
