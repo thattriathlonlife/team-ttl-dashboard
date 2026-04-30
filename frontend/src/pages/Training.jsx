@@ -368,7 +368,7 @@ function TrainingPage({ session, profile }) {
       .limit(500)
     if (data) {
       setActivities(data)
-      if (data.length > 0) setLastSync(data[0].created_at)
+      if (data.length > 0) setLastSync(data[0].start_date)
     }
   }
 
@@ -415,7 +415,6 @@ function TrainingPage({ session, profile }) {
       })
       if (res.ok) {
         await loadAll()
-        setLastSync(new Date().toISOString())
       }
     } catch (e) { console.error(e) }
     setSyncing(false)
@@ -442,8 +441,18 @@ function TrainingPage({ session, profile }) {
     ? [...new Set(Object.values(grouped)[0].map(a => a.athlete_id))]
     : []
 
-  const syncAge   = lastSync ? Math.floor((Date.now() - new Date(lastSync)) / 60000) : null
-  const syncLabel = syncAge === null ? '' : syncAge < 60 ? `${syncAge}m ago` : `${Math.floor(syncAge / 60)}h ago`
+  function latestActivityLabel(dateStr) {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    const now = new Date()
+    const diffDays = Math.floor((now - d) / 86400000)
+    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    const dateStr2 = diffDays === 0 ? `today at ${time}`
+      : diffDays === 1 ? `yesterday at ${time}`
+      : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${time}`
+    return `latest activity ${dateStr2}`
+  }
+  const syncLabel = latestActivityLabel(lastSync)
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem 1rem' }}>
@@ -464,7 +473,7 @@ function TrainingPage({ session, profile }) {
           <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 32, fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff', marginBottom: 2 }}>Training</div>
           <div style={{ fontSize: 13, color: '#999' }}>
             {connectedCount > 0 ? `${connectedCount} teammate${connectedCount !== 1 ? 's' : ''} connected via Strava` : 'Connect Strava to share your training'}
-            {syncLabel ? ` · synced ${syncLabel}` : ''}
+            {syncLabel ? ` · ${syncLabel}` : ''}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
