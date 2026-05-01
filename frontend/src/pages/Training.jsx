@@ -252,16 +252,26 @@ function MonthlySummary({ activities }) {
   const rnKm = acts.filter(a => ['Run','VirtualRun'].includes(a.sport_type)).reduce((s, a) => s + (a.distance || 0), 0) / 1000
   const hrs  = acts.reduce((s, a) => s + (a.moving_time || 0), 0) / 3600
   const aths = new Set(acts.map(a => a.athlete_id)).size
+  const stats = [
+    swKm > 0 && { emoji: '🏊', label: 'Swim',  value: `${swKm.toFixed(1)} km`, color: '#00C4B4' },
+    bkKm > 0 && { emoji: '🚴', label: 'Bike',  value: `${bkKm.toFixed(0)} km`,  color: '#FF5A1F' },
+    rnKm > 0 && { emoji: '🏃', label: 'Run',   value: `${rnKm.toFixed(1)} km`, color: '#FF3D8B' },
+               { emoji: '⏱',  label: 'Total', value: `${hrs.toFixed(0)}h`,     color: '#E8B84B' },
+  ].filter(Boolean)
   return (
-    <div style={{ background: 'rgba(255,61,139,0.06)', border: '1px solid rgba(255,61,139,0.18)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
-      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: '#FF3D8B', marginBottom: 6 }}>🗓 {MONTHS[lm]} Team Recap</div>
-      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 10 }}>{acts.length} sessions · {aths} athlete{aths !== 1 ? 's' : ''} 🤘</div>
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        {swKm > 0 && <div><div style={{ fontSize: 10, color: '#555' }}>🏊 Swim</div><div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 18, fontWeight: 700, color: '#00C4B4' }}>{swKm.toFixed(1)} km</div></div>}
-        {bkKm > 0 && <div><div style={{ fontSize: 10, color: '#555' }}>🚴 Bike</div><div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 18, fontWeight: 700, color: '#FF5A1F' }}>{bkKm.toFixed(0)} km</div></div>}
-        {rnKm > 0 && <div><div style={{ fontSize: 10, color: '#555' }}>🏃 Run</div><div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 18, fontWeight: 700, color: '#FF3D8B' }}>{rnKm.toFixed(1)} km</div></div>}
-        <div><div style={{ fontSize: 10, color: '#555' }}>⏱ Total</div><div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 18, fontWeight: 700, color: '#E8B84B' }}>{hrs.toFixed(0)}h</div></div>
+    <div style={{ background: 'rgba(255,61,139,0.06)', border: '1px solid rgba(255,61,139,0.18)', borderRadius: 10, padding: '0.875rem 1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ flexShrink: 0 }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: '#FF3D8B', marginBottom: 2 }}>🗓 {MONTHS[lm]} Recap</div>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: '#fff' }}>{acts.length} sessions · {aths} athlete{aths !== 1 ? 's' : ''}</div>
       </div>
+      <div style={{ width: '1px', background: 'rgba(255,255,255,0.08)', alignSelf: 'stretch', flexShrink: 0 }} />
+      {stats.map(s => (
+        <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13 }}>{s.emoji}</span>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 16, fontWeight: 700, color: s.color }}>{s.value}</span>
+          <span style={{ fontSize: 11, color: '#555' }}>{s.label}</span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -568,11 +578,23 @@ function TrainingPage({ session, profile }) {
           <MonthlySummary activities={enriched} />
           <WeeklySummary activities={enriched} />
 
-          <ChallengeCard
-            challenge={challenge}
-            isAdmin={profile?.role === 'admin'}
-            onManage={() => setShowChallengeModal(true)}
-          />
+          {challenge ? (
+            <ChallengeCard
+              challenge={challenge}
+              isAdmin={profile?.role === 'admin'}
+              onManage={() => setShowChallengeModal(true)}
+            />
+          ) : profile?.role === 'admin' && (
+            <div style={{ border: '1px dashed rgba(232,184,75,0.25)', borderRadius: 10, padding: '0.875rem 1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, color: '#555' }}>No active challenge this week</div>
+              <button
+                onClick={() => setShowChallengeModal(true)}
+                style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12, letterSpacing: '1px', textTransform: 'uppercase', padding: '6px 14px', background: 'rgba(232,184,75,0.1)', border: '1px solid rgba(232,184,75,0.3)', borderRadius: 4, color: '#E8B84B', cursor: 'pointer', flexShrink: 0 }}
+              >
+                + Set a challenge
+              </button>
+            </div>
+          )}
 
           <div className="train-grid">
             {/* Feed */}
