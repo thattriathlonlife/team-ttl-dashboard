@@ -368,6 +368,7 @@ const BADGE_LABELS = {
   suffer_200:     'Pain Cave 😤',
   half_iron_week: '70.3 Ready 🔶',
   full_iron_week: 'Iron Ready 🔴',
+  welcome_team:   'Welcome to Team 👋',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -485,9 +486,40 @@ async function updateChallengeProgress() {
     }
   }
 
+  // Check for completion and post a shout-out (once only)
+  const justCompleted = (
+    !challenge.challenge_completed_celebrated &&
+    (
+      (challenge.type === 'combined_distance' && progress.percent >= 100) ||
+      (challenge.type === 'everyone_logs_sport' && progress.count_completed > 0 && progress.count_completed === progress.count_total)
+    )
+  )
+
   await supabase.from('challenges')
-    .update({ challenge_progress: progress, updated_at: new Date().toISOString() })
+    .update({
+      challenge_progress:              progress,
+      challenge_completed_celebrated:  justCompleted ? true : challenge.challenge_completed_celebrated,
+      updated_at:                      new Date().toISOString(),
+    })
     .eq('id', challenge.id)
+
+  if (justCompleted) {
+    // Use a system-style post — attribute to the first admin we can find
+    const { data: admin } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'admin')
+      .limit(1)
+      .single()
+
+    if (admin) {
+      await postToTrainingChannel(
+        admin.id,
+        `🎉 The team just completed the **${challenge.title}** challenge!`
+      )
+    }
+    console.log(`[challenge] Completion announced for "${challenge.title}"`)
+  }
 
   console.log(`[challenge] Progress updated for "${challenge.title}"`)
 }
