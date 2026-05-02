@@ -482,14 +482,19 @@ async function celebratePRsAndAchievements(profile, activities) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function updateChallengeProgress() {
-  const { data: challenge } = await supabase
+  const { data: challenges } = await supabase
     .from('challenges')
     .select('*')
     .eq('is_active', true)
-    .single()
 
-  if (!challenge) return
+  if (!challenges?.length) return
 
+  for (const challenge of challenges) {
+    await updateSingleChallengeProgress(challenge)
+  }
+}
+
+async function updateSingleChallengeProgress(challenge) {
   const weekEnd = new Date(challenge.week_start)
   weekEnd.setDate(weekEnd.getDate() + 7)
 
