@@ -31,6 +31,8 @@ const STRAVA_API       = 'https://www.strava.com/api/v3'
 // Retention cutoff — always the 1st of the previous month.
 // e.g. on 15 May → 1 Apr; on 3 Jan → 1 Dec (prev year).
 // This ensures the full prior month is always available for the monthly recap.
+// The streak integer is stored on profiles.training_streak_current and is computed
+// from a full history walk during bootstrap — it does not depend on this window.
 function getRetentionCutoff() {
   const now = new Date()
   const year  = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
@@ -63,7 +65,7 @@ export default async function handler(req, res) {
         id, full_name,
         strava_athlete_id, strava_access_token, strava_refresh_token, strava_token_expires_at,
         strava_bootstrap_status,
-        training_streak_current, training_streak_longest,
+        training_streak_current, training_streak_longest, training_streak_last_active,
         total_run_km, total_bike_km, total_swim_km, total_pr_count, total_kudos_received
       `)
       .not('strava_athlete_id', 'is', null)
@@ -168,11 +170,18 @@ async function bootstrapAthlete(profile, token) {
   await upsertActivities(profile.id, recentActivities)
   await pruneOldActivities(profile.id)
 
+  // Most recent activity date — used by incremental sync to detect new active weeks
+  const mostRecent = allActivities.reduce((latest, a) => {
+    return !latest || a.start_date > latest ? a.start_date : latest
+  }, null)
+  const lastActiveWeek = mostRecent ? isoWeek(mostRecent) : null
+
   await supabase.from('profiles').update({
-    strava_bootstrap_status: 'complete',
-    strava_last_synced_at:   new Date().toISOString(),
-    training_streak_current: streak,
-    training_streak_longest: longest,
+    strava_bootstrap_status:        'complete',
+    strava_last_synced_at:          new Date().toISOString(),
+    training_streak_current:        streak,
+    training_streak_longest:        longest,
+    training_streak_last_active:    mostRecent ? mostRecent.slice(0, 10) : null,
     total_run_km:            totals.runKm,
     total_bike_km:           totals.bikeKm,
     total_swim_km:           totals.swimKm,
@@ -211,19 +220,64 @@ async function incrementalSync(profile, token) {
   const delta = computeTotals(activities)
   const updatedProfile = await incrementTotals(profile, delta)
 
-  // Recompute streak from the stored 14-day window (no Strava API call needed)
-  const { data: window } = await supabase
+  // Increment streak by comparing the current active week against the last known
+  // active week stored on the profile. Never recount from stored activities —
+  // the correct value was computed from full Strava history during bootstrap.
+  const { data: recentStored } = await supabase
     .from('strava_activities')
     .select('start_date')
     .eq('athlete_id', profile.id)
+    .order('start_date', { ascending: false })
+    .limit(50)
 
-  const streak  = computeWeeklyStreak(window || [])
+  const now          = new Date()
+  const thisWeek     = isoWeek(now)
+  const prevWeekDate = new Date(now)
+  prevWeekDate.setDate(prevWeekDate.getDate() - 7)
+  const lastWeek = isoWeek(prevWeekDate)
+
+  const activeWeeks  = new Set((recentStored || []).map(a => isoWeek(a.start_date)))
+  const athleteActive = activeWeeks.has(thisWeek) || activeWeeks.has(lastWeek)
+
+  const lastActiveWeek = profile.training_streak_last_active
+    ? isoWeek(profile.training_streak_last_active)
+    : null
+
+  const mostRecentWeek = activeWeeks.has(thisWeek) ? thisWeek : activeWeeks.has(lastWeek) ? lastWeek : null
+  const mostRecentDate = (recentStored || []).find(a =>
+    mostRecentWeek && isoWeek(a.start_date) === mostRecentWeek
+  )?.start_date?.slice(0, 10) || null
+
+  let streak = profile.training_streak_current || 0
+
+  if (!athleteActive) {
+    // No activity this week or last — streak is broken
+    streak = 0
+  } else if (!lastActiveWeek) {
+    // No previous record — preserve whatever bootstrap computed
+    streak = profile.training_streak_current || 1
+  } else if (mostRecentWeek === lastActiveWeek) {
+    // Already counted this week — no change
+    streak = profile.training_streak_current || 0
+  } else {
+    // Check if the new active week is exactly one week ahead of the last active week
+    const lastDate = new Date(profile.training_streak_last_active)
+    const nextExpectedWeek = isoWeek(new Date(lastDate.getTime() + 7 * 24 * 60 * 60 * 1000))
+    if (mostRecentWeek === nextExpectedWeek) {
+      streak = (profile.training_streak_current || 0) + 1
+    } else {
+      // Gap — streak broken
+      streak = 1
+    }
+  }
+
   const longest = Math.max(streak, updatedProfile.training_streak_longest || 0)
 
   await supabase.from('profiles').update({
-    training_streak_current: streak,
-    training_streak_longest: longest,
-    strava_last_synced_at:   new Date().toISOString(),
+    training_streak_current:     streak,
+    training_streak_longest:     longest,
+    training_streak_last_active: mostRecentDate || profile.training_streak_last_active,
+    strava_last_synced_at:       new Date().toISOString(),
   }).eq('id', profile.id)
 
   updatedProfile.training_streak_current = streak
@@ -745,10 +799,22 @@ function computeWeeklyStreak(activities) {
 function hasWeeklyGap(activities) {
   if (activities.length < 2) return false
   const weeks = [...new Set(activities.map(a => isoWeek(a.start_date)))].sort()
+
+  // Don't stop on a gap that touches this week or last week — those are
+  // legitimately incomplete and are handled by computeWeeklyStreak separately.
+  const now = new Date()
+  const thisWeek = isoWeek(now)
+  const prevWeekDate = new Date(now); prevWeekDate.setDate(prevWeekDate.getDate() - 7)
+  const lastWeek = isoWeek(prevWeekDate)
+  const recentWeeks = new Set([thisWeek, lastWeek])
+
   for (let i = 1; i < weeks.length; i++) {
     const [yA, wA] = weeks[i - 1].split('-W').map(Number)
     const [yB, wB] = weeks[i].split('-W').map(Number)
-    if (yB * 53 + wB - (yA * 53 + wA) > 1) return true
+    if (yB * 53 + wB - (yA * 53 + wA) > 1) {
+      // Only count as a real gap if neither edge touches the current/last week
+      if (!recentWeeks.has(weeks[i]) && !recentWeeks.has(weeks[i - 1])) return true
+    }
   }
   return false
 }
