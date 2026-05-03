@@ -45,7 +45,7 @@ const TABS = [
   { path: '/races', label: 'Races' },
   { path: '/training', label: 'Training' },
   { path: '/messages', label: 'Messages' },
-  { path: '/discounts', label: 'Discounts' },
+  { path: '/discounts', label: 'Gear' },
   { path: '/profile', label: 'Profile' },
 ]
 
@@ -54,7 +54,7 @@ const DESKTOP_NAV = [
   { path: '/races', label: 'Races' },
   { path: '/training', label: 'Training' },
   { path: '/messages', label: 'Messages' },
-  { path: '/discounts', label: 'Discounts' },
+  { path: '/discounts', label: 'Gear' },
 ]
 
 export default function Layout({ children, session, profile, onNavigateProfile, unreadCount = 0 }) {
