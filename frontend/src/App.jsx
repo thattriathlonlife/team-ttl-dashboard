@@ -5,7 +5,7 @@ import Login from './pages/Login'
 import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import Messaging from './pages/Messaging'
-import Discounts from './pages/Discounts'
+import GearHub from './pages/GearHub'
 import ProfilePage from './pages/ProfilePage'
 import CompleteProfile from './pages/CompleteProfile'
 import Training from './pages/Training'
@@ -45,7 +45,7 @@ function AppRoutes({ session, profile, setProfile }) {
         <Route path="/races" element={<Dashboard session={session} />} />
         <Route path="/training" element={<Training session={session} profile={profile} />} />
         <Route path="/messages" element={<Messaging session={session} profile={profile} onReadChannel={loadUnreadCount} />} />
-        <Route path="/discounts" element={<Discounts profile={profile} />} />
+        <Route path="/discounts" element={<GearHub profile={profile} />} />
         <Route path="/profile" element={<ProfilePage session={session} profile={profile} onSave={handleProfileSave} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
