@@ -2,6 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+// Given a DM channel (with dm_members hydrated), return the other person's profile
+function dmOtherProfile(channel, userId) {
+  return channel.dm_members?.find(m => m.id !== userId) || null
+}
+
 const MEMBER_COLORS = ['#00C4B4','#FF3D8B','#E8B84B','#FF5A1F','#a78bfa','#34d399','#f472b6','#60a5fa']
 const QUICK_EMOJIS = ['👍','💪','🔥','🤘','🏁','❤️','🎉','😮']
 const ALL_EMOJIS = ['😀','😂','🥹','😍','🤩','😎','🥳','🤔','😮','💪','🔥','❤️','👍','🎉','🏆','🤘','🏁','🏊','🚴','🏃','⚡','💯','🙌','👏']
@@ -58,6 +63,8 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 680)
   const [showNewChannel, setShowNewChannel] = useState(false)
   const [showMentions, setShowMentions] = useState(false)
+  const [dmChannels, setDmChannels] = useState([])
+  const [showNewDm, setShowNewDm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const userId = session.user.id
@@ -77,25 +84,55 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
   useEffect(() => {
     const channelId = searchParams.get('channel')
+    const dmId = searchParams.get('dm')
     if (channelId && channels.length > 0) {
       const ch = channels.find(c => c.id === channelId)
       if (ch) openChannel(ch)
     }
-  }, [searchParams, channels])
+    if (dmId && dmChannels.length > 0) {
+      const dm = dmChannels.find(c => c.id === dmId)
+      if (dm) openChannel(dm)
+    }
+  }, [searchParams, channels, dmChannels])
 
   const [lastMessages, setLastMessages] = useState({})
 
   async function loadChannels() {
     // 3 parallel queries instead of N+1
-    const [channelsRes, readsRes, mentionsRes, msgsRes] = await Promise.all([
-      supabase.from('channels').select('*, races(name)').order('sort_order').order('name'),
+    const [channelsRes, readsRes, mentionsRes, msgsRes, dmMembersRes] = await Promise.all([
+      supabase.from('channels').select('*, races(name)').neq('type', 'dm').order('sort_order').order('name'),
       supabase.from('channel_reads').select('*').eq('athlete_id', userId),
       supabase.from('message_mentions').select('*', { count: 'exact', head: true }).eq('mentioned_user_id', userId).is('seen_at', null),
       // Fetch last message per channel in one query using a recent window
       supabase.from('messages').select('channel_id, content, image_url, created_at, profiles(full_name)').order('created_at', { ascending: false }).limit(300),
+      // Fetch this user's DM channel memberships + the other member's profile
+      supabase.from('channel_members').select('channel_id, channels!inner(id, type, created_at), athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)').eq('athlete_id', userId),
     ])
 
     setMentionCount(mentionsRes.count || 0)
+
+    // Build DM channels: for each DM the user belongs to, fetch the other member
+    if (dmMembersRes.data) {
+      const dmChannelIds = dmMembersRes.data.map(m => m.channel_id)
+      if (dmChannelIds.length > 0) {
+        // Fetch all members of those DM channels to find the other participant
+        const { data: allDmMembers } = await supabase
+          .from('channel_members')
+          .select('channel_id, athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)')
+          .in('channel_id', dmChannelIds)
+        // Group members by channel, attach to channel object
+        const membersByChannel = {}
+        allDmMembers?.forEach(m => {
+          if (!membersByChannel[m.channel_id]) membersByChannel[m.channel_id] = []
+          membersByChannel[m.channel_id].push(m.athlete)
+        })
+        const builtDms = dmChannelIds.map(chId => ({
+          id: chId, type: 'dm',
+          dm_members: membersByChannel[chId] || [],
+        }))
+        setDmChannels(builtDms)
+      }
+    }
 
     if (channelsRes.data) {
       // Fix: ensure race-type channels get race category
@@ -202,6 +239,17 @@ export default function Messaging({ session, profile, onReadChannel }) {
             {regionChannels.length > 0 && <ChannelGroup label="Regions" channels={regionChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} />}
             {raceChannels.length > 0 && <ChannelGroup label="Race Threads" channels={raceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} />}
 
+            {/* Direct Messages */}
+            <DMGroup
+              dmChannels={dmChannels}
+              selected={selectedChannel}
+              unread={unreadCounts}
+              lastMessages={lastMessages}
+              userId={userId}
+              onSelect={openChannel}
+              onNewDm={() => setShowNewDm(true)}
+            />
+
             {/* Bottom hint when no channel selected on mobile */}
             {isMobile && !selectedChannel && !showMentions && (
               <div style={{ padding: '2rem 20px', textAlign: 'center' }}>
@@ -241,6 +289,20 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
       {showNewChannel && (
         <NewChannelModal session={session} onClose={() => setShowNewChannel(false)} onCreated={(ch) => { setChannels(prev => [...prev, ch]); setShowNewChannel(false); openChannel(ch) }} />
+      )}
+      {showNewDm && (
+        <NewDmModal
+          userId={userId}
+          onClose={() => setShowNewDm(false)}
+          onCreated={(dmChannel) => {
+            setDmChannels(prev => {
+              const exists = prev.find(c => c.id === dmChannel.id)
+              return exists ? prev : [...prev, dmChannel]
+            })
+            setShowNewDm(false)
+            openChannel(dmChannel)
+          }}
+        />
       )}
     </div>
   )
@@ -639,11 +701,29 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       {/* Header */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, background: '#111' }}>
         {isMobile && <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '0', marginRight: '4px' }}>←</button>}
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', color: '#555', flexShrink: 0 }}>{channel.type === 'race' ? '🏁' : '#'}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
-          {channel.description && <div style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{channel.description}</div>}
-        </div>
+        {channel.type === 'dm' ? (
+          // DM header — show other person's avatar + name
+          (() => {
+            const other = dmOtherProfile(channel, session.user.id)
+            return (
+              <>
+                <Avatar profile={other} size={32} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{other?.full_name || 'DM'}</div>
+                  <div style={{ fontSize: '12px', color: '#555' }}>Direct message</div>
+                </div>
+              </>
+            )
+          })()
+        ) : (
+          <>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', color: '#555', flexShrink: 0 }}>{channel.type === 'race' ? '🏁' : '#'}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
+              {channel.description && <div style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{channel.description}</div>}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Messages */}
@@ -798,7 +878,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           <textarea
             ref={textareaRef}
             style={{ flex: 1, background: 'none', border: 'none', color: '#fff', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', resize: 'none', lineHeight: 1.5, minHeight: '20px', maxHeight: '120px', padding: '0' }}
-            placeholder={`Message #${channel.type === 'race' ? (channel.races?.name?.split(' ').pop() || channel.name) : channel.name} — type @ to mention`}
+            placeholder={channel.type === 'dm' ? `Message ${dmOtherProfile(channel, session.user.id)?.full_name?.split(' ')[0] || 'DM'}…` : `Message #${channel.type === 'race' ? (channel.races?.name?.split(' ').pop() || channel.name) : channel.name} — type @ to mention`}
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
@@ -823,6 +903,150 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         </div>
       </div>
       )}
+    </div>
+  )
+}
+
+
+// ─── DMGroup — sidebar section for direct messages ───────────────────────────
+function DMGroup({ dmChannels, selected, unread, lastMessages, userId, onSelect, onNewDm }) {
+  const [open, setOpen] = useState(true)
+  const dmUnread = dmChannels.reduce((sum, ch) => sum + (unread[ch.id] || 0), 0)
+
+  return (
+    <div>
+      <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', padding: '12px 20px 5px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#444', flex: 1 }}>Direct Messages</span>
+        {!open && dmUnread > 0 && (
+          <span style={{ background: '#00C4B4', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', fontWeight: 700, borderRadius: '8px', padding: '1px 6px' }}>{dmUnread}</span>
+        )}
+        <span style={{ fontSize: '10px', color: '#333', marginLeft: '4px' }}>{open ? '▾' : '▸'}</span>
+      </button>
+
+      {open && (
+        <>
+          {dmChannels.map(ch => {
+            const other = dmOtherProfile(ch, userId)
+            const isSelected = selected?.id === ch.id
+            const unreadCount = unread[ch.id] || 0
+            const last = lastMessages?.[ch.id]
+            const preview = last ? (last.content || (last.image_url ? '📎 Image' : '')) : ''
+
+            return (
+              <button
+                key={ch.id}
+                onClick={() => onSelect(ch)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  width: '100%', padding: '8px 16px 8px 20px',
+                  background: isSelected ? 'rgba(0,196,180,0.07)' : 'none',
+                  border: 'none',
+                  borderLeft: isSelected ? '2px solid #00C4B4' : '2px solid transparent',
+                  cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s',
+                }}
+              >
+                <Avatar profile={other} size={32} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: unreadCount > 0 ? 700 : 500, color: isSelected ? '#fff' : unreadCount > 0 ? '#ddd' : '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                    {other?.full_name || 'DM'}
+                  </div>
+                  {preview && (
+                    <div style={{ fontSize: '11px', color: unreadCount > 0 ? '#999' : '#444', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
+                      {preview}
+                    </div>
+                  )}
+                </div>
+                {unreadCount > 0 && (
+                  <div style={{ background: '#00C4B4', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '8px', padding: '1px 7px', flexShrink: 0 }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+
+          {/* New DM button */}
+          <button
+            onClick={onNewDm}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+          >
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#555', flexShrink: 0 }}>+</div>
+            <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', color: '#444', letterSpacing: '0.5px' }}>New message</span>
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── NewDmModal — athlete picker to start a DM ───────────────────────────────
+function NewDmModal({ userId, onClose, onCreated }) {
+  const [profiles, setProfiles] = useState([])
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [starting, setStarting] = useState(null) // athlete id being DM'd
+
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name, avatar_color, avatar_url').neq('id', userId).order('full_name')
+      .then(({ data }) => { setProfiles(data || []); setLoading(false) })
+  }, [])
+
+  const filtered = profiles.filter(p =>
+    !query.trim() || p.full_name?.toLowerCase().includes(query.toLowerCase())
+  )
+
+  async function startDm(athlete) {
+    setStarting(athlete.id)
+    const { data: channelId, error } = await supabase.rpc('create_dm_channel', { other_athlete_id: athlete.id })
+    if (error || !channelId) { setStarting(null); return }
+    // Build the channel object with dm_members so the thread header can render
+    const dmChannel = {
+      id: channelId, type: 'dm',
+      dm_members: [
+        { id: userId },
+        { id: athlete.id, full_name: athlete.full_name, avatar_color: athlete.avatar_color, avatar_url: athlete.avatar_url },
+      ],
+    }
+    onCreated(dmChannel)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid #a78bfa', borderRadius: '10px', padding: '2rem', width: '100%', maxWidth: '400px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#a78bfa', marginBottom: '1.25rem' }}>New Message</div>
+
+        <input
+          autoFocus
+          placeholder="Search teammates…"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          style={{ width: '100%', background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', padding: '10px 12px', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }}
+        />
+
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          {loading ? (
+            <div style={{ color: '#555', fontSize: '13px', textAlign: 'center', padding: '2rem' }}>Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ color: '#555', fontSize: '13px', textAlign: 'center', padding: '2rem' }}>No teammates found</div>
+          ) : filtered.map(athlete => (
+            <button
+              key={athlete.id}
+              onClick={() => startDm(athlete)}
+              disabled={!!starting}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 8px', background: starting === athlete.id ? 'rgba(167,139,250,0.1)' : 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', marginBottom: '2px' }}
+            >
+              <Avatar profile={athlete} size={36} />
+              <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', color: '#fff', fontWeight: 600 }}>{athlete.full_name}</span>
+              {starting === athlete.id && <span style={{ fontSize: '12px', color: '#a78bfa', marginLeft: 'auto' }}>Opening…</span>}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <button onClick={onClose} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase', padding: '10px 20px', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '5px', color: '#999', cursor: 'pointer' }}>Cancel</button>
+        </div>
+      </div>
     </div>
   )
 }
