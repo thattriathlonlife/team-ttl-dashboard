@@ -273,7 +273,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
           profile={profile}
           isMobile={isMobile}
           onBack={() => { setShowSidebar(true); setSelectedChannel(null) }}
-          onMarkRead={() => setUnreadCounts(prev => ({ ...prev, [selectedChannel.id]: 0 }))}
+          onMarkRead={() => { setUnreadCounts(prev => ({ ...prev, [selectedChannel.id]: 0 })); onReadChannel?.() }}
           onMention={() => setMentionCount(prev => prev + 1)}
         />
       )}
@@ -596,6 +596,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         { channel_id: channel.id, athlete_id: userId, last_read_at: new Date().toISOString() },
         { onConflict: 'channel_id,athlete_id' }
       )
+      onMarkRead?.()
       // Insert mentions
       const mentionedIds = extractMentions(content || '')
       if (mentionedIds.length > 0) {
