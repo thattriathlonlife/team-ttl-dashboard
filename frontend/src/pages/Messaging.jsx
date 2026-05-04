@@ -115,19 +115,16 @@ export default function Messaging({ session, profile, onReadChannel }) {
     if (dmMembersRes.data) {
       const dmChannelIds = dmMembersRes.data.map(m => m.channel_id)
       if (dmChannelIds.length > 0) {
-        // Fetch all members of those DM channels to find the other participant
-        const { data: allDmMembers } = await supabase
-          .from('channel_members')
-          .select('channel_id, athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)')
-          .in('channel_id', dmChannelIds)
-        // Group members by channel, attach to channel object
-        const membersByChannel = {}
-        allDmMembers?.forEach(m => {
-          if (!membersByChannel[m.channel_id]) membersByChannel[m.channel_id] = []
-          membersByChannel[m.channel_id].push(m.athlete)
-        })
-        // Dedupe channel IDs (channel_members could return same channel twice)
+        // RLS restricts channel_members reads to own rows only, so use a
+        // security definer RPC to fetch all members of these DM channels
         const uniqueChannelIds = [...new Set(dmChannelIds)]
+        const { data: dmPeers } = await supabase
+          .rpc('get_dm_peers', { p_channel_ids: uniqueChannelIds })
+        const membersByChannel = {}
+        ;(dmPeers || []).forEach(m => {
+          if (!membersByChannel[m.channel_id]) membersByChannel[m.channel_id] = []
+          membersByChannel[m.channel_id].push({ id: m.id, full_name: m.full_name, avatar_color: m.avatar_color, avatar_url: m.avatar_url })
+        })
         const builtDms = uniqueChannelIds.map(chId => ({
           id: chId, type: 'dm',
           dm_members: (membersByChannel[chId] || []).filter(Boolean),
@@ -1004,14 +1001,11 @@ function NewDmModal({ userId, onClose, onCreated }) {
     // Supabase wraps scalar RPC returns — unwrap if needed
     const channelId = typeof data === 'string' ? data : (data?.id ?? data)
     if (!channelId) { console.error('create_dm_channel returned no id:', data); setStarting(null); return }
-    // Reload the DM channel from DB to get correctly hydrated dm_members
-    const { data: members } = await supabase
-      .from('channel_members')
-      .select('channel_id, athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)')
-      .eq('channel_id', channelId)
+    // Fetch both members via security definer RPC (RLS blocks direct channel_members reads)
+    const { data: dmPeers } = await supabase.rpc('get_dm_peers', { p_channel_ids: [channelId] })
     const dmChannel = {
       id: channelId, type: 'dm',
-      dm_members: (members || []).map(m => m.athlete).filter(Boolean),
+      dm_members: (dmPeers || []).map(m => ({ id: m.id, full_name: m.full_name, avatar_color: m.avatar_color, avatar_url: m.avatar_url })).filter(Boolean),
     }
     onCreated(dmChannel)
   }
