@@ -180,6 +180,26 @@ export default function Messaging({ session, profile, onReadChannel }) {
     setLoading(false)
   }
 
+  // Realtime: increment sidebar unread badge instantly when a new message arrives
+  // in any channel the user is not currently viewing
+  useEffect(() => {
+    const sub = supabase.channel('global-message-feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const { channel_id, athlete_id } = payload.new
+          // Don't increment for own messages or if user has that channel open
+          setSelectedChannel(current => {
+            if (athlete_id === userId) return current
+            if (current?.id === channel_id) return current
+            setUnreadCounts(prev => ({ ...prev, [channel_id]: (prev[channel_id] || 0) + 1 }))
+            onReadChannel?.() // refresh nav badge
+            return current
+          })
+        })
+      .subscribe()
+    return () => supabase.removeChannel(sub)
+  }, [userId])
+
   async function openChannel(channel) {
     setSelectedChannel(channel)
     setShowMentions(false)
@@ -518,7 +538,10 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               .then(({ data }) => {
                 if (data) {
                   setMessages(p => p.some(m => m.id === data.id) ? p : [...p, data])
-                  onMarkRead()
+                  // Only mark read automatically if the message is from the current user
+                  // (they're already looking at it). Other people's messages stay unread
+                  // until the user explicitly opens the channel.
+                  if (payload.new.athlete_id === userId) onMarkRead()
                 }
               })
             return prev
