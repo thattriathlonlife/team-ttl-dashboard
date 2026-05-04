@@ -189,17 +189,19 @@ export default function Messaging({ session, profile, onReadChannel }) {
     const sub = supabase.channel('global-message-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
+          console.log('[GlobalSub] message received:', payload.new)
           const { channel_id, athlete_id } = payload.new
           // Ignore own messages — sender already marked read in sendMessage
-          if (athlete_id === userId) return
+          if (athlete_id === userId) { console.log('[GlobalSub] ignoring own message'); return }
           // Ignore if user currently has this channel open — they're reading it
-          if (selectedChannelRef.current?.id === channel_id) return
+          if (selectedChannelRef.current?.id === channel_id) { console.log('[GlobalSub] ignoring, channel is open'); return }
           // Increment sidebar badge for this channel
+          console.log('[GlobalSub] incrementing unread for', channel_id)
           setUnreadCounts(prev => ({ ...prev, [channel_id]: (prev[channel_id] || 0) + 1 }))
           // Refresh nav badge immediately using ref to avoid stale closure
           onReadChannelRef.current?.()
         })
-      .subscribe()
+      .subscribe((status) => console.log('[GlobalSub] status:', status))
     return () => supabase.removeChannel(sub)
   }, [userId])
 
