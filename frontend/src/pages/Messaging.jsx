@@ -591,6 +591,11 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
 
     if (!error && data) {
       setMessages(prev => prev.map(m => m.id === optimisticId ? data : m))
+      // Mark channel as read for sender immediately after sending
+      await supabase.from('channel_reads').upsert(
+        { channel_id: channel.id, athlete_id: userId, last_read_at: new Date().toISOString() },
+        { onConflict: 'channel_id,athlete_id' }
+      )
       // Insert mentions
       const mentionedIds = extractMentions(content || '')
       if (mentionedIds.length > 0) {
