@@ -126,9 +126,11 @@ export default function Messaging({ session, profile, onReadChannel }) {
           if (!membersByChannel[m.channel_id]) membersByChannel[m.channel_id] = []
           membersByChannel[m.channel_id].push(m.athlete)
         })
-        const builtDms = dmChannelIds.map(chId => ({
+        // Dedupe channel IDs (channel_members could return same channel twice)
+        const uniqueChannelIds = [...new Set(dmChannelIds)]
+        const builtDms = uniqueChannelIds.map(chId => ({
           id: chId, type: 'dm',
-          dm_members: membersByChannel[chId] || [],
+          dm_members: (membersByChannel[chId] || []).filter(Boolean),
         }))
         setDmChannels(builtDms)
       }
@@ -997,15 +999,19 @@ function NewDmModal({ userId, onClose, onCreated }) {
 
   async function startDm(athlete) {
     setStarting(athlete.id)
-    const { data: channelId, error } = await supabase.rpc('create_dm_channel', { other_athlete_id: athlete.id })
-    if (error || !channelId) { setStarting(null); return }
-    // Build the channel object with dm_members so the thread header can render
+    const { data, error } = await supabase.rpc('create_dm_channel', { other_athlete_id: athlete.id })
+    if (error) { console.error('create_dm_channel error:', error); setStarting(null); return }
+    // Supabase wraps scalar RPC returns — unwrap if needed
+    const channelId = typeof data === 'string' ? data : (data?.id ?? data)
+    if (!channelId) { console.error('create_dm_channel returned no id:', data); setStarting(null); return }
+    // Reload the DM channel from DB to get correctly hydrated dm_members
+    const { data: members } = await supabase
+      .from('channel_members')
+      .select('channel_id, athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)')
+      .eq('channel_id', channelId)
     const dmChannel = {
       id: channelId, type: 'dm',
-      dm_members: [
-        { id: userId },
-        { id: athlete.id, full_name: athlete.full_name, avatar_color: athlete.avatar_color, avatar_url: athlete.avatar_url },
-      ],
+      dm_members: (members || []).map(m => m.athlete).filter(Boolean),
     }
     onCreated(dmChannel)
   }
