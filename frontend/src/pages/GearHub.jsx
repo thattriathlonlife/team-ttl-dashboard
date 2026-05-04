@@ -1000,6 +1000,7 @@ function GarageSale({ profile }) {
   const [catFilter, setCatFilter]   = useState('all')
   const [showModal, setShowModal]   = useState(false)
   const [editingListing, setEditingListing] = useState(null)
+  const [messagingSeller, setMessagingSeller] = useState(null)
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin'
 
@@ -1017,11 +1018,14 @@ function GarageSale({ profile }) {
 
   async function handleMessageSeller(sellerId) {
     if (!profile) return
-    // create_dm_channel returns existing or new channel id
+    setMessagingSeller(sellerId)
     const { data, error } = await supabase.rpc('create_dm_channel', { other_athlete_id: sellerId })
+    setMessagingSeller(null)
     if (error) { console.error(error); return }
-    // Navigate to messages tab with the DM channel pre-selected
-    navigate(`/messages?dm=${data}`)
+    // Unwrap scalar — Supabase may return string or object
+    const channelId = typeof data === 'string' ? data : (data?.id ?? data)
+    if (!channelId) { console.error('create_dm_channel returned no id:', data); return }
+    navigate(`/messages?dm=${channelId}`)
   }
 
   async function handleMarkStatus(listing, status) {
@@ -1100,6 +1104,7 @@ function GarageSale({ profile }) {
             onMarkStatus={status => handleMarkStatus(listing, status)}
             onEdit={() => { setEditingListing(listing); setShowModal(true) }}
             onDelete={() => handleDelete(listing.id)}
+            isMessaging={messagingSeller === listing.seller_id}
           />
         ))}
       </div>
@@ -1116,7 +1121,7 @@ function GarageSale({ profile }) {
   )
 }
 
-function GarageListingCard({ listing: l, profile, isAdmin, onMessageSeller, onMarkStatus, onEdit, onDelete }) {
+function GarageListingCard({ listing: l, profile, isAdmin, onMessageSeller, onMarkStatus, onEdit, onDelete, isMessaging }) {
   const isMine  = l.seller_id === profile?.id
   const canEdit = isMine || isAdmin
   const isSold  = l.status !== 'available'
@@ -1177,8 +1182,12 @@ function GarageListingCard({ listing: l, profile, isAdmin, onMessageSeller, onMa
       {/* Actions */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {!isMine && !isSold && (
-          <button style={{ ...S.btnPrimary('#00C4B4'), flex: 1, fontSize: 12, padding: '8px 12px' }} onClick={onMessageSeller}>
-            Message seller
+          <button
+            style={{ ...S.btnPrimary('#00C4B4'), flex: 1, fontSize: 12, padding: '8px 12px', opacity: isMessaging ? 0.6 : 1 }}
+            onClick={onMessageSeller}
+            disabled={isMessaging}
+          >
+            {isMessaging ? 'Opening…' : 'Message seller'}
           </button>
         )}
         {isMine && !isSold && (
@@ -1354,17 +1363,8 @@ const TABS = [
   { id: 'garage', label: 'Garage Sale'   },
 ]
 
-export default function GearHub() {
-  const [tab, setTab]       = useState('deals')
-  const [profile, setProfile] = useState(null)
-
-  useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      setProfile(data)
-    })
-  }, [])
+export default function GearHub({ profile }) {
+  const [tab, setTab] = useState('deals')
 
   return (
     <div style={S.page}>
