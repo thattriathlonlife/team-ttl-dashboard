@@ -69,6 +69,9 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const [searchParams] = useSearchParams()
   const userId = session.user.id
   const isAdmin = profile?.role === 'admin'
+  const selectedChannelRef = useRef(null)
+  const onReadChannelRef = useRef(onReadChannel)
+  useEffect(() => { onReadChannelRef.current = onReadChannel }, [onReadChannel])
 
   useEffect(() => {
     const handleResize = () => {
@@ -187,25 +190,26 @@ export default function Messaging({ session, profile, onReadChannel }) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const { channel_id, athlete_id } = payload.new
-          // Don't increment for own messages or if user has that channel open
-          setSelectedChannel(current => {
-            if (athlete_id === userId) return current
-            if (current?.id === channel_id) return current
-            setUnreadCounts(prev => ({ ...prev, [channel_id]: (prev[channel_id] || 0) + 1 }))
-            onReadChannel?.() // refresh nav badge
-            return current
-          })
+          // Ignore own messages — sender already marked read in sendMessage
+          if (athlete_id === userId) return
+          // Ignore if user currently has this channel open — they're reading it
+          if (selectedChannelRef.current?.id === channel_id) return
+          // Increment sidebar badge for this channel
+          setUnreadCounts(prev => ({ ...prev, [channel_id]: (prev[channel_id] || 0) + 1 }))
+          // Refresh nav badge immediately using ref to avoid stale closure
+          onReadChannelRef.current?.()
         })
       .subscribe()
     return () => supabase.removeChannel(sub)
   }, [userId])
 
   async function openChannel(channel) {
+    selectedChannelRef.current = channel
     setSelectedChannel(channel)
     setShowMentions(false)
     if (isMobile) setShowSidebar(false)
     await supabase.from('channel_reads').upsert(
-      { channel_id: channel.id, athlete_id: userId, last_read_at: new Date().toISOString() },
+      { channel_id: channel.id, athlete_id: userId, last_read_at: new Date(Date.now() + 1000).toISOString() },
       { onConflict: 'channel_id,athlete_id' }
     )
     setUnreadCounts(prev => ({ ...prev, [channel.id]: 0 }))
@@ -292,7 +296,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
           session={session}
           profile={profile}
           isMobile={isMobile}
-          onBack={() => { setShowSidebar(true); setSelectedChannel(null) }}
+          onBack={() => { setShowSidebar(true); selectedChannelRef.current = null; setSelectedChannel(null) }}
           onMarkRead={() => { setUnreadCounts(prev => ({ ...prev, [selectedChannel.id]: 0 })); onReadChannel?.() }}
           onMention={() => setMentionCount(prev => prev + 1)}
         />
@@ -614,9 +618,11 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
 
     if (!error && data) {
       setMessages(prev => prev.map(m => m.id === optimisticId ? data : m))
-      // Mark channel as read for sender immediately after sending
+      // Mark channel as read for sender — use a timestamp slightly ahead to ensure
+      // the just-sent message is always counted as read by get_unread_counts
+      const readAt = new Date(Date.now() + 1000).toISOString()
       await supabase.from('channel_reads').upsert(
-        { channel_id: channel.id, athlete_id: userId, last_read_at: new Date().toISOString() },
+        { channel_id: channel.id, athlete_id: userId, last_read_at: readAt },
         { onConflict: 'channel_id,athlete_id' }
       )
       onMarkRead?.()
