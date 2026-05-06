@@ -16,9 +16,9 @@ A private, invite-only race tracking and team coordination platform for ThatTria
 
 **Training** — Team training feed powered by Strava. Activities sync automatically every hour via GitHub Actions and are served instantly from Supabase — no live Strava API calls at page load. Features include a weekly team summary (swim/bike/run totals), weekly leaderboard (score = sessions × 10 + hours × 5), weekly training streaks, peak week callouts, monthly team recap, activity badge strips, and weekly challenges. Activity cards show available metrics conditionally — pace, power (watts + normalized power), cadence, heart rate, suffer score, PR count, and kudos — only displaying fields the athlete has made public on Strava. Athletes can trigger an immediate manual sync with the Refresh button. Responsive two-column layout on desktop, single column on mobile.
 
-**Messages** — Built-in team messaging replacing WhatsApp. Channels are grouped into General, Training, Groups, and Regions — mirroring the existing WhatsApp group structure — plus Race Threads auto-created when athletes discuss a race. The `#shout-outs` channel (Training category) receives all automated badge, PR, achievement, and challenge completion announcements. The Announcements channel is admin-only. Supports text, image sharing, emoji reactions, Discord-style replies with quoted context, @mentions with a dedicated Mentions view and unread badge, and message editing. Messages are real-time via Supabase subscriptions with optimistic UI for instant feedback. Sections are collapsible to keep the sidebar clean.
+**Messages** — Built-in team messaging replacing WhatsApp. Channels are grouped into General, Training, Groups, and Regions — mirroring the existing WhatsApp group structure — plus Race Threads auto-created when athletes discuss a race. The `#shout-outs` channel (Training category) receives all automated badge, PR, achievement, and challenge completion announcements. The Announcements channel is admin-only. Supports text, image sharing, emoji reactions, Discord-style replies with quoted context, @mentions with a dedicated Mentions view and unread badge, and message editing. Also includes **Direct Messages** — private 1:1 messaging between any two athletes, accessible from the sidebar and triggered automatically from the Garage Sale "Message seller" button. Messages are real-time via Supabase subscriptions with optimistic UI for instant feedback. Unread badges update instantly via realtime, not polling. Sections are collapsible to keep the sidebar clean.
 
-**Discounts** — Partner discount codes managed by admins in-app. Shows brand logo, discount amount, copy-to-clipboard code button, expiry countdown, and single-use/rolling offer badges. Expired discounts auto-archive. No code deploy needed to add or update discounts.
+**Gear** — A three-section hub replacing the old Discounts page. **Partner Deals** — partner discount codes managed by admins in-app; shows brand logo, discount amount, copy-to-clipboard code, expiry countdown, and single-use/rolling offer badges. **Community Gear Guide** — community-sourced gear recommendations organised into categories (Swim, Bike, Run, Nutrition, Recovery, Travel, Fitness, Locations, Coffee, AV Media); each pick shows brand, model, type, link, "good for" tags, and inline reviews; any athlete can add picks and reviews; up/down voting sorts picks by community consensus. **TTL Garage Sale** — peer-to-peer marketplace for buying, selling, and trading used gear within the team; listings include photos, condition, price or trade/free, and a direct "Message seller" button that opens a DM.
 
 **Profile** — Upload a profile photo, pick an avatar colour, update your name and WhatsApp number, view your personal race schedule grouped by month with days-to-go countdown, export your schedule to Google Calendar or Apple Calendar (.ics), view earned badges, and sign out.
 
@@ -26,7 +26,7 @@ A private, invite-only race tracking and team coordination platform for ThatTria
 
 ## Navigation
 
-On desktop the app uses a top navigation bar. On mobile it switches to a bottom tab bar: Home, Races, Training, Messages, Discounts, Profile.
+On desktop the app uses a top navigation bar. On mobile it switches to a bottom tab bar: Home, Races, Training, Messages, Gear, Profile.
 
 ---
 
@@ -84,7 +84,7 @@ Vercel Serverless Fns          GitHub Actions
 │   │   │   ├── Dashboard.jsx       # Race list with filters, search, My Races toggle
 │   │   │   ├── Training.jsx        # Strava training feed + challenges + badge strips
 │   │   │   ├── Messaging.jsx       # Team messaging — channels, replies, @mentions
-│   │   │   ├── Discounts.jsx       # Partner discounts with admin management
+│   │   │   ├── GearHub.jsx         # Gear hub — Partner Deals, Gear Guide, Garage Sale
 │   │   │   ├── ProfilePage.jsx     # Profile settings + personal race schedule + badges
 │   │   │   ├── Login.jsx           # Magic link auth
 │   │   │   └── CompleteProfile.jsx # First-login onboarding — awards welcome_team badge
@@ -140,9 +140,10 @@ cd team-ttl-dashboard
 1. Create a project at [supabase.com](https://supabase.com)
 2. Run `supabase/schema.sql` in the SQL Editor
 3. Run `badge-system-migration.sql` in the SQL Editor
-4. Enable magic link auth: Authentication → Providers → Email
-5. Set Site URL to `http://localhost:5173`
-6. Add `http://localhost:5173/**` to Redirect URLs
+4. Run `gear-hub-migration.sql` in the SQL Editor
+5. Enable magic link auth: Authentication → Providers → Email
+6. Set Site URL to `http://localhost:5173`
+7. Add `http://localhost:5173/**` to Redirect URLs
 
 ### 3. Configure environment variables
 ```bash
@@ -455,17 +456,19 @@ All automated announcements post to the `#shout-outs` channel (looked up by name
 ## Messaging Architecture
 
 - **Channel categories** — General, Training, Groups, Regions, Race Threads. Seeded to match existing WhatsApp group structure
+- **Direct Messages** — private 1:1 channels (type = 'dm') stored in the same `channels` table, members tracked via `channel_members` table. Created via `create_dm_channel(other_athlete_id)` RPC (security definer, handles dedup). DM channels are excluded from team channel queries via `.neq('type', 'dm')`. Members fetched via `get_dm_peers(channel_ids[])` RPC (security definer, bypasses RLS which only allows reading own rows)
 - **Announcements** — `is_readonly = true`, only admins can post, enforced at DB policy level
 - **Collapsible sections** — sidebar groups collapse/expand, defaulting to General open
 - **Channel icons** — colour-coded letter avatars per category (teal = General, amber = Training, purple = Groups, blue = Regions, orange = Race Threads)
-- **Real-time** — Supabase WebSocket subscriptions
+- **Real-time** — Supabase WebSocket subscriptions. `messages` table must be in the `supabase_realtime` publication (run `alter publication supabase_realtime add table messages`)
+- **Global message subscription** — parent-level subscription increments sidebar unread counts instantly for any channel not currently open, without polling
 - **Optimistic UI** — messages appear at 50% opacity with "Sending..." label, confirmed on DB insert
 - **Deduplication** — subscription skips messages already added optimistically
 - **Replies** — Discord-style with quoted parent message
 - **@mentions** — matched against profile names, stored in `message_mentions`, surfaced in Mentions view with pink badge
 - **Edits** — inline edit on hover for own messages, marked with `(edited)` label
 - **Race threads** — auto-created on "Discuss This Race", auto-deleted 14 days post-race
-- **Unread badge** — calculated via single Postgres RPC call (`get_unread_counts`), collapsed sections show aggregate badge
+- **Unread badge** — `get_unread_count` (nav badge) and `get_unread_counts` (sidebar) RPCs exclude the current user's own messages so sending never triggers your own unread badge. Sidebar updates via realtime; nav badge updates via `onReadChannel` callback
 
 ---
 
@@ -499,6 +502,9 @@ DELETE FROM messages WHERE channel_id = (
   SELECT id FROM channels WHERE name = 'channel-name'
 );
 
+-- Delete all DM channels and their messages (cascades via ON DELETE CASCADE)
+DELETE FROM channels WHERE type = 'dm';
+
 -- Backfill welcome_team badge for all existing athletes
 INSERT INTO profile_badges (athlete_id, badge_key)
 SELECT id, 'welcome_team' FROM profiles
@@ -517,6 +523,13 @@ WHERE strava_athlete_id IS NOT NULL AND training_streak_last_active IS NULL;
 ## Roadmap
 
 ### Planned
+- Race history (past races)
+- Admin member management
+- CSV race import
+
+### Planned
+- Push notifications for DMs and @mentions (when app is in background)
+- Read receipts visible to sender ("Seen by…")
 - Race history (past races)
 - Admin member management
 - CSV race import

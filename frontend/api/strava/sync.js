@@ -565,6 +565,9 @@ async function updateSingleChallengeProgress(challenge) {
     .update({
       challenge_progress:             progress,
       challenge_completed_celebrated: justCompleted ? true : challenge.challenge_completed_celebrated,
+      // Auto-close completed challenges so they stop appearing on the Training page
+      // without requiring manual admin action. Data is preserved for recap counts.
+      is_active:                      justCompleted ? false : challenge.is_active,
       updated_at:                     new Date().toISOString(),
     })
     .eq('id', challenge.id)

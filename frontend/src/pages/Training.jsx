@@ -92,7 +92,7 @@ function Av({ name, color, url, size = 26 }) {
 }
 
 // ── Weekly summary ────────────────────────────────────────────────
-function WeeklySummary({ activities }) {
+function WeeklySummary({ activities, challenges }) {
   const ws = getWeekStart(new Date())
   const week = activities.filter(a => new Date(a.start_date) >= ws)
   const sw = week.filter(a => ['Swim'].includes(a.sport_type))
@@ -101,16 +101,32 @@ function WeeklySummary({ activities }) {
   const swKm = sw.reduce((s, a) => s + (a.distance || 0), 0) / 1000
   const bkKm = bk.reduce((s, a) => s + (a.distance || 0), 0) / 1000
   const rnKm = rn.reduce((s, a) => s + (a.distance || 0), 0) / 1000
+
+  // Count challenges that belong to the current ISO week (active or completed)
+  const thisWeekStart = ws.toISOString().slice(0, 10)
+  const thisWeekEnd   = new Date(ws.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const weekChallenges = (challenges || []).filter(ch =>
+    ch.week_start >= thisWeekStart && ch.week_start < thisWeekEnd
+  )
+  const completedCount = weekChallenges.filter(ch => ch.challenge_completed_celebrated).length
+
   const cols = [
-    { e: '🏅', l: 'Sessions', v: week.length,                                        s: 'this week',                                        c: '#fff'    },
-    { e: '🏊', l: 'Swim',     v: swKm > 0 ? `${swKm.toFixed(1)} km` : sw.length,    s: `${sw.length} session${sw.length !== 1 ? 's' : ''}`, c: '#00C4B4' },
-    { e: '🚴', l: 'Bike',     v: bkKm > 0 ? `${bkKm.toFixed(0)} km` : bk.length,    s: `${bk.length} session${bk.length !== 1 ? 's' : ''}`, c: '#FF5A1F' },
-    { e: '🏃', l: 'Run',      v: rnKm > 0 ? `${rnKm.toFixed(1)} km` : rn.length,    s: `${rn.length} session${rn.length !== 1 ? 's' : ''}`, c: '#FF3D8B' },
-  ]
+    { e: '🏅', l: 'Sessions',   v: week.length,                                        s: 'this week',                                        c: '#fff'    },
+    { e: '🏊', l: 'Swim',       v: swKm > 0 ? `${swKm.toFixed(1)} km` : sw.length,    s: `${sw.length} session${sw.length !== 1 ? 's' : ''}`, c: '#00C4B4' },
+    { e: '🚴', l: 'Bike',       v: bkKm > 0 ? `${bkKm.toFixed(0)} km` : bk.length,    s: `${bk.length} session${bk.length !== 1 ? 's' : ''}`, c: '#FF5A1F' },
+    { e: '🏃', l: 'Run',        v: rnKm > 0 ? `${rnKm.toFixed(1)} km` : rn.length,    s: `${rn.length} session${rn.length !== 1 ? 's' : ''}`, c: '#FF3D8B' },
+    // Only show the challenges column when there are challenges this week
+    weekChallenges.length > 0 && {
+      e: '🏆', l: 'Challenges',
+      v: completedCount,
+      s: completedCount === weekChallenges.length ? 'all complete' : `of ${weekChallenges.length}`,
+      c: completedCount > 0 ? '#E8B84B' : '#555',
+    },
+  ].filter(Boolean)
   return (
     <div style={{ background: 'rgba(252,76,2,0.06)', border: '1px solid rgba(252,76,2,0.18)', borderTop: '2px solid #FC4C02', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
       <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2.5px', textTransform: 'uppercase', color: STRAVA_ORANGE, marginBottom: 10 }}>This Week — Team Training</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: 8 }}>
         {cols.map(c => (
           <div key={c.l}>
             <div style={{ fontSize: 10, color: '#555', marginBottom: 3, fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', textTransform: 'uppercase' }}>{c.e} {c.l}</div>
@@ -239,7 +255,7 @@ function PeakWeek({ activities, athleteId }) {
 }
 
 // ── Monthly summary ───────────────────────────────────────────────
-function MonthlySummary({ activities }) {
+function MonthlySummary({ activities, challenges }) {
   const now = new Date()
   if (now.getDate() > 7) return null
   const lm = now.getMonth() === 0 ? 11 : now.getMonth() - 1
@@ -252,6 +268,16 @@ function MonthlySummary({ activities }) {
   const rnKm = acts.filter(a => ['Run','VirtualRun'].includes(a.sport_type)).reduce((s, a) => s + (a.distance || 0), 0) / 1000
   const hrs  = acts.reduce((s, a) => s + (a.moving_time || 0), 0) / 3600
   const aths = new Set(acts.map(a => a.athlete_id)).size
+
+  // Count challenges that were completed during the previous month
+  const monthStart = new Date(Date.UTC(ly, lm, 1)).toISOString().slice(0, 10)
+  const monthEnd   = new Date(Date.UTC(ly, lm + 1, 1)).toISOString().slice(0, 10)
+  const completedChallenges = (challenges || []).filter(ch =>
+    ch.challenge_completed_celebrated &&
+    ch.week_start >= monthStart &&
+    ch.week_start < monthEnd
+  ).length
+
   const stats = [
     swKm > 0 && { emoji: '🏊', label: 'Swim',  value: `${swKm.toFixed(1)} km`, color: '#00C4B4' },
     bkKm > 0 && { emoji: '🚴', label: 'Bike',  value: `${bkKm.toFixed(0)} km`,  color: '#FF5A1F' },
@@ -262,7 +288,10 @@ function MonthlySummary({ activities }) {
     <div style={{ background: 'rgba(255,61,139,0.06)', border: '1px solid rgba(255,61,139,0.18)', borderRadius: 10, padding: '0.875rem 1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
       <div style={{ flexShrink: 0 }}>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: '#FF3D8B', marginBottom: 2 }}>🗓 {MONTHS[lm]} Recap</div>
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: '#fff' }}>{acts.length} sessions · {aths} athlete{aths !== 1 ? 's' : ''}</div>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: '#fff' }}>
+          {acts.length} sessions · {aths} athlete{aths !== 1 ? 's' : ''}
+          {completedChallenges > 0 && ` · ${completedChallenges} challenge${completedChallenges !== 1 ? 's' : ''} completed`}
+        </div>
       </div>
       <div style={{ width: '1px', background: 'rgba(255,255,255,0.08)', alignSelf: 'stretch', flexShrink: 0 }} />
       {stats.map(s => (
@@ -478,10 +507,17 @@ function TrainingPage({ session, profile }) {
   }
 
   async function loadChallenge() {
+    // Fetch active challenges plus recently completed ones (within the activity
+    // retention window — back to 1st of previous month). Completed ones are
+    // excluded from the card display but counted in MonthlySummary / WeeklySummary.
+    const now = new Date()
+    const cutoffYear  = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+    const cutoffMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1
+    const cutoff = new Date(Date.UTC(cutoffYear, cutoffMonth, 1)).toISOString().slice(0, 10)
     const { data } = await supabase
       .from('challenges')
       .select('*')
-      .eq('is_active', true)
+      .gte('week_start', cutoff)
       .order('created_at', { ascending: true })
     setChallenges(data || [])
   }
@@ -579,10 +615,10 @@ function TrainingPage({ session, profile }) {
         <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#555', textTransform: 'uppercase', fontSize: 13 }}>Loading...</div>
       ) : (
         <>
-          <MonthlySummary activities={enriched} />
-          <WeeklySummary activities={enriched} />
+          <MonthlySummary activities={enriched} challenges={challenges} />
+          <WeeklySummary activities={enriched} challenges={challenges} />
 
-          {challenges.map(ch => (
+          {challenges.filter(ch => ch.is_active).map(ch => (
             <ChallengeCard
               key={ch.id}
               challenge={ch}

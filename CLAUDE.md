@@ -86,6 +86,49 @@ Must deploy from `cd frontend && vercel --prod`. Running `vercel --prod` from th
 - `pr_celebrated` (boolean) — prevents duplicate PR shout-outs. Never overwrite `true` back to `false`.
 - `sport_type` stores raw Strava strings (`VirtualRide`, `VirtualRun`, `TrailRun` etc.) — always normalise before comparing.
 
+
+---
+
+## Gear Hub Architecture
+
+### GearHub.jsx — Three-tab page at /discounts
+
+The "Discounts" route now renders `GearHub.jsx`, a three-tab page. The nav label is "Gear" (updated in `Layout.jsx`). Route path stays `/discounts` to avoid breaking bookmarks and the mobile bottom nav.
+
+**Tab 1 — Partner Deals**
+Exact `Discounts.jsx` logic preserved verbatim. Fields: `brand`, `code`, `amount`, `description`, `category`, `color`, `expiry`, `single_use`, `note`, `active`, `sort_order`, `logo_url`. Logo uploads go to the `logos` Supabase Storage bucket. Soft-delete via `active = false`.
+
+**Tab 2 — Community Gear Guide**
+Four tables: `gear_categories`, `gear_picks`, `gear_pick_votes`, `gear_pick_reviews`.
+- Categories are seeded (10 TTL categories) — admins can add more
+- `gear_picks.good_for` is a `text[]` of preset tags — enforced frontend only (chip selector), not by DB constraint
+- Votes: `gear_pick_votes` has composite PK `(pick_id, athlete_id)` with a `direction` column (up/down). Toggling a vote deletes the row; switching direction upserts
+- Sort order: picks sorted by net score (up votes minus down votes) descending
+- Reviews: multiple per pick, any athlete can add, author or admin can delete
+
+**Tab 3 — Garage Sale**
+One table: `garage_listings`. Images upload to `garage-images` Supabase Storage bucket (public, 5MB limit).
+- Upload path: `{seller_id}/{timestamp}.{ext}` — must match the storage RLS policy `(storage.foldername(name))[1] = auth.uid()::text`
+- Storage also requires a SELECT policy on `storage.objects` for `garage-images` — without it, `upsert: true` uploads fail with RLS error even though the bucket is public
+- "Message seller" button calls `create_dm_channel` RPC then navigates to `/messages?dm={channelId}`
+- `GearHub` root accepts `profile` as a prop from `App.jsx` — do NOT re-fetch profile inside `GearHub` (caused RLS failures on garage listing inserts when profile was null on first render)
+
+### DM System
+
+**New tables:** `channel_members(channel_id, athlete_id, joined_at)`
+
+**New RPC functions (both security definer):**
+- `create_dm_channel(other_athlete_id uuid) → uuid` — finds existing DM channel between caller and target, or creates one. Returns the channel ID. Requires `channels.type` and `channels.category` check constraints to include `'dm'`
+- `get_dm_peers(p_channel_ids uuid[]) → table(channel_id, id, full_name, avatar_color, avatar_url)` — returns all members of given DM channels. Security definer needed because RLS on `channel_members` only allows reading own rows, blocking the recipient lookup
+
+**Critical DM gotchas:**
+- `channels` table has check constraints on both `type` and `category` columns. Both must include `'dm'` as a valid value or `create_dm_channel` will fail with a check constraint violation
+- `channel_members` INSERT policy only allows `auth.uid() = athlete_id` — so inserting the other person's membership row must be done inside the `security definer` function
+- All team channel queries must add `.neq('type', 'dm')` to exclude DM channels from sidebar groups
+- `get_unread_count` and `get_unread_counts` RPCs must exclude `athlete_id = p_user_id` from message counts, otherwise senders see their own messages as unread
+- The `messages` table must be added to the `supabase_realtime` publication: `alter publication supabase_realtime add table messages`. Without this, the global sidebar unread subscription won't receive events
+- `onMarkRead` in `MessageThread` only fires after send (not on every incoming realtime message) — the `channel_reads` upsert uses `now() + 1 second` to ensure the just-sent message always falls before `last_read_at`
+
 ---
 
 ## Common Tasks
@@ -111,6 +154,19 @@ DELETE FROM messages WHERE channel_id = (
 );
 ```
 
+### Deleting all DM channels (test cleanup)
+```sql
+DELETE FROM channels WHERE type = 'dm';
+```
+Cascades to `channel_members` and `messages` automatically.
+
+### Clearing all gear picks for a category (test cleanup)
+```sql
+DELETE FROM gear_picks WHERE category_id = (
+  SELECT id FROM gear_categories WHERE name = 'Swim'
+);
+```
+
 ### Checking what sport types are stored
 ```sql
 SELECT DISTINCT sport_type FROM strava_activities ORDER BY sport_type;
@@ -129,6 +185,9 @@ SELECT DISTINCT sport_type FROM strava_activities ORDER BY sport_type;
 | Training feed, weekly summary, challenge cards, badge strips | `Training.jsx` |
 | Badge display on profile | `ProfilePage.jsx` |
 | Welcome badge award | `CompleteProfile.jsx` |
+| Gear hub — Partner Deals, Gear Guide, Garage Sale | `GearHub.jsx` |
+| Team messaging + DMs | `Messaging.jsx` |
+| Responsive nav — top bar (desktop) / bottom tabs (mobile) | `Layout.jsx` |
 
 ---
 
@@ -146,5 +205,5 @@ Future improvement: a "silent bootstrap" flag that awards badges without posting
 - **Colours** — `#00C4B4` (teal/primary), `#FF3D8B` (pink), `#E8B84B` (amber/challenge), `#FF5A1F` (orange), `#161616` (card bg), `#1a1a1a` (modal bg)
 - **Typography** — `Barlow Condensed` for headings/labels/buttons, `Barlow` for body text
 - **Modal pattern** — match `AddRaceModal.jsx` / `InviteModal.jsx`: fixed overlay, `#1a1a1a` bg, coloured `borderTop`, Barlow Condensed title, cancel + submit buttons right-aligned
-- **Admin pattern** — match `Discounts.jsx` admin modal for any new admin UI
+- **Admin pattern** — match the `DiscountModal` in `GearHub.jsx` for any new admin UI
 - **No markdown in messages** — the messaging UI does not render markdown. Do not use `**bold**` in `postToTrainingChannel()` strings.
