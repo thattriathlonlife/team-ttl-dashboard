@@ -1,0 +1,471 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{display:flex;gap:16px;justify-content:center;padding:16px;background:var(--color-background-secondary);border-radius:var(--border-radius-lg);flex-wrap:wrap}
+.label{text-align:center;font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;letter-spacing:0.05em;text-transform:uppercase}
+.phone{width:300px;height:660px;border:1.5px solid var(--color-border-primary);border-radius:38px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.phone.light{background:#f8f8f6}
+.phone.dark{background:#0a0a0a}
+.notch{width:72px;height:4px;border-radius:2px;margin:8px auto 0}
+.phone.light .notch{background:rgba(0,0,0,0.15)}
+.phone.dark .notch{background:rgba(255,255,255,0.15)}
+.status{display:flex;justify-content:space-between;align-items:center;padding:6px 18px 4px}
+.stime{font-size:11px;font-weight:500}
+.phone.light .stime{color:#111}
+.phone.dark .stime{color:#fff}
+.sbars{display:flex;gap:3px;align-items:flex-end}
+.sbar{width:3px;border-radius:1px}
+.phone.light .sbar{background:#111}
+.phone.dark .sbar{background:#fff}
+
+.feed{flex:1;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;padding-bottom:76px}
+.feed::-webkit-scrollbar{display:none}
+
+.ttl-header{padding:14px 16px 8px;display:flex;align-items:center;justify-content:space-between}
+.ttl-logo{font-size:17px;font-weight:500;letter-spacing:-0.02em}
+.phone.light .ttl-logo{color:#111}
+.phone.dark .ttl-logo{color:#fff}
+.ttl-logo span{color:#00C4B4}
+.header-right{display:flex;gap:10px;align-items:center}
+.hicon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.phone.light .hicon{background:#f0f0ee}
+.phone.dark .hicon{background:#1a1a1a}
+
+.filter-row{display:flex;gap:6px;padding:0 16px 10px;overflow-x:auto}
+.filter-row::-webkit-scrollbar{display:none}
+.chip{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;cursor:pointer;border:0.5px solid transparent}
+.phone.light .chip{background:#f0f0ee;color:#666}
+.phone.dark .chip{background:#1a1a1a;color:#666}
+.chip.active{background:#00C4B4;color:#fff;border-color:#00C4B4}
+
+.post{padding:12px 16px;border-bottom:0.5px solid transparent}
+.phone.light .post{border-color:rgba(0,0,0,0.07)}
+.phone.dark .post{border-color:rgba(255,255,255,0.06)}
+.post-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;flex-shrink:0}
+.pname{font-size:13px;font-weight:500}
+.phone.light .pname{color:#111}
+.phone.dark .pname{color:#e8e8e8}
+.pmeta{font-size:10px;margin-top:1px}
+.phone.light .pmeta{color:#999}
+.phone.dark .pmeta{color:#555}
+.pbody{font-size:12px;line-height:1.6;margin-bottom:8px}
+.phone.light .pbody{color:#333}
+.phone.dark .pbody{color:#bbb}
+.pactions{display:flex;gap:16px}
+.pact{display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer}
+.phone.light .pact{color:#999}
+.phone.dark .pact{color:#555}
+.pact svg{width:13px;height:13px}
+
+.sec-divider{display:flex;align-items:center;padding:10px 16px 6px;gap:8px}
+.sec-lbl{font-size:10px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;white-space:nowrap}
+.phone.light .sec-lbl{color:#bbb}
+.phone.dark .sec-lbl{color:#444}
+.sec-line{flex:1;height:0.5px}
+.phone.light .sec-line{background:rgba(0,0,0,0.08)}
+.phone.dark .sec-line{background:rgba(255,255,255,0.08)}
+
+.pod-card{margin:0 12px 10px;border-radius:16px;overflow:hidden}
+.phone.light .pod-card{background:#fff;border:0.5px solid rgba(0,0,0,0.08)}
+.phone.dark .pod-card{background:#18101f;border:0.5px solid #2a1a3a}
+.pod-inner{padding:12px 14px}
+.pod-row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.pod-art{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#2d1a40}
+.pod-title{font-size:12px;font-weight:500;line-height:1.3}
+.phone.light .pod-title{color:#111}
+.phone.dark .pod-title{color:#ddd}
+.pod-ep{font-size:10px;margin-top:2px}
+.phone.light .pod-ep{color:#999}
+.phone.dark .pod-ep{color:#7a5a99}
+.pod-bar{height:3px;border-radius:2px;margin-bottom:5px}
+.phone.light .pod-bar{background:#eee}
+.phone.dark .pod-bar{background:#2a1a3a}
+.pod-fill{height:100%;width:35%;background:#8B5CF6;border-radius:2px}
+.pod-times{display:flex;justify-content:space-between;font-size:9px}
+.phone.light .pod-times{color:#bbb}
+.phone.dark .pod-times{color:#7a5a99}
+.pod-controls{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:10px}
+.pctl{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.phone.light .pctl{background:#f0f0ee}
+.phone.dark .pctl{background:#2a1a3a}
+.pctl.play{width:36px;height:36px;background:#8B5CF6}
+.pctl svg{width:12px;height:12px}
+.phone.light .pctl svg{fill:#555}
+.phone.dark .pctl svg{fill:#ddd}
+.pctl.play svg{fill:#fff;margin-left:2px}
+
+.vid-card{margin:0 12px 10px;border-radius:16px;overflow:hidden}
+.phone.light .vid-card{background:#fff;border:0.5px solid rgba(0,0,0,0.08)}
+.phone.dark .vid-card{background:#111;border:0.5px solid #222}
+.vid-thumb{height:86px;display:flex;align-items:center;justify-content:center;position:relative}
+.phone.light .vid-thumb{background:#e8e8e8}
+.phone.dark .vid-thumb{background:#1a1a1a}
+.vplay{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.phone.light .vplay{background:rgba(0,0,0,0.12)}
+.phone.dark .vplay{background:rgba(255,255,255,0.12)}
+.vplay svg{width:13px;height:13px}
+.phone.light .vplay svg{fill:#333}
+.phone.dark .vplay svg{fill:#fff}
+.ybadge{position:absolute;top:7px;right:8px;background:#FF0000;color:#fff;font-size:8px;font-weight:500;padding:2px 5px;border-radius:3px}
+.vid-info{padding:8px 12px 10px}
+.vid-title{font-size:11px;font-weight:500}
+.phone.light .vid-title{color:#111}
+.phone.dark .vid-title{color:#ddd}
+.vid-meta{font-size:10px;margin-top:2px}
+.phone.light .vid-meta{color:#999}
+.phone.dark .vid-meta{color:#555}
+
+.team-divider{display:flex;align-items:center;padding:12px 16px 8px;gap:8px}
+.team-lbl{font-size:10px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:#00C4B4}
+.team-line{flex:1;height:0.5px;background:rgba(0,196,180,0.25)}
+.team-pill{font-size:9px;color:#00C4B4;background:rgba(0,196,180,0.1);border:0.5px solid rgba(0,196,180,0.25);border-radius:10px;padding:2px 7px;white-space:nowrap}
+
+.ch-card{margin:0 12px 8px;border-radius:14px;padding:11px 13px;background:#111a0f;border:0.5px solid #1e3018}
+.ch-label{font-size:10px;font-weight:500;color:#6b9a52;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+.ch-title{font-size:12px;font-weight:500;color:#d4f0b8;margin-bottom:8px}
+.ch-bar{height:4px;background:#1e3018;border-radius:2px;overflow:hidden;margin-bottom:4px}
+.ch-fill{height:100%;width:68%;background:#7cb849;border-radius:2px}
+.ch-meta{font-size:10px;color:#4a7030;display:flex;justify-content:space-between}
+
+.act-card{margin:0 12px 8px;border-radius:14px;padding:11px 13px;background:#0d1a1a;border:0.5px solid #153030}
+.act-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.act-name{font-size:12px;font-weight:500;color:#c8f0ee}
+.act-sub{font-size:10px;color:#00C4B4;margin-top:1px}
+.act-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.act-box{background:#0a1414;border-radius:8px;padding:6px 7px}
+.act-val{font-size:12px;font-weight:500;color:#00C4B4}
+.act-lbl{font-size:9px;color:#2a6060;margin-top:1px}
+.act-badge{display:inline-flex;align-items:center;gap:4px;margin-top:7px;background:#0a2020;border:0.5px solid #153030;border-radius:12px;padding:3px 8px;font-size:10px;color:#00C4B4}
+
+.race-card{margin:0 12px 8px;border-radius:14px;padding:11px 13px;background:#0d0d1a;border:0.5px solid #1a1a35}
+.race-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.race-name{font-size:12px;font-weight:500;color:#c8c8f0}
+.race-date{font-size:10px;color:#FF3D8B;background:rgba(255,61,139,0.1);border-radius:8px;padding:2px 7px}
+.race-loc{font-size:10px;color:#5a5a99;margin-bottom:6px}
+.race-athletes{display:flex;gap:-4px}
+.race-av{width:20px;height:20px;border-radius:50%;border:1.5px solid #0d0d1a;margin-right:-6px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:500}
+
+.dock{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px;border-radius:40px;padding:7px 12px;z-index:10;border:0.5px solid transparent}
+.phone.light .dock{background:rgba(255,255,255,0.95);border-color:rgba(0,0,0,0.1)}
+.phone.dark .dock{background:rgba(16,16,16,0.95);border-color:rgba(255,255,255,0.1)}
+.dbtn{width:38px;height:38px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;border:none;background:transparent}
+.dbtl{font-size:7px;letter-spacing:0.02em}
+.phone.light .dbtl{color:#aaa}
+.phone.dark .dbtl{color:#555}
+.dbtl.on{color:#00C4B4}
+.dbtn-active{background:rgba(0,196,180,0.1)}
+.ddiv{width:0.5px;height:22px;margin:0 2px}
+.phone.light .ddiv{background:rgba(0,0,0,0.1)}
+.phone.dark .ddiv{background:rgba(255,255,255,0.1)}
+.dsvg{width:17px;height:17px}
+</style>
+
+<div class="wrap">
+
+<div>
+<div class="label">Public member</div>
+<div class="phone light">
+  <div class="notch"></div>
+  <div class="status">
+    <span class="stime">9:41</span>
+    <div class="sbars"><div class="sbar" style="height:8px"></div><div class="sbar" style="height:6px"></div><div class="sbar" style="height:4px;opacity:0.3"></div></div>
+  </div>
+
+  <div class="ttl-header">
+    <div class="ttl-logo">TTL<span>.</span></div>
+    <div class="header-right">
+      <div class="hicon">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#555" stroke-width="1.5"><circle cx="7" cy="7" r="4"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>
+      </div>
+      <div class="hicon" style="background:#e0f7f4">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#00C4B4" stroke-width="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <div class="chip active">All</div>
+    <div class="chip">Training</div>
+    <div class="chip">Racing</div>
+    <div class="chip">Gear</div>
+    <div class="chip">Ask TTL</div>
+  </div>
+
+  <div class="feed" id="feed-light">
+    <div class="post">
+      <div class="post-top">
+        <div class="av" style="background:#e0f0ff;color:#185FA5">JT</div>
+        <div>
+          <div class="pname">Jake T.</div>
+          <div class="pmeta">2h ago · Training</div>
+        </div>
+      </div>
+      <div class="pbody">Anyone doing Kona this year? Looking for long ride partners in Boulder 🚴‍♂️</div>
+      <div class="pactions">
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 2l1.5 3H12L9.5 7l1 3L7 8.5 4.5 10l1-3L3 5h3.5z"/></svg> 24</div>
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 2h12v8H8.5L7 11.5 5.5 10H1z"/></svg> 7</div>
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7h10M8 4l4 3-4 3"/></svg> Share</div>
+      </div>
+    </div>
+
+    <div class="post">
+      <div class="post-top">
+        <div class="av" style="background:#fce4ec;color:#993556">AM</div>
+        <div>
+          <div class="pname">Amy M.</div>
+          <div class="pmeta">5h ago · Gear</div>
+        </div>
+      </div>
+      <div class="pbody">Finally got my Speedsuit dialled in after 3 fittings. Worth every penny for open water. Anyone tried the Roka Maverick Pro II?</div>
+      <div class="pactions">
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 2l1.5 3H12L9.5 7l1 3L7 8.5 4.5 10l1-3L3 5h3.5z"/></svg> 41</div>
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 2h12v8H8.5L7 11.5 5.5 10H1z"/></svg> 12</div>
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7h10M8 4l4 3-4 3"/></svg> Share</div>
+      </div>
+    </div>
+
+    <div class="sec-divider"><span class="sec-lbl">Media</span><div class="sec-line"></div></div>
+
+    <div class="pod-card">
+      <div class="pod-inner">
+        <div class="pod-row">
+          <div class="pod-art"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#8B5CF6" stroke-width="1.5"><circle cx="9" cy="9" r="3"/><path d="M4 9a5 5 0 0 1 5-5M14 9a5 5 0 0 1-5 5"/></svg></div>
+          <div>
+            <div class="pod-title">Ep. 47 — Race week nutrition</div>
+            <div class="pod-ep">TTL Podcast · 58 min</div>
+          </div>
+        </div>
+        <div class="pod-bar"><div class="pod-fill"></div></div>
+        <div class="pod-times"><span>22:14</span><span>58:02</span></div>
+        <div class="pod-controls">
+          <div class="pctl"><svg viewBox="0 0 12 12" fill="#555"><polygon points="9,2 2,6 9,10"/></svg></div>
+          <div class="pctl play"><svg viewBox="0 0 12 12"><rect x="3" y="2" width="2" height="8" rx="1" fill="#fff"/><rect x="7" y="2" width="2" height="8" rx="1" fill="#fff"/></svg></div>
+          <div class="pctl"><svg viewBox="0 0 12 12" fill="#555"><polygon points="3,2 10,6 3,10"/></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vid-card">
+      <div class="vid-thumb">
+        <div class="vplay"><svg viewBox="0 0 12 12"><polygon points="3,1 10,6 3,11"/></svg></div>
+        <span class="ybadge">YouTube</span>
+      </div>
+      <div class="vid-info">
+        <div class="vid-title">How to pace your first 70.3 — TTL breakdown</div>
+        <div class="vid-meta">ThatTriathlonLife · 24 min</div>
+      </div>
+    </div>
+
+    <div class="vid-card">
+      <div class="vid-thumb">
+        <div class="vplay"><svg viewBox="0 0 12 12"><polygon points="3,1 10,6 3,11"/></svg></div>
+        <span class="ybadge">YouTube</span>
+      </div>
+      <div class="vid-info">
+        <div class="vid-title">Kona 2024 race recap — pro breakdowns</div>
+        <div class="vid-meta">ThatTriathlonLife · 18 min</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dock" id="dock-light">
+    <button class="dBtn dbtn-active" onclick="jmp('feed-light','top-light','dock-light',0)">
+      <svg class="dsvg" viewBox="0 0 18 18" fill="none" stroke="#00C4B4" stroke-width="1.5"><rect x="2" y="2" width="6" height="6" rx="1.5"/><rect x="10" y="2" width="6" height="6" rx="1.5"/><rect x="2" y="10" width="6" height="6" rx="1.5"/><rect x="10" y="10" width="6" height="6" rx="1.5"/></svg>
+      <span class="dbtl on">feed</span>
+    </button>
+    <button class="dBtn" onclick="jmp('feed-light','media-light','dock-light',1)">
+      <svg class="dsvg" viewBox="0 0 18 18" fill="none" stroke="#aaa" stroke-width="1.5"><circle cx="9" cy="9" r="6"/><polygon points="7,6 13,9 7,12" fill="#aaa" stroke="none"/></svg>
+      <span class="dbtl">media</span>
+    </button>
+    <button class="dBtn" onclick="jmp('feed-light','profile-light','dock-light',2)">
+      <svg class="dsvg" viewBox="0 0 18 18" fill="none" stroke="#aaa" stroke-width="1.5"><circle cx="9" cy="7" r="3"/><path d="M3 17c0-3.31 2.69-6 6-6s6 2.69 6 6"/></svg>
+      <span class="dbtl">you</span>
+    </button>
+  </div>
+  <div id="top-light" style="display:none"></div>
+  <div id="media-light" style="display:none"></div>
+  <div id="profile-light" style="display:none"></div>
+</div>
+</div>
+
+<div>
+<div class="label">Team member</div>
+<div class="phone dark">
+  <div class="notch"></div>
+  <div class="status">
+    <span class="stime">9:41</span>
+    <div class="sbars"><div class="sbar" style="height:8px"></div><div class="sbar" style="height:6px"></div><div class="sbar" style="height:4px;opacity:0.3"></div></div>
+  </div>
+
+  <div class="ttl-header">
+    <div class="ttl-logo">TTL<span>.</span></div>
+    <div class="header-right">
+      <div class="hicon">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#666" stroke-width="1.5"><circle cx="7" cy="7" r="4"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>
+      </div>
+      <div class="hicon" style="background:#0d2e2e">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#00C4B4" stroke-width="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <div class="chip active">All</div>
+    <div class="chip">Training</div>
+    <div class="chip">Racing</div>
+    <div class="chip">Gear</div>
+    <div class="chip">Ask TTL</div>
+  </div>
+
+  <div class="feed" id="feed-dark">
+    <div class="post">
+      <div class="post-top">
+        <div class="av" style="background:#1e3050;color:#85B7EB">JT</div>
+        <div>
+          <div class="pname">Jake T.</div>
+          <div class="pmeta">2h ago · Training</div>
+        </div>
+      </div>
+      <div class="pbody">Anyone doing Kona this year? Looking for long ride partners in Boulder 🚴‍♂️</div>
+      <div class="pactions">
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 2l1.5 3H12L9.5 7l1 3L7 8.5 4.5 10l1-3L3 5h3.5z"/></svg> 24</div>
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 2h12v8H8.5L7 11.5 5.5 10H1z"/></svg> 7</div>
+        <div class="pact"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7h10M8 4l4 3-4 3"/></svg> Share</div>
+      </div>
+    </div>
+
+    <div class="sec-divider"><span class="sec-lbl">Media</span><div class="sec-line"></div></div>
+
+    <div class="pod-card">
+      <div class="pod-inner">
+        <div class="pod-row">
+          <div class="pod-art"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#8B5CF6" stroke-width="1.5"><circle cx="9" cy="9" r="3"/><path d="M4 9a5 5 0 0 1 5-5M14 9a5 5 0 0 1-5 5"/></svg></div>
+          <div>
+            <div class="pod-title">Ep. 47 — Race week nutrition</div>
+            <div class="pod-ep">TTL Podcast · 58 min</div>
+          </div>
+        </div>
+        <div class="pod-bar"><div class="pod-fill"></div></div>
+        <div class="pod-times"><span>22:14</span><span>58:02</span></div>
+        <div class="pod-controls">
+          <div class="pctl"><svg viewBox="0 0 12 12"><polygon points="9,2 2,6 9,10" fill="#aaa"/></svg></div>
+          <div class="pctl play"><svg viewBox="0 0 12 12"><rect x="3" y="2" width="2" height="8" rx="1" fill="#fff"/><rect x="7" y="2" width="2" height="8" rx="1" fill="#fff"/></svg></div>
+          <div class="pctl"><svg viewBox="0 0 12 12"><polygon points="3,2 10,6 3,10" fill="#aaa"/></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="team-divider" id="team-anchor">
+      <span class="team-lbl">Team</span>
+      <div class="team-line"></div>
+      <span class="team-pill">members only</span>
+    </div>
+
+    <div class="ch-card">
+      <div class="ch-label">Active challenge</div>
+      <div class="ch-title">Team Run 200km — week 3</div>
+      <div class="ch-bar"><div class="ch-fill"></div></div>
+      <div class="ch-meta"><span>136 / 200km</span><span>4 days left</span></div>
+    </div>
+
+    <div class="act-card">
+      <div class="act-top">
+        <div class="av" style="background:#0d2e2e;color:#00C4B4;width:28px;height:28px;font-size:9px;flex-shrink:0">ZG</div>
+        <div>
+          <div class="act-name">Zack Godwin</div>
+          <div class="act-sub">Morning Run · 2h ago</div>
+        </div>
+      </div>
+      <div class="act-grid">
+        <div class="act-box"><div class="act-val">18.4km</div><div class="act-lbl">Distance</div></div>
+        <div class="act-box"><div class="act-val">4:58/km</div><div class="act-lbl">Pace</div></div>
+        <div class="act-box"><div class="act-val">3 PRs</div><div class="act-lbl">PRs</div></div>
+      </div>
+      <div class="act-badge">
+        <svg width="9" height="9" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#00C4B4"/></svg>
+        Marathon Legs
+      </div>
+    </div>
+
+    <div class="race-card">
+      <div class="race-top">
+        <div class="race-name">IRONMAN 70.3 Oceanside</div>
+        <div class="race-date">Apr 5</div>
+      </div>
+      <div class="race-loc">Oceanside, CA · 6 weeks away</div>
+      <div class="race-athletes">
+        <div class="race-av" style="background:#0d2e2e;color:#00C4B4">ZG</div>
+        <div class="race-av" style="background:#1a0d2e;color:#FF3D8B">SK</div>
+        <div class="race-av" style="background:#1e3050;color:#85B7EB">MJ</div>
+        <div class="race-av" style="background:#1a1a0d;color:#E8B84B;font-size:7px">+4</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="dock" id="dock-dark">
+    <button class="dBtn dbtn-active" onclick="jmpD('feed-dark','top-dark','dock-dark',0)">
+      <svg class="dsvg" viewBox="0 0 18 18" fill="none" stroke="#00C4B4" stroke-width="1.5"><rect x="2" y="2" width="6" height="6" rx="1.5"/><rect x="10" y="2" width="6" height="6" rx="1.5"/><rect x="2" y="10" width="6" height="6" rx="1.5"/><rect x="10" y="10" width="6" height="6" rx="1.5"/></svg>
+      <span class="dbtl on">feed</span>
+    </button>
+    <button class="dBtn" onclick="jmpD('feed-dark','media-dark','dock-dark',1)">
+      <svg class="dsvg" viewBox="0 0 18 18" fill="none" stroke="#555" stroke-width="1.5"><circle cx="9" cy="9" r="6"/><polygon points="7,6 13,9 7,12" fill="#555" stroke="none"/></svg>
+      <span class="dbtl">media</span>
+    </button>
+    <div class="ddiv"></div>
+    <button class="dBtn" onclick="jmpD('feed-dark','team-anchor','dock-dark',2)">
+      <svg class="dsvg" viewBox="0 0 18 18" fill="none" stroke="#00C4B4" stroke-width="1.5"><polyline points="2,13 5,9 8,11 12,6 16,9"/></svg>
+      <span class="dbtl on">team</span>
+    </button>
+    <button class="dBtn" onclick="jmpD('feed-dark','profile-dark','dock-dark',3)">
+      <svg class="dsvg" viewBox="0 0 18 18" fill="none" stroke="#555" stroke-width="1.5"><circle cx="9" cy="7" r="3"/><path d="M3 17c0-3.31 2.69-6 6-6s6 2.69 6 6"/></svg>
+      <span class="dbtl">you</span>
+    </button>
+  </div>
+  <div id="top-dark" style="display:none"></div>
+  <div id="media-dark" style="display:none"></div>
+  <div id="profile-dark" style="display:none"></div>
+</div>
+</div>
+
+</div>
+
+<script>
+function jmp(feedId, anchorId, dockId, idx) {
+  const feed = document.getElementById(feedId);
+  const anchor = document.getElementById(anchorId);
+  if(feed && anchor && anchor !== feed) {
+    feed.scrollTo({top: anchor.offsetTop - 10, behavior:'smooth'});
+  } else if(feed) {
+    feed.scrollTo({top: 0, behavior:'smooth'});
+  }
+  setActive(dockId, idx, false);
+}
+function jmpD(feedId, anchorId, dockId, idx) {
+  const feed = document.getElementById(feedId);
+  const anchor = document.getElementById(anchorId);
+  if(feed && anchor && anchor !== feed) {
+    feed.scrollTo({top: anchor.offsetTop - 10, behavior:'smooth'});
+  } else if(feed) {
+    feed.scrollTo({top: 0, behavior:'smooth'});
+  }
+  setActive(dockId, idx, true);
+}
+function setActive(dockId, idx, dark) {
+  const dock = document.getElementById(dockId);
+  if(!dock) return;
+  const btns = dock.querySelectorAll('.dBtn');
+  const svgs = dock.querySelectorAll('.dBtn svg');
+  const lbls = dock.querySelectorAll('.dbtl');
+  btns.forEach((b,i) => {
+    b.classList.remove('dbtn-active');
+    if(lbls[i]) { lbls[i].classList.remove('on'); }
+    if(svgs[i]) { svgs[i].setAttribute('stroke', dark ? '#555' : '#aaa'); }
+  });
+  if(btns[idx]) {
+    btns[idx].classList.add('dbtn-active');
+    if(lbls[idx]) lbls[idx].classList.add('on');
+    if(svgs[idx]) svgs[idx].setAttribute('stroke','#00C4B4');
+  }
+}
+</script>
