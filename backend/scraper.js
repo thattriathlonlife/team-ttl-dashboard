@@ -8,24 +8,47 @@
  */
 
 import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
-import ws from 'ws';
 
 // --- Config ---
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const TRIATHLON_API_KEY = process.env.TRIATHLON_API_KEY;
 const TRIATHLON_API_BASE = 'https://api.triathlon.org/v1';
+
+// ---------------------------------------------------------------
+// SUPABASE REST HELPER — replaces the JS client entirely.
+// Uses the PostgREST API directly via fetch (native in Node 20).
+// This avoids the WebSocket initialisation that @supabase/supabase-js
+// performs at client creation time, which fails on Node < 22.
+// ---------------------------------------------------------------
+async function supabaseRequest(path, method = 'GET', body = null, extraHeaders = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+    method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...extraHeaders,
+    },
+    body: body ? JSON.stringify(body) : null,
+  });
+
+  // DELETE and some POSTs return no body
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!res.ok) {
+    return { data: null, error: { message: text || res.statusText } };
+  }
+  return { data, error: null };
+}
 
 // ---------------------------------------------------------------
 // FEATURE FLAG — set to true once Meta Business account is ready
 // ---------------------------------------------------------------
 const NOTIFICATIONS_ENABLED = false;
-
-// Meta WhatsApp Cloud API config (unused until NOTIFICATIONS_ENABLED = true)
-// const WA_API_URL = `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_ID}/messages`;
-// const WA_TOKEN = process.env.WHATSAPP_TOKEN;
-// const WA_CHANNEL_ID = process.env.WHATSAPP_CHANNEL_ID;
 
 // ---------------------------------------------------------------
 // TRIATHLON.ORG API — fetch events by date range
@@ -251,15 +274,10 @@ function parseDateStr(str) {
 // ---------------------------------------------------------------
 
 function extractCityFromName(raceName) {
-  // Strip "Ironman 70.3 " or "Ironman " prefix and take what's left
-  // e.g. "Ironman 70.3 Chattanooga" → "Chattanooga"
-  // e.g. "Ironman Hamburg" → "Hamburg"
-  // Only use this if the remainder is a single recognisable place name (no spaces = likely a city)
   const stripped = raceName
     .replace(/^ironman\s+70\.3\s+/i, '')
     .replace(/^ironman\s+/i, '')
     .trim();
-  // Accept as city if it's 1-3 words and doesn't look like a generic descriptor
   if (stripped && stripped.split(' ').length <= 3 && !/championship|world|series/i.test(stripped)) {
     return stripped;
   }
@@ -267,12 +285,8 @@ function extractCityFromName(raceName) {
 }
 
 function extractCityFromLocation(location) {
-  // "Hamburg, Germany" → "Hamburg"
-  // "State College, PA, United States" → "State College"
-  // "United States" (country only) → null
   if (!location || location === 'TBD') return null;
   const parts = location.split(',').map(p => p.trim());
-  // If only one part it's just a country — no city
   if (parts.length < 2) return null;
   return parts[0] || null;
 }
@@ -287,13 +301,10 @@ async function geocodeRaces(races) {
       continue;
     }
 
-    // Derive best city guess before geocoding
     const cityFromName = extractCityFromName(race.name);
     const cityFromLocation = extractCityFromLocation(race.location);
     const bestCity = cityFromName || cityFromLocation || null;
 
-    // Build geocode query — use city+country if we have it, else full location
-    // Append "city" as a hint to help Nominatim prefer populated places over islands/regions
     const geocodeQuery = bestCity && race.country
       ? `${bestCity}, ${race.country}`
       : race.location;
@@ -313,7 +324,6 @@ async function geocodeRaces(races) {
       const data = await res.json();
 
       if (data.length > 0) {
-        // Pick the result that has the richest city-level address data
         const ranked = data.sort((a, b) => {
           const aHasCity = !!(a.address?.city || a.address?.town || a.address?.village);
           const bHasCity = !!(b.address?.city || b.address?.town || b.address?.village);
@@ -323,11 +333,9 @@ async function geocodeRaces(races) {
         const addr = place.address || {};
         const placeType = place.type || '';
 
-        // Extract city from structured address — most reliable signal
         const geocodedCity = addr.city || addr.town || addr.village ||
           addr.municipality || addr.city_district || null;
 
-        // Types that are definitively NOT cities — reject coords for these
         const invalidTypes = ['bay', 'sea', 'ocean', 'river', 'lake', 'region',
           'state', 'country', 'continent', 'county', 'district'];
         const isInvalidType = invalidTypes.includes(placeType) && !geocodedCity;
@@ -378,10 +386,12 @@ async function upsertRaces(races) {
 
   for (let i = 0; i < races.length; i += batchSize) {
     const batch = races.slice(i, i + batchSize);
-    const { data, error } = await supabase
-      .from('races')
-      .upsert(batch, { onConflict: 'external_id', ignoreDuplicates: false })
-      .select();
+    const { data, error } = await supabaseRequest(
+      '/races?on_conflict=external_id',
+      'POST',
+      batch,
+      { 'Prefer': 'resolution=merge-duplicates,return=representation' }
+    );
 
     if (error) {
       console.error(`[DB] Upsert error (batch ${Math.floor(i / batchSize) + 1}):`, error.message);
@@ -396,8 +406,6 @@ async function upsertRaces(races) {
 // ---------------------------------------------------------------
 // NOTIFICATION — Check for races this weekend & notify WhatsApp
 // Disabled until Meta Business account is approved.
-// To re-enable: set NOTIFICATIONS_ENABLED = true at the top,
-// then uncomment the WA_API_URL / WA_TOKEN / WA_CHANNEL_ID lines.
 // ---------------------------------------------------------------
 async function checkAndNotify() {
   if (!NOTIFICATIONS_ENABLED) {
@@ -423,16 +431,9 @@ async function checkAndNotify() {
   const satStr = saturday.toISOString().split('T')[0];
   const sunStr = sunday.toISOString().split('T')[0];
 
-  const { data: races, error } = await supabase
-    .from('races')
-    .select(`
-      id, name, type, race_date, location,
-      race_entries(
-        athlete_id,
-        profiles(full_name, whatsapp_number)
-      )
-    `)
-    .in('race_date', [satStr, sunStr]);
+  const { data: races, error } = await supabaseRequest(
+    `/races?select=id,name,type,race_date,location,race_entries(athlete_id,profiles(full_name,whatsapp_number))&race_date=in.(${satStr},${sunStr})`
+  );
 
   if (error) { console.error('[Notify] DB error:', error.message); return; }
   if (!races || races.length === 0) { console.log('[Notify] No races this weekend'); return; }
@@ -481,14 +482,14 @@ async function sendWhatsAppMessage(message, raceId) {
       throw new Error(JSON.stringify(err));
     }
 
-    await supabase.from('notification_log').insert({
+    await supabaseRequest('/notification_log', 'POST', {
       race_id: raceId, channel: 'whatsapp', message, status: 'sent',
     });
 
     console.log('[Notify] WhatsApp message sent for race:', raceId);
   } catch (err) {
     console.error('[Notify] WhatsApp send failed:', err.message);
-    await supabase.from('notification_log').insert({
+    await supabaseRequest('/notification_log', 'POST', {
       race_id: raceId, channel: 'whatsapp', message, status: 'failed',
     });
   }
@@ -500,23 +501,20 @@ async function sendWhatsAppMessage(message, raceId) {
 async function cleanupOldRaceChannels() {
   console.log('[Cleanup] Checking for expired race channels...');
 
-  // Find race channels where the race was more than 14 days ago
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 14);
   const cutoffDate = cutoff.toISOString().split('T')[0];
 
-  const { data: expiredChannels, error: fetchError } = await supabase
-    .from('channels')
-    .select('id, name, races(name, race_date)')
-    .eq('type', 'race')
-    .not('race_id', 'is', null);
+  const { data: allRaceChannels, error: fetchError } = await supabaseRequest(
+    '/channels?select=id,name,races(name,race_date)&type=eq.race&race_id=not.is.null'
+  );
 
   if (fetchError) {
     console.error('[Cleanup] Failed to fetch race channels:', fetchError.message);
     return;
   }
 
-  const toDelete = (expiredChannels || []).filter(ch => {
+  const toDelete = (allRaceChannels || []).filter(ch => {
     const raceDate = ch.races?.race_date;
     return raceDate && raceDate < cutoffDate;
   });
@@ -529,12 +527,11 @@ async function cleanupOldRaceChannels() {
   console.log(`[Cleanup] Found ${toDelete.length} expired race channel(s) to delete:`);
   toDelete.forEach(ch => console.log(`  - #${ch.name} (race: ${ch.races?.race_date})`));
 
-  // Delete channels — messages/reactions/mentions cascade automatically
-  const ids = toDelete.map(ch => ch.id);
-  const { error: deleteError } = await supabase
-    .from('channels')
-    .delete()
-    .in('id', ids);
+  const ids = toDelete.map(ch => ch.id).join(',');
+  const { error: deleteError } = await supabaseRequest(
+    `/channels?id=in.(${ids})`,
+    'DELETE'
+  );
 
   if (deleteError) {
     console.error('[Cleanup] Failed to delete channels:', deleteError.message);
