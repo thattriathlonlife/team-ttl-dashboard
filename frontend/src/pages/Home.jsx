@@ -84,7 +84,7 @@ function RaceMap({ races }) {
           fontSize: '14px', letterSpacing: '2px',
           textTransform: 'uppercase', color: '#555',
         }}>
-          No location data for this week's races
+          No location data for these races
         </div>
       </div>
     )
@@ -143,6 +143,7 @@ function RaceMap({ races }) {
 
 export default function Home({ session }) {
   const [weekRaces, setWeekRaces] = useState([])
+  const [upcomingRaces, setUpcomingRaces] = useState([])
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -161,17 +162,31 @@ export default function Home({ session }) {
   async function loadWeek() {
     const { start, end } = getWeekRange()
     const userId = session.user.id
-    const [racesRes, profileRes] = await Promise.all([
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    const horizon = new Date(today)
+    horizon.setDate(today.getDate() + 90)
+    const horizonStr = horizon.toISOString().split('T')[0]
+    const [racesRes, upcomingRes, profileRes] = await Promise.all([
       supabase
         .from('races')
         .select('*, race_entries(athlete_id, profiles(full_name, id))')
         .gte('race_date', start)
         .lte('race_date', end)
         .order('race_date'),
+      supabase
+        .from('races')
+        .select('*')
+        .gte('race_date', todayStr)
+        .lte('race_date', horizonStr)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .order('race_date'),
       supabase.from('profiles').select('*').eq('id', userId).single(),
       ensureProfile(),
     ])
     if (racesRes.data) setWeekRaces(racesRes.data.filter(r => r.race_entries?.length > 0))
+    if (upcomingRes.data) setUpcomingRaces(upcomingRes.data)
     if (profileRes.data) setProfile(profileRes.data)
     setLoading(false)
   }
@@ -295,10 +310,23 @@ export default function Home({ session }) {
             </div>
           </div>
 
-          {/* 3 — Map */}
-          <RaceMap races={weekRaces} />
         </>
       )}
+
+      {/* Map — always shown. In quiet weeks (no TTL entries) it falls back
+          to upcoming races over the next 90 days so the map never vanishes. */}
+      <div style={{ marginTop: '1.25rem' }}>
+        {weekRaces.length === 0 && (
+          <div style={{
+            fontFamily: 'Barlow Condensed, sans-serif',
+            fontSize: '12px', letterSpacing: '3px',
+            textTransform: 'uppercase', color: '#00C4B4', marginBottom: '10px',
+          }}>
+            On the horizon — upcoming races
+          </div>
+        )}
+        <RaceMap races={weekRaces.length > 0 ? weekRaces : upcomingRaces} />
+      </div>
     </div>
   )
 }
