@@ -131,27 +131,63 @@ const styles = {
 }
 
 export default function Login() {
+  // Multi-method auth (auth amendment, 2026-10-31): password is primary,
+  // email code and magic link are fallbacks. "Continue with Shopify" activates
+  // when TTL creates the Customer Account API client (see AUTH-AMENDMENT.md);
+  // the button is shown disabled so the target shape is visible in the POC.
+  const [mode, setMode] = useState('password') // 'password' | 'code' | 'link'
+  const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e) => {
+  async function handlePassword(e) {
     e.preventDefault()
-    if (!email) return
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
+    const fn = isSignUp ? supabase.auth.signUp : supabase.auth.signInWithPassword
+    const { error } = await fn({ email, password })
+    setLoading(false)
+    if (error) setError(error.message)
+    else if (isSignUp) setSent('signup')
+  }
+
+  async function handleSendCode(e) {
+    e.preventDefault()
+    setLoading(true); setError('')
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
+    setLoading(false)
+    if (error) setError(error.message); else setCodeSent(true)
+  }
+
+  async function handleVerifyCode(e) {
+    e.preventDefault()
+    setLoading(true); setError('')
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' })
+    setLoading(false)
+    if (error) setError(error.message)
+  }
+
+  async function handleLink(e) {
+    e.preventDefault()
+    setLoading(true); setError('')
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: window.location.origin },
     })
     setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      setSent(true)
-    }
+    if (error) setError(error.message); else setSent('link')
   }
+
+  const tabBtn = (m, label) => (
+    <button type="button" onClick={() => { setMode(m); setError(''); setCodeSent(false) }}
+      style={{ flex: 1, background: mode === m ? '#1f1f1f' : 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: mode === m ? '#fff' : '#888', padding: '9px 4px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', cursor: 'pointer' }}>
+      {label}
+    </button>
+  )
 
   return (
     <div style={styles.page}>
@@ -159,33 +195,65 @@ export default function Login() {
       <div style={styles.stripes} />
       <div style={styles.card}>
         <div style={styles.logo}>TTL</div>
-        <div style={styles.logoSub}>Team Dashboard</div>
+        <div style={styles.logoSub}>That Triathlon Life</div>
 
         {sent ? (
           <div style={styles.success}>
-            Check your email for a magic link to sign in.
+            {sent === 'link' ? 'Check your email for a magic link to sign in.' : 'Account created — check your email to confirm, then sign in.'}
           </div>
         ) : (
           <>
-            <div style={styles.heading}>Sign In</div>
+            <div style={styles.heading}>{isSignUp && mode === 'password' ? 'Create Account' : 'Sign In'}</div>
             <div style={styles.sub}>
-              Enter your email to receive a sign-in link.<br />
-              Invite-only — contact your team admin to join.
+              Team members get the full app; everyone can browse races, the map, and TTL content.
             </div>
-            <form style={styles.form} onSubmit={handleSubmit}>
-              <input
-                style={styles.input}
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-              {error && <div style={styles.error}>{error}</div>}
-              <button style={styles.btn} type="submit" disabled={loading}>
-                {loading ? 'Sending...' : 'Send Magic Link'}
-              </button>
-            </form>
+
+            <button type="button" disabled title="Activates when the TTL store creates its Customer Account API client"
+              style={{ ...styles.btn, width: '100%', background: '#222', color: '#777', cursor: 'not-allowed', marginBottom: 6 }}>
+              Continue with Shopify — coming soon
+            </button>
+            <div style={styles.divider}><div style={styles.dividerLine} />or<div style={styles.dividerLine} /></div>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {tabBtn('password', 'Password')}
+              {tabBtn('code', 'Email code')}
+              {tabBtn('link', 'Magic link')}
+            </div>
+
+            {mode === 'password' && (
+              <form style={styles.form} onSubmit={handlePassword}>
+                <input style={styles.input} type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                <input style={styles.input} type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+                {error && <div style={styles.error}>{error}</div>}
+                <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Working…' : isSignUp ? 'Create Account' : 'Sign In'}</button>
+                <button type="button" onClick={() => setIsSignUp(v => !v)} style={{ background: 'none', border: 'none', color: '#888', fontSize: 13, cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                  {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
+                </button>
+              </form>
+            )}
+
+            {mode === 'code' && !codeSent && (
+              <form style={styles.form} onSubmit={handleSendCode}>
+                <input style={styles.input} type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                {error && <div style={styles.error}>{error}</div>}
+                <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Sending…' : 'Email Me a Code'}</button>
+              </form>
+            )}
+            {mode === 'code' && codeSent && (
+              <form style={styles.form} onSubmit={handleVerifyCode}>
+                <input style={styles.input} type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" value={code} onChange={e => setCode(e.target.value)} required />
+                {error && <div style={styles.error}>{error}</div>}
+                <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Verifying…' : 'Verify Code'}</button>
+              </form>
+            )}
+
+            {mode === 'link' && (
+              <form style={styles.form} onSubmit={handleLink}>
+                <input style={styles.input} type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                {error && <div style={styles.error}>{error}</div>}
+                <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Sending...' : 'Send Magic Link'}</button>
+              </form>
+            )}
           </>
         )}
       </div>

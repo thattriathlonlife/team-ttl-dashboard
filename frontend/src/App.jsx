@@ -11,6 +11,8 @@ import CompleteProfile from './pages/CompleteProfile'
 import Training from './pages/Training'
 import Content from './pages/Content'
 import Layout from './components/Layout'
+import TeamLocked from './components/TeamLocked'
+import { isTeamTier } from './lib/tier'
 
 function AppRoutes({ session, profile, setProfile }) {
   const [unreadCount, setUnreadCount] = useState(0)
@@ -44,10 +46,10 @@ function AppRoutes({ session, profile, setProfile }) {
         <Route path="/login" element={<Navigate to="/" />} />
         <Route path="/" element={<Home session={session} />} />
         <Route path="/races" element={<Dashboard session={session} />} />
-        <Route path="/training" element={<Training session={session} profile={profile} />} />
+        <Route path="/training" element={isTeamTier(profile) ? <Training session={session} profile={profile} /> : <TeamLocked feature="Training" />} />
         <Route path="/content" element={<Content />} />
         <Route path="/messages" element={<Messaging session={session} profile={profile} onReadChannel={loadUnreadCount} />} />
-        <Route path="/discounts" element={<GearHub profile={profile} />} />
+        <Route path="/discounts" element={isTeamTier(profile) ? <GearHub profile={profile} /> : <TeamLocked feature="Gear & Deals" />} />
         <Route path="/profile" element={<ProfilePage session={session} profile={profile} onSave={handleProfileSave} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

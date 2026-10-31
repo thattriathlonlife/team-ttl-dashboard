@@ -1,3 +1,4 @@
+import { getDemoTier, setDemoTier } from '../lib/tier'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -237,6 +238,15 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
       </div>
 
       <button style={S.saveBtn} onClick={handleSave} disabled={saving || uploading}>{saving ? 'Saving...' : 'Save Profile'}</button>
+      <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Demo view (proof of concept)</div>
+        <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#888', marginBottom: 10 }}>Preview the app as a fan or as a team member. Real access is set by team entitlement.</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {['fan', 'team'].map(t => (
+            <button key={t} onClick={() => setDemoTier(t)} style={{ flex: 1, background: getDemoTier() === t ? 'var(--brand)' : '#1f1f1f', color: getDemoTier() === t ? '#06282a' : '#ccc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '9px 4px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', cursor: 'pointer' }}>{t === 'fan' ? 'Fan view' : 'Team view'}</button>
+          ))}
+        </div>
+      </div>
       <button style={S.signOutBtn} onClick={signOut}>Sign Out</button>
 
       <div style={S.divider} />
