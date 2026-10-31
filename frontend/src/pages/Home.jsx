@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 function getWeekRange() {
@@ -66,86 +67,14 @@ function RaceRow({ race }) {
   )
 }
 
-function RaceMap({ races }) {
-  const racesWithCoords = races.filter(r => r.latitude && r.longitude)
-
-  if (racesWithCoords.length === 0) {
-    return (
-      <div style={{
-        background: '#161616',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '12px', height: '340px',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: '12px',
-      }}>
-        <div style={{ fontSize: '32px' }}>🗺️</div>
-        <div style={{
-          fontFamily: 'Barlow Condensed, sans-serif',
-          fontSize: '14px', letterSpacing: '2px',
-          textTransform: 'uppercase', color: '#555',
-        }}>
-          No location data for these races
-        </div>
-      </div>
-    )
-  }
-
-  const markers = racesWithCoords.map(r => `marker=${r.latitude},${r.longitude}`).join('&')
-  const minLat = Math.min(...racesWithCoords.map(r => r.latitude))
-  const maxLat = Math.max(...racesWithCoords.map(r => r.latitude))
-  const minLon = Math.min(...racesWithCoords.map(r => r.longitude))
-  const maxLon = Math.max(...racesWithCoords.map(r => r.longitude))
-  const latPad = Math.max((maxLat - minLat) * 0.4, 2)
-  const lonPad = Math.max((maxLon - minLon) * 0.4, 3)
-  const bbox = `${minLon - lonPad},${minLat - latPad},${maxLon + lonPad},${maxLat + latPad}`
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&${markers}`
-
-  return (
-    <div style={{
-      borderRadius: '12px', overflow: 'hidden',
-      border: '1px solid rgba(255,255,255,0.08)',
-      position: 'relative',
-    }}>
-      <div style={{
-        background: '#161616',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding: '10px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap',
-      }}>
-        {racesWithCoords.map(race => (
-          <div key={race.id} style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            fontSize: '13px', color: '#ccc',
-            fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px',
-          }}>
-            <span style={{ color: '#00B5B9', fontSize: '16px' }}>📍</span>
-            <span style={{ fontWeight: 600, color: '#fff' }}>{race.city || race.location}</span>
-            <span style={{ color: '#999' }}>— {race.name}</span>
-          </div>
-        ))}
-      </div>
-      <iframe
-        title="Race locations"
-        src={src}
-        style={{ width: '100%', height: '320px', border: 'none', display: 'block' }}
-        loading="lazy"
-      />
-      <div style={{
-        position: 'absolute', bottom: '8px', right: '8px',
-        background: 'rgba(0,0,0,0.6)', borderRadius: '4px',
-        padding: '3px 8px', fontSize: '10px', color: '#999',
-        fontFamily: 'Barlow, sans-serif',
-      }}>
-        © OpenStreetMap contributors
-      </div>
-    </div>
-  )
-}
-
 export default function Home({ session }) {
   const [weekRaces, setWeekRaces] = useState([])
   const [upcomingRaces, setUpcomingRaces] = useState([])
+  const [nextRace, setNextRace] = useState(null)
+  const [latestContent, setLatestContent] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => { loadWeek() }, [])
 
@@ -188,6 +117,26 @@ export default function Home({ session }) {
     if (racesRes.data) setWeekRaces(racesRes.data.filter(r => r.race_entries?.length > 0))
     if (upcomingRes.data) setUpcomingRaces(upcomingRes.data)
     if (profileRes.data) setProfile(profileRes.data)
+
+    // Feed additions (5-tab model): my next entered race + the latest
+    // Watch content. Both are best-effort teasers — Home renders without them.
+    try {
+      const { data: myEntries } = await supabase.from('race_entries').select('race_id').eq('athlete_id', userId)
+      const ids = (myEntries || []).map(e => e.race_id)
+      if (ids.length > 0) {
+        const { data: mine } = await supabase.from('races').select('*')
+          .in('id', ids).gte('race_date', todayStr).order('race_date').limit(1)
+        if (mine?.length) setNextRace(mine[0])
+      }
+    } catch { /* teaser only */ }
+    try {
+      const res = await fetch('/api/content/feeds')
+      const data = await res.json()
+      if (data && (data.episodes?.length || data.stories?.length)) {
+        setLatestContent({ episode: data.episodes?.[0] || null, story: data.stories?.[0] || null })
+      }
+    } catch { /* teaser only */ }
+
     setLoading(false)
   }
 
@@ -313,20 +262,74 @@ export default function Home({ session }) {
         </>
       )}
 
-      {/* Map — always shown. In quiet weeks (no TTL entries) it falls back
-          to upcoming races over the next 90 days so the map never vanishes. */}
-      <div style={{ marginTop: '1.25rem' }}>
-        {weekRaces.length === 0 && (
-          <div style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontSize: '12px', letterSpacing: '3px',
-            textTransform: 'uppercase', color: '#00B5B9', marginBottom: '10px',
+      {/* Feed cards (5-tab model): Home points at the dedicated pages
+          instead of duplicating them — the full map and lists live in
+          Races, the full player and stories live in Watch. */}
+      {nextRace && (() => {
+        const days = Math.ceil((new Date(nextRace.race_date + 'T12:00:00') - new Date()) / 86400000)
+        return (
+          <button onClick={() => navigate('/races')} style={{
+            display: 'flex', alignItems: 'center', gap: '16px', width: '100%', textAlign: 'left',
+            background: '#161616', border: '1px solid rgba(232, 115, 98,0.3)', borderRadius: '10px',
+            padding: '1.25rem 1.75rem', marginTop: '1.25rem', cursor: 'pointer',
           }}>
-            On the horizon — upcoming races
+            <div style={{ fontSize: '28px', flexShrink: 0 }}>🏁</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#E87362', marginBottom: '3px' }}>
+                Your next race{days >= 0 ? ` — ${days === 0 ? 'today!' : `in ${days} day${days === 1 ? '' : 's'}`}` : ''}
+              </div>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '18px', fontWeight: 700, letterSpacing: '1px', color: '#fff' }}>{nextRace.name}</div>
+              <div style={{ fontSize: '13px', color: '#aaa' }}>{getDayName(nextRace.race_date)} · {nextRace.location}</div>
+            </div>
+            <div style={{ color: '#555', fontSize: '20px', flexShrink: 0 }}>→</div>
+          </button>
+        )
+      })()}
+
+      {latestContent && (
+        <button onClick={() => navigate('/content')} style={{
+          display: 'flex', alignItems: 'center', gap: '16px', width: '100%', textAlign: 'left',
+          background: '#161616', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px',
+          padding: '1.25rem 1.75rem', marginTop: '1.25rem', cursor: 'pointer',
+        }}>
+          <div style={{ fontSize: '28px', flexShrink: 0 }}>🎧</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#00B5B9', marginBottom: '3px' }}>
+              Latest from TTL
+            </div>
+            {latestContent.episode && (
+              <div style={{ fontSize: '14px', color: '#fff', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Podcast: {latestContent.episode.title}
+              </div>
+            )}
+            {latestContent.story && (
+              <div style={{ fontSize: '13px', color: '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
+                Story: {latestContent.story.title}
+              </div>
+            )}
           </div>
-        )}
-        <RaceMap races={weekRaces.length > 0 ? weekRaces : upcomingRaces} />
-      </div>
+          <div style={{ color: '#555', fontSize: '20px', flexShrink: 0 }}>→</div>
+        </button>
+      )}
+
+      <button onClick={() => navigate('/races')} style={{
+        display: 'flex', alignItems: 'center', gap: '16px', width: '100%', textAlign: 'left',
+        background: '#161616', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px',
+        padding: '1.25rem 1.75rem', marginTop: '1.25rem', cursor: 'pointer',
+      }}>
+        <div style={{ fontSize: '28px', flexShrink: 0 }}>🗺️</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '18px', fontWeight: 700, letterSpacing: '1px', color: '#fff', marginBottom: '3px' }}>
+            Team race map
+          </div>
+          <div style={{ fontSize: '13px', color: '#aaa' }}>
+            {upcomingRaces.length > 0
+              ? `${upcomingRaces.length} upcoming race${upcomingRaces.length === 1 ? '' : 's'} with locations in the next 90 days`
+              : 'See where the team is racing'}
+          </div>
+        </div>
+        <div style={{ color: '#555', fontSize: '20px', flexShrink: 0 }}>→</div>
+      </button>
     </div>
   )
 }

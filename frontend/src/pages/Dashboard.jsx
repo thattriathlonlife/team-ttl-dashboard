@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import RaceList from '../components/RaceList'
-import TeamRoster from '../components/TeamRoster'
 import CalendarView from '../components/CalendarView'
 import AddRaceModal from '../components/AddRaceModal'
-import InviteModal from '../components/InviteModal'
+import RaceMap from '../components/RaceMap'
 
 const S = {
   page: { maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' },
@@ -36,12 +35,11 @@ const S = {
   viewBtnActive: { background: '#00B5B9', color: '#000', fontWeight: 600 },
 }
 
-const TABS = ['Races', 'Calendar', 'Team']
 const ORG_OPTIONS = [{ value: 'all', label: 'All' }, { value: 'pto_scrape', label: 'IRONMAN' }, { value: 'triathlon_api', label: 'World Tri' }, { value: 'manual', label: 'Manual' }]
 const TYPE_OPTIONS = [{ value: 'all', label: 'All Types' }, { value: 'IRONMAN', label: 'Full' }, { value: '70.3', label: '70.3' }, { value: 'Olympic', label: 'Olympic' }, { value: 'Sprint', label: 'Sprint' }, { value: 'Other', label: 'Other' }]
 
 export default function Dashboard({ session }) {
-  const [tab, setTab] = useState('Races')
+  const [view, setView] = useState('list') // 'list' | 'calendar'
   const [races, setRaces] = useState([])
   const [myEntries, setMyEntries] = useState([])
   const [allEntries, setAllEntries] = useState([])
@@ -49,7 +47,6 @@ export default function Dashboard({ session }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddRace, setShowAddRace] = useState(false)
-  const [showInvite, setShowInvite] = useState(false)
   const [orgFilter, setOrgFilter] = useState('pto_scrape')
   const [typeFilter, setTypeFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -147,13 +144,19 @@ export default function Dashboard({ session }) {
         </div>
       </div>
 
-      <div style={S.tabBar}>
-        {TABS.map(t => (
-          <button key={t} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }} onClick={() => setTab(t)}>{t}</button>
-        ))}
+      {/* Map — the Races page is the map's home (moved from Home in the
+          5-tab reshuffle); it reflects the same filters as the list. */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <RaceMap races={filteredRaces} />
       </div>
 
-      {tab === 'Races' && (
+      {/* List / Calendar view toggle (replaces the old tab bar) */}
+      <div style={S.viewToggle}>
+        <button style={{ ...S.viewBtn, ...(view === 'list' ? S.viewBtnActive : {}) }} onClick={() => setView('list')}>List</button>
+        <button style={{ ...S.viewBtn, ...(view === 'calendar' ? S.viewBtnActive : {}) }} onClick={() => setView('calendar')}>Calendar</button>
+      </div>
+
+      {view === 'list' && (
         <>
           <div style={S.sectionHead}>
             <div style={S.sectionTitle}>Upcoming <span style={S.sectionTitleSpan}>Races</span></div>
@@ -201,20 +204,9 @@ export default function Dashboard({ session }) {
         </>
       )}
 
-      {tab === 'Calendar' && <CalendarView races={filteredRaces} myEntries={myEntries} />}
-
-      {tab === 'Team' && (
-        <>
-          <div style={S.sectionHead}>
-            <div style={S.sectionTitle}>Team <span style={S.sectionTitleSpan}>Members</span></div>
-            {profile?.role === 'admin' && <button style={S.btnGhost} onClick={() => setShowInvite(true)}>+ Invite Member</button>}
-          </div>
-          <TeamRoster profiles={profiles} allEntries={allEntries} races={races} />
-        </>
-      )}
+      {view === 'calendar' && <CalendarView races={filteredRaces} myEntries={myEntries} />}
 
       {showAddRace && <AddRaceModal onAdd={addRace} onClose={() => setShowAddRace(false)} />}
-      {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
     </div>
   )
 }

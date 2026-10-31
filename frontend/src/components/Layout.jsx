@@ -26,14 +26,12 @@ const PlayIcon = ({ active }) => (
     <circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4V8z"/>
   </svg>
 )
-const TrainingIcon = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
-    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-  </svg>
-)
-const DiscountIcon = ({ active }) => (  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
-    <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
-    <circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/>
+const TeamIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+    <path d="M16 3.13a4 4 0 010 7.75"/>
   </svg>
 )
 const ProfileIcon = ({ active, avatarUrl, color, initials }) => {
@@ -45,23 +43,22 @@ const ProfileIcon = ({ active, avatarUrl, color, initials }) => {
   )
 }
 
+// 5-tab model (ACCESS-AND-UI-SPEC, built 2026-10-31): Home, Races, Watch,
+// Chat, Team hub. Profile is not a tab — it lives behind the avatar.
 const TABS = [
   { path: '/', label: 'Home' },
   { path: '/races', label: 'Races' },
-  { path: '/training', label: 'Training' },
   { path: '/content', label: 'Watch' },
-  { path: '/messages', label: 'Messages' },
-  { path: '/discounts', label: 'Gear' },
-  { path: '/profile', label: 'Profile' },
+  { path: '/messages', label: 'Chat' },
+  { path: '/team', label: 'Team' },
 ]
 
 const DESKTOP_NAV = [
   { path: '/', label: 'Home' },
   { path: '/races', label: 'Races' },
-  { path: '/training', label: 'Training' },
   { path: '/content', label: 'Watch' },
-  { path: '/messages', label: 'Messages' },
-  { path: '/discounts', label: 'Gear' },
+  { path: '/messages', label: 'Chat' },
+  { path: '/team', label: 'Team' },
 ]
 
 export default function Layout({ children, session, profile, onNavigateProfile, unreadCount = 0 }) {
@@ -86,8 +83,19 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
   if (isMobile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-        {/* Top stripe only */}
+        {/* Top stripe */}
         <div style={{ height: '3px', background: 'linear-gradient(90deg, #00B5B9, #E87362, #E8B84B, #E87362)', flexShrink: 0 }} />
+
+        {/* Slim top bar — wordmark + avatar. Profile is not a tab in the
+            5-tab model; it lives behind the avatar. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#161616', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+          <button onClick={() => navigate('/')} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 900, letterSpacing: '3px', color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <span style={{ color: '#00B5B9' }}>TEAM</span> TTL
+          </button>
+          <button onClick={onNavigateProfile} aria-label="Profile" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+            <ProfileIcon active={location.pathname === '/profile'} avatarUrl={avatarUrl} color={avatarColor} initials={initials} />
+          </button>
+        </div>
 
         {/* Page content */}
         <main style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -104,11 +112,10 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
           {TABS.map(tab => {
             const active = location.pathname === tab.path
             const isMessages = tab.path === '/messages'
-            const isProfile = tab.path === '/profile'
             return (
               <button
                 key={tab.path}
-                onClick={() => isProfile ? onNavigateProfile() : navigate(tab.path)}
+                onClick={() => navigate(tab.path)}
                 style={{
                   flex: 1, display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center',
@@ -121,11 +128,9 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
               >
                 {tab.path === '/' && <HomeIcon active={active} />}
                 {tab.path === '/races' && <RaceIcon active={active} />}
-                {tab.path === '/training' && <TrainingIcon active={active} />}
                 {tab.path === '/content' && <PlayIcon active={active} />}
                 {tab.path === '/messages' && <MessageIcon active={active} />}
-                {tab.path === '/discounts' && <DiscountIcon active={active} />}
-                {isProfile && <ProfileIcon active={active} avatarUrl={avatarUrl} color={avatarColor} initials={initials} />}
+                {tab.path === '/team' && <TeamIcon active={active} />}
                 <span style={{ fontSize: '10px', marginTop: '3px', letterSpacing: '0.5px', fontFamily: 'Barlow Condensed, sans-serif', textTransform: 'uppercase' }}>
                   {tab.label}
                 </span>

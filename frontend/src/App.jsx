@@ -5,10 +5,9 @@ import Login from './pages/Login'
 import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import Messaging from './pages/Messaging'
-import GearHub from './pages/GearHub'
 import ProfilePage from './pages/ProfilePage'
 import CompleteProfile from './pages/CompleteProfile'
-import Training from './pages/Training'
+import Team from './pages/Team'
 import Content from './pages/Content'
 import Layout from './components/Layout'
 import TeamLocked from './components/TeamLocked'
@@ -46,10 +45,13 @@ function AppRoutes({ session, profile, setProfile }) {
         <Route path="/login" element={<Navigate to="/" />} />
         <Route path="/" element={<Home session={session} />} />
         <Route path="/races" element={<Dashboard session={session} />} />
-        <Route path="/training" element={isTeamTier(profile) ? <Training session={session} profile={profile} /> : <TeamLocked feature="Training" />} />
+        <Route path="/team" element={isTeamTier(profile) ? <Team session={session} profile={profile} /> : <TeamLocked feature="Team Hub" />} />
         <Route path="/content" element={<Content />} />
         <Route path="/messages" element={<Messaging session={session} profile={profile} onReadChannel={loadUnreadCount} />} />
-        <Route path="/discounts" element={isTeamTier(profile) ? <GearHub profile={profile} /> : <TeamLocked feature="Gear & Deals" />} />
+        {/* Legacy routes from the 7-tab layout land on the matching
+            Team hub segment so saved links keep working. */}
+        <Route path="/training" element={<Navigate to="/team?tab=training" replace />} />
+        <Route path="/discounts" element={<Navigate to="/team?tab=deals" replace />} />
         <Route path="/profile" element={<ProfilePage session={session} profile={profile} onSave={handleProfileSave} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

@@ -1363,19 +1363,21 @@ const TABS = [
   { id: 'garage', label: 'Garage Sale'   },
 ]
 
-export default function GearHub({ profile }) {
-  const [tab, setTab] = useState('deals')
+export default function GearHub({ profile, initialTab = 'deals', lockTab = false }) {
+  const [tab, setTab] = useState(initialTab)
 
   return (
     <div style={S.page}>
-      {/* Tab bar */}
-      <div style={S.tabBar}>
-        {TABS.map(t => (
-          <button key={t.id} style={S.tab(tab === t.id)} onClick={() => setTab(t.id)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tab bar — hidden when the Team hub drives the section via lockTab */}
+      {!lockTab && (
+        <div style={S.tabBar}>
+          {TABS.map(t => (
+            <button key={t.id} style={S.tab(tab === t.id)} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Tab panels */}
       {tab === 'deals'  && <PartnerDeals profile={profile} />}
