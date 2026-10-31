@@ -9,6 +9,13 @@
 // members-only prototype, so they normalize to logistics rather than being
 // silently reclassified as public. The matching database shape is drafted in
 // supabase/draft-migrations/0003_race_channel_split.sql.
+//
+// LIVE-DB CONSTRAINT (documented in the repo's CLAUDE.md): channels.type and
+// channels.category carry CHECK constraints, so new type values are rejected
+// by the live database until a migration widens them. Until then the split
+// is ALSO encoded with the proven-valid type='race' + a name suffix
+// ('-discussion' / '-logistics'), which raceChannelKind recognizes. The
+// canonical type/audience encoding wins wherever it exists.
 
 export const RACE_DISCUSSION_TYPE = 'race_discussion'
 export const RACE_LOGISTICS_TYPE = 'race_logistics'
@@ -26,7 +33,16 @@ export function raceChannelKind(channel) {
   }
 
   if (channel.type === RACE_DISCUSSION_TYPE) return 'discussion'
-  if (channel.type === RACE_LOGISTICS_TYPE || channel.type === LEGACY_RACE_TYPE) return 'logistics'
+  if (channel.type === RACE_LOGISTICS_TYPE) return 'logistics'
+
+  // Live-DB-compatible encoding: type stays 'race' (a value the live CHECK
+  // constraint accepts) and the kind rides in the channel name suffix.
+  if (channel.type === LEGACY_RACE_TYPE || channel.category === 'race') {
+    if (channel.name?.endsWith('-discussion')) return 'discussion'
+    if (channel.name?.endsWith('-logistics')) return 'logistics'
+    // Unsuffixed legacy race channels are team history: logistics.
+    if (channel.type === LEGACY_RACE_TYPE) return 'logistics'
+  }
   return null
 }
 
@@ -66,7 +82,10 @@ export function channelDisplayName(channel) {
   const kind = raceChannelKind(channel)
   if (!kind) return channel.name || ''
 
-  const base = shortRaceName(channel.races?.name || channel.name || 'Race')
+  const fallbackName = (channel.name || 'Race')
+    .replace(/-(discussion|logistics)$/, '')
+    .replace(/-/g, ' ')
+  const base = shortRaceName(channel.races?.name || fallbackName)
   return `${base} · ${kind === 'discussion' ? 'Discussion' : 'Logistics'}`
 }
 

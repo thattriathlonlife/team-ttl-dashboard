@@ -12,14 +12,26 @@
 --     without silently making old team conversations public.
 
 -- 1. Canonical taxonomy -------------------------------------------------------
+--
+-- PREREQUISITE (learned live 2026-10-31): the live channels table carries
+-- CHECK constraints on BOTH type and category (documented in the repo's
+-- CLAUDE.md from the DM build; they are why client inserts of
+-- 'race_discussion'/'race_logistics' fail today with a check violation).
+-- Before the updates below, export the live constraint definitions
+-- (pg_constraint for channels) and widen the type check to include
+-- 'race_discussion' and 'race_logistics' alongside every existing value.
+-- The exact drop/add statements must be written from the exported
+-- definitions — do not guess the existing value list.
+-- Until this migration runs, the client uses the compatible encoding:
+-- type='race' + a '-discussion'/'-logistics' name suffix (lib/channels.js).
 
 alter table channels
   add column if not exists audience text;
 
 update channels
 set audience = case
-  when type = 'race_discussion' then 'public'
-  when type in ('race', 'race_logistics') then 'team'
+  when type = 'race_discussion' or name like '%-discussion' then 'public'
+  when type in ('race', 'race_logistics') or name like '%-logistics' then 'team'
   else coalesce(audience, 'team')
 end;
 

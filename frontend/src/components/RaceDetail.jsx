@@ -75,6 +75,7 @@ const S = {
   enterBtnJoined: { borderColor: '#00B5B9', color: '#00B5B9' },
   logisticsBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'rgba(0, 181, 185,0.07)', border: '1px solid rgba(0, 181, 185,0.35)', borderRadius: '8px', color: '#00B5B9', cursor: 'pointer', marginTop: '10px' },
   lockNote: { marginTop: '10px', padding: '12px', background: 'rgba(232, 115, 98,0.08)', border: '1px solid rgba(232, 115, 98,0.25)', borderRadius: '8px', color: '#bbb', fontSize: '13px', lineHeight: 1.55 },
+  threadError: { marginTop: '10px', padding: '12px', background: 'rgba(232, 115, 98,0.12)', border: '1px solid rgba(232, 115, 98,0.45)', borderRadius: '8px', color: '#f0b0a6', fontSize: '13px', lineHeight: 1.55 },
   lockLink: { color: '#E87362', fontWeight: 700, textDecoration: 'none' },
   demoSwitch: { background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '12px', padding: 0, textDecoration: 'underline' },
   loading: { fontSize: '13px', color: '#555', padding: '4px 0' },
@@ -87,6 +88,7 @@ export default function RaceDetail({ race, session, profile, onClose, onToggleEn
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [loadingDetails, setLoadingDetails] = useState(true)
   const [openingThread, setOpeningThread] = useState(null)
+  const [threadError, setThreadError] = useState('')
   const [showLogisticsLock, setShowLogisticsLock] = useState(false)
   const navigate = useNavigate()
   const teamView = isTeamTier(profile)
@@ -114,34 +116,37 @@ export default function RaceDetail({ race, session, profile, onClose, onToggleEn
     setLoadingDetails(false)
   }
 
+  async function findRaceChannel(kindWanted) {
+    const { data } = await supabase
+      .from('channels')
+      .select('id, name, type, category, race_id')
+      .eq('race_id', race.id)
+    // Legacy type='race' channels normalize to logistics in lib/channels;
+    // they keep their history instead of being duplicated or made public.
+    return (data || []).find(ch => raceChannelKind(ch) === kindWanted) || null
+  }
+
   async function openRaceChannel(kind) {
     if (kind === 'logistics' && !teamView) {
       setShowLogisticsLock(true)
       return
     }
 
+    setThreadError('')
     setOpeningThread(kind)
-    const { data: existingChannels, error: loadError } = await supabase
-      .from('channels')
-      .select('id, name, type, category, race_id')
-      .eq('race_id', race.id)
 
-    if (loadError) {
-      console.error('[openRaceChannel]', loadError.message)
-      setOpeningThread(null)
-      return
+    let channel = null
+    try {
+      channel = await findRaceChannel(kind)
+    } catch (e) {
+      console.error('[openRaceChannel] lookup failed', e)
     }
-
-    // Legacy type='race' channels normalize to logistics in lib/channels;
-    // they keep their history instead of being duplicated or made public.
-    let channel = (existingChannels || []).find(ch => raceChannelKind(ch) === kind)
 
     if (!channel) {
       const slug = race.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
       const suffix = kind === 'discussion' ? 'discussion' : 'logistics'
-      const payload = {
+      const basePayload = {
         name: `${slug}-${suffix}`,
-        type: raceChannelType(kind),
         category: 'race',
         race_id: race.id,
         description: kind === 'discussion'
@@ -150,34 +155,37 @@ export default function RaceDetail({ race, session, profile, onClose, onToggleEn
         created_by: session.user.id,
       }
 
-      // Migration 0003 adds the explicit audience column. Try the canonical
-      // payload first, then retry without it so the preview keeps working
-      // against the not-yet-migrated live database.
+      // Attempt 1: the canonical encoding (migration 0003: explicit type +
+      // audience). The live database rejects this today — its channels.type
+      // CHECK constraint predates the split (documented in CLAUDE.md).
       let { data: newChannel, error } = await supabase.from('channels')
-        .insert({ ...payload, audience: raceChannelAudience(kind) })
+        .insert({ ...basePayload, type: raceChannelType(kind), audience: raceChannelAudience(kind) })
         .select('id').single()
+      if (!error && newChannel) channel = newChannel
 
-      if (error && /audience|schema cache|column/i.test(error.message || '')) {
-        ;({ data: newChannel, error } = await supabase.from('channels')
-          .insert(payload)
-          .select('id').single())
+      // Attempt 2: the live-DB encoding — type stays 'race' (a value the
+      // CHECK constraint accepts) and the kind rides in the name suffix,
+      // which lib/channels recognizes.
+      if (!channel) {
+        channel = await findRaceChannel(kind) // a parallel tap may have won
+        if (!channel) {
+          ;({ data: newChannel, error } = await supabase.from('channels')
+            .insert({ ...basePayload, type: 'race' })
+            .select('id').single())
+          if (!error && newChannel) channel = newChannel
+        }
       }
 
-      if (error) {
-        // Another client may have created the channel in parallel. Re-read
-        // before treating the click as a failure.
-        const { data: retryChannels } = await supabase
-          .from('channels')
-          .select('id, name, type, category, race_id')
-          .eq('race_id', race.id)
-        channel = (retryChannels || []).find(ch => raceChannelKind(ch) === kind)
+      if (!channel) {
+        channel = await findRaceChannel(kind)
         if (!channel) {
-          console.error('[openRaceChannel]', error.message)
+          // Never fail silently: surface the database's own words so the
+          // blocker is visible on screen, not just in a console.
+          console.error('[openRaceChannel]', error?.message)
+          setThreadError(`Couldn't open the ${kind === 'discussion' ? 'discussion' : 'logistics'} channel${error?.message ? `: ${error.message}` : ''}`)
           setOpeningThread(null)
           return
         }
-      } else {
-        channel = newChannel
       }
     }
 
@@ -268,6 +276,9 @@ export default function RaceDetail({ race, session, profile, onClose, onToggleEn
               <button style={S.logisticsBtn} onClick={() => openRaceChannel('logistics')} disabled={openingThread !== null}>
                 {teamView ? '🧭 ' : '🔒 '}{openingThread === 'logistics' ? 'Opening...' : 'Team Logistics'}
               </button>
+              {threadError && (
+                <div style={S.threadError}>{threadError}</div>
+              )}
               {showLogisticsLock && !teamView && (
                 <div style={S.lockNote}>
                   <strong style={{ color: '#fff' }}>Team-only.</strong> Members use this private channel for travel,

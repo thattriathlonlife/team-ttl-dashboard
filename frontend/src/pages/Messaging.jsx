@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { isTeamTier } from '../lib/tier'
-import { channelAccessLabel, channelDisplayName, isRaceChannel, isTeamOnlyChannel, raceChannelKind, RACE_LOGISTICS_TYPE } from '../lib/channels'
+import { channelAccessLabel, channelDisplayName, isRaceChannel, isTeamOnlyChannel, raceChannelKind } from '../lib/channels'
 import TeamLocked from '../components/TeamLocked'
 
 // Given a DM channel (with dm_members hydrated), return the other person's profile
@@ -1209,9 +1209,13 @@ function NewChannelModal({ session, onClose, onCreated }) {
     const n = name.trim().toLowerCase().replace(/\s+/g, '-')
     if (!n) { setError('Please enter a channel name'); return }
     setSaving(true)
-    const type = category === 'general' ? 'general' : category === 'race' ? RACE_LOGISTICS_TYPE : 'topic'
+    const type = category === 'general' ? 'general' : category === 'race' ? 'race' : 'topic'
+    // Race channels use the live-DB encoding (type 'race' + '-logistics'
+    // name suffix): the live type CHECK constraint rejects new type values
+    // until migration 0003 widens it. See lib/channels.js.
+    const channelName = category === 'race' && !n.endsWith('-logistics') ? `${n}-logistics` : n
     const { data, error: err } = await supabase.from('channels')
-      .insert({ name: n, type, category, description: description.trim() || null, created_by: session.user.id })
+      .insert({ name: channelName, type, category, description: description.trim() || null, created_by: session.user.id })
       .select('*, races(name)').single()
     if (err) { setError(err.message); setSaving(false); return }
     onCreated(data)
