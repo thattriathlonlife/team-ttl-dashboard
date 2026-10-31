@@ -6,12 +6,16 @@
  * Buzzsprout) — this function only normalises it to JSON. No Firebase,
  * no scraping of anything private, no credentials.
  *
- * GET /api/content/feeds -> { stories: [...], episodes: [...] }
+ * GET /api/content/feeds -> { stories: [...], episodes: [...], videos: [...] }
  */
 
 const SOURCES = {
   stories: 'https://thattriathlonlife.com/blogs/journal.atom',
   episodes: 'https://rss.buzzsprout.com/1922707.rss',
+  // YouTube's per-channel RSS endpoint 404s for this channel (verified
+  // 2026-10-31), so videos come from the channel's own /videos page data —
+  // still TTL's own public property, same sourcing rule as the feeds above.
+  videosPage: 'https://www.youtube.com/@ThatTriathlonLife/videos',
 }
 
 function decodeEntities(s = '') {
@@ -67,15 +71,82 @@ function parseRss(xml, limit) {
   })
 }
 
+const AGE_UNITS = { minute: 60e3, hour: 3600e3, day: 86400e3, week: 7 * 86400e3, month: 30 * 86400e3, year: 365 * 86400e3 }
+
+function approxDateFromAge(ageLabel) {
+  const m = String(ageLabel || '').match(/(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago/)
+  if (!m) return null
+  return new Date(Date.now() - Number(m[1]) * AGE_UNITS[m[2]]).toISOString()
+}
+
+// The /videos page embeds ytInitialData whose video "lockups" carry the id,
+// title, thumbnail, view count, and a relative age ("3 weeks ago"). The grid
+// is newest-first; ages convert to approximate dates — good enough to rank
+// videos against episodes and stories in the Home feed, and the raw age
+// label is passed through for display so nothing pretends to be exact.
+function parseYouTubeVideos(html, limit) {
+  const m = html.match(/var ytInitialData = (\{[\s\S]*?\});<\/script>/)
+  if (!m) return []
+  let data
+  try { data = JSON.parse(m[1]) } catch { return [] }
+
+  const lockups = []
+  const walk = node => {
+    if (!node || typeof node !== 'object') return
+    if (!Array.isArray(node) && node.lockupViewModel) lockups.push(node.lockupViewModel)
+    for (const v of Object.values(node)) walk(v)
+  }
+  walk(data)
+
+  const seen = new Set()
+  const videos = []
+  for (const lk of lockups) {
+    if (lk?.contentType !== 'LOCKUP_CONTENT_TYPE_VIDEO') continue
+    const id = lk.contentId
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const meta = lk.metadata?.lockupMetadataViewModel || {}
+    const rows = meta.metadata?.contentMetadataViewModel?.metadataRows || []
+    const parts = rows.flatMap(r => r.metadataParts || [])
+    const views = parts[0]?.accessibilityLabel || null
+    const age = parts.map(p => p.accessibilityLabel).find(t => /ago/.test(t || '')) || null
+    const image = lk.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url || null
+    videos.push({
+      id,
+      title: meta.title?.content || null,
+      link: `https://www.youtube.com/watch?v=${id}`,
+      published: approxDateFromAge(age),
+      age,
+      views,
+      image,
+    })
+    if (videos.length >= limit) break
+  }
+  return videos
+}
+
+async function fetchVideos() {
+  try {
+    const r = await fetch(SOURCES.videosPage, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36' },
+    })
+    if (!r.ok) return []
+    return parseYouTubeVideos(await r.text(), 15)
+  } catch {
+    return [] // Videos are additive — never fail the whole feed for them.
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const [storiesRes, episodesRes] = await Promise.all([
+    const [storiesRes, episodesRes, videos] = await Promise.all([
       fetch(SOURCES.stories),
       fetch(SOURCES.episodes),
+      fetchVideos(),
     ])
     if (!storiesRes.ok || !episodesRes.ok) {
       return res.status(502).json({ error: 'Upstream feed error' })
@@ -87,6 +158,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       stories: parseAtom(storiesXml, 20),
       episodes: parseRss(episodesXml, 30),
+      videos,
       fetchedAt: new Date().toISOString(),
     })
   } catch (err) {

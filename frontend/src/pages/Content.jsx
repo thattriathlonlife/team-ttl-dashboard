@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 
 // Content tab — the TTL public content world inside the unified app.
-// Stories come from the Shopify `journal` blog Atom feed and episodes from
-// the Buzzsprout podcast RSS, normalised by /api/content/feeds.
+// Stories come from the Shopify `journal` blog Atom feed, episodes from
+// the Buzzsprout podcast RSS, and videos from the TTL YouTube channel's
+// /videos page (YouTube's channel RSS 404s for this channel), all
+// normalised by /api/content/feeds.
 // TTL keeps publishing exactly where it already publishes; nothing here
 // depends on the legacy app or Firebase.
 
@@ -66,6 +68,26 @@ export default function Content() {
         </div>
       ))}
       {playing && <audio ref={audioRef} src={playing} preload="none" onEnded={() => setPlaying(null)} />}
+
+      {data.videos?.length > 0 && (
+        <>
+          <div style={S.h}>Videos</div>
+          {data.videos.map((v) => (
+            <button key={v.id} style={{ ...S.card, flexDirection: 'column', gap: 10 }} onClick={() => window.open(v.link, '_blank', 'noopener')}>
+              {v.image && (
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <img style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 8, display: 'block', background: '#1f1f1f' }} src={v.image} alt="" loading="lazy" />
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 46, height: 46, borderRadius: '50%', background: 'rgba(0,0,0,0.62)', color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>▶</div>
+                </div>
+              )}
+              <div>
+                <div style={S.title}>{v.title}</div>
+                <div style={S.meta}>{v.age || fmtDate(v.published)}{v.views ? ` · ${v.views}` : ''}</div>
+              </div>
+            </button>
+          ))}
+        </>
+      )}
 
       <div style={S.h}>TTL Stories</div>
       {data.stories.map((st, i) => (

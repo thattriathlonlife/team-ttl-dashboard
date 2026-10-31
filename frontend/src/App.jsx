@@ -43,7 +43,7 @@ function AppRoutes({ session, profile, setProfile }) {
     >
       <Routes>
         <Route path="/login" element={<Navigate to="/" />} />
-        <Route path="/" element={<Home session={session} />} />
+        <Route path="/" element={<Home session={session} profile={profile} />} />
         <Route path="/races" element={<Dashboard session={session} />} />
         <Route path="/team" element={isTeamTier(profile) ? <Team session={session} profile={profile} /> : <TeamLocked feature="Team Hub" />} />
         <Route path="/content" element={<Content />} />
