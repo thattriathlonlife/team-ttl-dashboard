@@ -1,4 +1,4 @@
-const MEMBER_COLORS = ['#00C4B4','#FF3D8B','#E8B84B','#FF5A1F','#a78bfa','#34d399','#f472b6','#60a5fa']
+const MEMBER_COLORS = ['#00B5B9','#E87362','#E8B84B','#E87362','#a78bfa','#34d399','#f472b6','#60a5fa']
 
 const S = {
   grid: {
@@ -34,8 +34,8 @@ const S = {
     fontSize: '10px', letterSpacing: '0.5px',
     padding: '2px 8px', borderRadius: '3px',
   },
-  tagFull: { background: 'rgba(0,196,180,0.12)', color: '#00C4B4', border: '1px solid rgba(0,196,180,0.2)' },
-  tag703: { background: 'rgba(255,61,139,0.12)', color: '#FF3D8B', border: '1px solid rgba(255,61,139,0.2)' },
+  tagFull: { background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9', border: '1px solid rgba(0, 181, 185,0.2)' },
+  tag703: { background: 'rgba(232, 115, 98,0.12)', color: '#E87362', border: '1px solid rgba(232, 115, 98,0.2)' },
   tagOther: { background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.2)' },
   role: {
     display: 'inline-block',

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const MEMBER_COLORS = ['#00C4B4','#FF3D8B','#E8B84B','#FF5A1F','#a78bfa','#34d399','#f472b6','#60a5fa']
+const MEMBER_COLORS = ['#00B5B9','#E87362','#E8B84B','#E87362','#a78bfa','#34d399','#f472b6','#60a5fa']
 
 const ICONS = {
   swim: {
@@ -30,7 +30,7 @@ function CourseIcon({ category, value, distance }) {
   const labels = { swim: 'Swim', bike: 'Bike', run: 'Run' }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-      <div style={{ width: '52px', height: '52px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00C4B4', background: 'rgba(0,196,180,0.06)' }}>{icon}</div>
+      <div style={{ width: '52px', height: '52px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00B5B9', background: 'rgba(0, 181, 185,0.06)' }}>{icon}</div>
       <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#999' }}>{labels[category]}</div>
       <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, color: '#fff', textAlign: 'center' }}>{value || '—'}</div>
       {distance && <div style={{ fontSize: '11px', color: '#999' }}>{distance}</div>}
@@ -39,8 +39,8 @@ function CourseIcon({ category, value, distance }) {
 }
 
 function getBadgeStyle(type) {
-  if (type === 'IRONMAN') return { background: 'rgba(0,196,180,0.12)', color: '#00C4B4', border: '1px solid rgba(0,196,180,0.25)' }
-  if (type === '70.3') return { background: 'rgba(255,61,139,0.12)', color: '#FF3D8B', border: '1px solid rgba(255,61,139,0.25)' }
+  if (type === 'IRONMAN') return { background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9', border: '1px solid rgba(0, 181, 185,0.25)' }
+  if (type === '70.3') return { background: 'rgba(232, 115, 98,0.12)', color: '#E87362', border: '1px solid rgba(232, 115, 98,0.25)' }
   return { background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.2)' }
 }
 
@@ -67,10 +67,10 @@ const S = {
   avatar: { width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, color: '#000', flexShrink: 0 },
   athleteName: { fontSize: '14px', color: '#fff', fontWeight: 500 },
   descText: { fontSize: '14px', color: '#bbb', lineHeight: 1.7 },
-  regBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', padding: '14px', background: '#00C4B4', border: 'none', borderRadius: '8px', color: '#000', cursor: 'pointer', textAlign: 'center', textDecoration: 'none' },
+  regBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', padding: '14px', background: '#00B5B9', border: 'none', borderRadius: '8px', color: '#000', cursor: 'pointer', textAlign: 'center', textDecoration: 'none' },
   discussBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#ccc', cursor: 'pointer', marginTop: '10px', textAlign: 'center' },
   enterBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#ccc', cursor: 'pointer', marginTop: '10px' },
-  enterBtnJoined: { borderColor: '#00C4B4', color: '#00C4B4' },
+  enterBtnJoined: { borderColor: '#00B5B9', color: '#00B5B9' },
   loading: { fontSize: '13px', color: '#555', padding: '4px 0' },
   emptyText: { fontSize: '13px', color: '#555', fontStyle: 'italic' },
 }

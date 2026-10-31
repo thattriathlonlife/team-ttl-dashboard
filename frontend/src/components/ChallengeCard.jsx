@@ -55,7 +55,7 @@ function CombinedDistance({ progress, challenge }) {
         <span style={{ fontSize: 12, color: '#999' }}>
           Team {sport.toLowerCase()} distance this week
         </span>
-        <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: done ? '#00C4B4' : '#fff' }}>
+        <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: done ? '#00B5B9' : '#fff' }}>
           {current.toFixed(1)} / {target} km
         </span>
       </div>
@@ -65,13 +65,13 @@ function CombinedDistance({ progress, challenge }) {
           width: `${pct}%`,
           borderRadius: 4,
           background: done
-            ? 'linear-gradient(90deg, #00C4B4, #34d399)'
+            ? 'linear-gradient(90deg, #00B5B9, #34d399)'
             : 'linear-gradient(90deg, #FC4C02, #E8B84B)',
           transition: 'width 0.4s ease',
         }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-        <span style={{ fontSize: 11, color: done ? '#00C4B4' : '#555' }}>
+        <span style={{ fontSize: 11, color: done ? '#00B5B9' : '#555' }}>
           {done ? '🎉 Challenge complete!' : `${pct}% there`}
         </span>
         <span style={{ fontSize: 11, color: '#444' }}>{target} km goal</span>
@@ -81,7 +81,7 @@ function CombinedDistance({ progress, challenge }) {
 }
 
 // ── Everyone logs sport progress ──────────────────────────────────
-const AVATAR_COLORS = ['#00C4B4', '#FF3D8B', '#E8B84B', '#FF5A1F', '#a78bfa', '#34d399', '#f472b6', '#60a5fa']
+const AVATAR_COLORS = ['#00B5B9', '#E87362', '#E8B84B', '#E87362', '#a78bfa', '#34d399', '#f472b6', '#60a5fa']
 
 function avatarColor(name) {
   return AVATAR_COLORS[(name || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length]
@@ -102,7 +102,7 @@ function AthleteChip({ athlete, done }) {
       <div style={{
         width: 32, height: 32, borderRadius: '50%',
         background: done ? avatarColor(athlete.full_name) : 'rgba(255,255,255,0.06)',
-        border: done ? '2px solid rgba(0,196,180,0.35)' : '2px solid rgba(255,255,255,0.08)',
+        border: done ? '2px solid rgba(0, 181, 185,0.35)' : '2px solid rgba(255,255,255,0.08)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, fontWeight: 700,
         color: done ? '#000' : '#444',
@@ -141,14 +141,14 @@ function EveryoneLogs({ progress }) {
         <span style={{ fontSize: 12, color: '#999' }}>
           Everyone logs a {sport.toLowerCase()} this week
         </span>
-        <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: allDone ? '#00C4B4' : '#fff' }}>
+        <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: allDone ? '#00B5B9' : '#fff' }}>
           {nDone} / {total}
         </span>
       </div>
 
       {completed.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: '#00C4B4', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: '#00B5B9', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 6 }}>
             ✓ Done
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -169,7 +169,7 @@ function EveryoneLogs({ progress }) {
       )}
 
       {allDone && (
-        <div style={{ marginTop: 10, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, color: '#00C4B4' }}>
+        <div style={{ marginTop: 10, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, color: '#00B5B9' }}>
           🎉 Every athlete has done it!
         </div>
       )}
@@ -221,8 +221,8 @@ export default function ChallengeCard({ challenge, isAdmin, onManage }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <span style={{
             fontFamily: 'Barlow Condensed, sans-serif', fontSize: 10, letterSpacing: '1px', textTransform: 'uppercase',
-            background: 'rgba(0,196,180,0.12)', color: '#00C4B4',
-            border: '1px solid rgba(0,196,180,0.25)', padding: '2px 8px', borderRadius: 3,
+            background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9',
+            border: '1px solid rgba(0, 181, 185,0.25)', padding: '2px 8px', borderRadius: 3,
           }}>
             Active
           </span>

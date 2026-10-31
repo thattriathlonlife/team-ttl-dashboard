@@ -14,11 +14,11 @@ const S = {
   },
   stripesTop: {
     position: 'absolute', top: 0, left: 0, width: '100%', height: '4px',
-    background: 'linear-gradient(90deg, #00C4B4 0%, #00C4B4 25%, #FF3D8B 25%, #FF3D8B 50%, #E8B84B 50%, #E8B84B 75%, #FF5A1F 75%)',
+    background: 'linear-gradient(90deg, #00B5B9 0%, #00B5B9 25%, #E87362 25%, #E87362 50%, #E8B84B 50%, #E8B84B 75%, #E87362 75%)',
   },
   stripesBottom: {
     position: 'absolute', bottom: 0, left: 0, width: '100%', height: '4px',
-    background: 'linear-gradient(90deg, #00C4B4 0%, #00C4B4 25%, #FF3D8B 25%, #FF3D8B 50%, #E8B84B 50%, #E8B84B 75%, #FF5A1F 75%)',
+    background: 'linear-gradient(90deg, #00B5B9 0%, #00B5B9 25%, #E87362 25%, #E87362 50%, #E8B84B 50%, #E8B84B 75%, #E87362 75%)',
   },
   card: {
     width: '100%', maxWidth: '440px', textAlign: 'center',
@@ -28,7 +28,7 @@ const S = {
     fontSize: '56px', fontWeight: 900, letterSpacing: '4px',
     color: '#fff', lineHeight: 1, marginBottom: '4px',
   },
-  logoAccent: { color: '#00C4B4' },
+  logoAccent: { color: '#00B5B9' },
   logoSub: {
     fontFamily: 'Barlow Condensed, sans-serif',
     fontSize: '13px', letterSpacing: '5px', color: '#999',
@@ -59,7 +59,7 @@ const S = {
     fontSize: '12px', color: '#555', marginTop: '-4px',
   },
   btn: {
-    background: '#00C4B4', color: '#000',
+    background: '#00B5B9', color: '#000',
     border: 'none', borderRadius: '6px',
     padding: '14px', marginTop: '4px',
     fontFamily: 'Barlow Condensed, sans-serif',
@@ -68,10 +68,10 @@ const S = {
     cursor: 'pointer', transition: 'opacity 0.15s',
   },
   error: {
-    background: 'rgba(255,61,139,0.1)',
-    border: '1px solid rgba(255,61,139,0.2)',
+    background: 'rgba(232, 115, 98,0.1)',
+    border: '1px solid rgba(232, 115, 98,0.2)',
     borderRadius: '6px', padding: '10px',
-    color: '#FF3D8B', fontSize: '13px',
+    color: '#E87362', fontSize: '13px',
   },
 }
 

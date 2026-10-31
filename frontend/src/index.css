@@ -10,11 +10,16 @@
   --muted: #888888;
   --muted2: #555555;
 
-  /* TTL Brand Colors */
-  --cyan: #00C4B4;
-  --pink: #FF3D8B;
-  --gold: #E8B84B;
-  --orange: #FF5A1F;
+  /* TTL Brand Colors — seasonal tokens; keep in sync with src/lib/theme.js
+     (the single source of truth) and re-apply with scripts/recolor.mjs */
+  --brand: #00B5B9;
+  --accent: #E87362;
+  --highlight: #E8B84B;
+  --ink: #1F212D;
+  --cyan: var(--brand);
+  --pink: var(--accent);
+  --gold: var(--highlight);
+  --orange: var(--accent);
   --white: #ffffff;
 
   --font-display: 'Barlow Condensed', sans-serif;

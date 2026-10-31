@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AVATAR_COLORS = [
-  { value: '#00C4B4', label: 'Teal' },
-  { value: '#FF3D8B', label: 'Pink' },
+  { value: '#00B5B9', label: 'Teal' },
+  { value: '#E87362', label: 'Pink' },
   { value: '#E8B84B', label: 'Gold' },
-  { value: '#FF5A1F', label: 'Orange' },
+  { value: '#E87362', label: 'Orange' },
   { value: '#a78bfa', label: 'Purple' },
   { value: '#34d399', label: 'Green' },
   { value: '#60a5fa', label: 'Blue' },
@@ -16,8 +16,8 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const FULL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 function getBadgeStyle(type) {
-  if (type === 'IRONMAN') return { background: 'rgba(0,196,180,0.12)', color: '#00C4B4', border: '1px solid rgba(0,196,180,0.25)' }
-  if (type === '70.3') return { background: 'rgba(255,61,139,0.12)', color: '#FF3D8B', border: '1px solid rgba(255,61,139,0.25)' }
+  if (type === 'IRONMAN') return { background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9', border: '1px solid rgba(0, 181, 185,0.25)' }
+  if (type === '70.3') return { background: 'rgba(232, 115, 98,0.12)', color: '#E87362', border: '1px solid rgba(232, 115, 98,0.25)' }
   return { background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.2)' }
 }
 
@@ -25,10 +25,10 @@ function getDaysAway(dateStr) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const race = new Date(dateStr + 'T00:00:00')
   const diff = Math.ceil((race - today) / 86400000)
-  if (diff === 0) return { text: 'Today!', color: '#FF3D8B' }
-  if (diff === 1) return { text: 'Tomorrow!', color: '#FF3D8B' }
+  if (diff === 0) return { text: 'Today!', color: '#E87362' }
+  if (diff === 1) return { text: 'Tomorrow!', color: '#E87362' }
   if (diff <= 7) return { text: `${diff} days`, color: '#E8B84B' }
-  if (diff <= 30) return { text: `${diff} days`, color: '#FF5A1F' }
+  if (diff <= 30) return { text: `${diff} days`, color: '#E87362' }
   return { text: `${diff} days`, color: '#999' }
 }
 
@@ -58,10 +58,10 @@ const S = {
   input: { width: '100%', background: '#1f1f1f', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', padding: '12px 14px', fontSize: '15px', fontFamily: 'Barlow, sans-serif', outline: 'none' },
   inputReadonly: { opacity: 0.5, cursor: 'not-allowed' },
   hint: { fontSize: '12px', color: '#555', marginTop: '5px' },
-  saveBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', padding: '13px 24px', background: '#00C4B4', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer', width: '100%', marginTop: '4px' },
-  signOutBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '11px 24px', background: 'none', border: '1px solid rgba(255,61,139,0.3)', borderRadius: '6px', color: '#FF3D8B', cursor: 'pointer', width: '100%', marginTop: '10px' },
-  success: { background: 'rgba(0,196,180,0.1)', border: '1px solid rgba(0,196,180,0.25)', borderRadius: '6px', padding: '12px 16px', color: '#00C4B4', fontSize: '14px', marginBottom: '1rem' },
-  error: { background: 'rgba(255,61,139,0.1)', border: '1px solid rgba(255,61,139,0.2)', borderRadius: '6px', padding: '12px 16px', color: '#FF3D8B', fontSize: '13px', marginBottom: '1rem' },
+  saveBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', padding: '13px 24px', background: '#00B5B9', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer', width: '100%', marginTop: '4px' },
+  signOutBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '11px 24px', background: 'none', border: '1px solid rgba(232, 115, 98,0.3)', borderRadius: '6px', color: '#E87362', cursor: 'pointer', width: '100%', marginTop: '10px' },
+  success: { background: 'rgba(0, 181, 185,0.1)', border: '1px solid rgba(0, 181, 185,0.25)', borderRadius: '6px', padding: '12px 16px', color: '#00B5B9', fontSize: '14px', marginBottom: '1rem' },
+  error: { background: 'rgba(232, 115, 98,0.1)', border: '1px solid rgba(232, 115, 98,0.2)', borderRadius: '6px', padding: '12px 16px', color: '#E87362', fontSize: '13px', marginBottom: '1rem' },
   // My races
   exportBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '7px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#ccc', cursor: 'pointer', marginBottom: '1rem', display: 'inline-block' },
   raceCard: { background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.9rem 1.1rem', display: 'grid', gridTemplateColumns: '56px 1fr auto', alignItems: 'center', gap: '1rem', marginBottom: '8px' },
@@ -90,7 +90,7 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
   const [profile, setProfile] = useState(initialProfile)
   const [fullName, setFullName] = useState(initialProfile?.full_name || '')
   const [whatsapp, setWhatsapp] = useState(initialProfile?.whatsapp_number || '')
-  const [avatarColor, setAvatarColor] = useState(initialProfile?.avatar_color || '#00C4B4')
+  const [avatarColor, setAvatarColor] = useState(initialProfile?.avatar_color || '#00B5B9')
   const [avatarUrl, setAvatarUrl] = useState(initialProfile?.avatar_url || null)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -204,7 +204,7 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
         <div>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
           <button style={S.uploadBtn} onClick={() => fileRef.current.click()}>{uploading ? 'Uploading...' : avatarUrl ? 'Change photo' : 'Upload photo'}</button>
-          {avatarUrl && <button style={{ ...S.uploadBtn, color: '#FF3D8B', borderColor: 'rgba(255,61,139,0.2)' }} onClick={() => setAvatarUrl(null)}>Remove photo</button>}
+          {avatarUrl && <button style={{ ...S.uploadBtn, color: '#E87362', borderColor: 'rgba(232, 115, 98,0.2)' }} onClick={() => setAvatarUrl(null)}>Remove photo</button>}
           <div style={S.uploadHint}>JPG or PNG, max 2MB</div>
         </div>
       </div>

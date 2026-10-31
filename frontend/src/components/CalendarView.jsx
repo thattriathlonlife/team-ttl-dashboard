@@ -31,8 +31,8 @@ const S = {
     textOverflow: 'ellipsis',
     cursor: 'default',
   },
-  dotFull: { background: 'rgba(0,196,180,0.12)', color: '#00C4B4' },
-  dot703: { background: 'rgba(255,61,139,0.12)', color: '#FF3D8B' },
+  dotFull: { background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9' },
+  dot703: { background: 'rgba(232, 115, 98,0.12)', color: '#E87362' },
   dotOther: { background: 'rgba(232,184,75,0.1)', color: '#E8B84B' },
   dotMine: { outline: '1px solid #fff', outlineOffset: '1px' },
   legend: {
@@ -55,11 +55,11 @@ export default function CalendarView({ races, myEntries }) {
     <>
       <div style={S.legend}>
         <div style={S.legendItem}>
-          <div style={{ ...S.legendDot, background: '#00C4B4' }} />
+          <div style={{ ...S.legendDot, background: '#00B5B9' }} />
           IRONMAN Full
         </div>
         <div style={S.legendItem}>
-          <div style={{ ...S.legendDot, background: '#FF3D8B' }} />
+          <div style={{ ...S.legendDot, background: '#E87362' }} />
           70.3 Half
         </div>
         <div style={S.legendItem}>

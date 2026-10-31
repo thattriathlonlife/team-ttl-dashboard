@@ -233,7 +233,7 @@ export default function ChallengeAdminModal({ challenge, userId, onSave, onClose
 
         {/* Error */}
         {error && (
-          <div style={{ background: 'rgba(255,61,139,0.1)', border: '1px solid rgba(255,61,139,0.2)', borderRadius: 6, padding: '10px 12px', color: '#FF3D8B', fontSize: 13, marginBottom: 12 }}>
+          <div style={{ background: 'rgba(232, 115, 98,0.1)', border: '1px solid rgba(232, 115, 98,0.2)', borderRadius: 6, padding: '10px 12px', color: '#E87362', fontSize: 13, marginBottom: 12 }}>
             {error}
           </div>
         )}
@@ -249,8 +249,8 @@ export default function ChallengeAdminModal({ challenge, userId, onSave, onClose
                 style={{
                   fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase',
                   padding: '9px 16px', background: 'none',
-                  border: '1px solid rgba(255,61,139,0.25)',
-                  borderRadius: 5, color: '#FF3D8B', cursor: 'pointer',
+                  border: '1px solid rgba(232, 115, 98,0.25)',
+                  borderRadius: 5, color: '#E87362', cursor: 'pointer',
                 }}
               >
                 {deactivating ? 'Deactivating...' : 'End challenge'}

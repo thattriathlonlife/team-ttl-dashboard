@@ -31,29 +31,29 @@ const GOOD_FOR_TAGS = [
 ]
 
 const TAG_COLORS = {
-  'Women':              { bg: 'rgba(255,61,139,0.15)',  color: '#FF3D8B' },
-  'Men':                { bg: 'rgba(0,196,180,0.15)',   color: '#00C4B4' },
+  'Women':              { bg: 'rgba(232, 115, 98,0.15)',  color: '#E87362' },
+  'Men':                { bg: 'rgba(0, 181, 185,0.15)',   color: '#00B5B9' },
   'All / Non-binary':   { bg: 'rgba(139,92,246,0.15)',  color: '#a78bfa' },
-  'XS / Petite':        { bg: 'rgba(255,90,31,0.15)',   color: '#FF5A1F' },
-  'XL / Plus':          { bg: 'rgba(255,90,31,0.15)',   color: '#FF5A1F' },
+  'XS / Petite':        { bg: 'rgba(232, 115, 98,0.15)',   color: '#E87362' },
+  'XL / Plus':          { bg: 'rgba(232, 115, 98,0.15)',   color: '#E87362' },
   'Beginners':          { bg: 'rgba(34,197,94,0.15)',   color: '#4ade80' },
   'Intermediate':       { bg: 'rgba(232,184,75,0.15)',  color: '#E8B84B' },
   'Advanced':           { bg: 'rgba(239,68,68,0.15)',   color: '#f87171' },
-  'Speed':              { bg: 'rgba(255,61,139,0.15)',  color: '#FF3D8B' },
-  'Comfort':            { bg: 'rgba(0,196,180,0.15)',   color: '#00C4B4' },
+  'Speed':              { bg: 'rgba(232, 115, 98,0.15)',  color: '#E87362' },
+  'Comfort':            { bg: 'rgba(0, 181, 185,0.15)',   color: '#00B5B9' },
   'Durability':         { bg: 'rgba(232,184,75,0.15)',  color: '#E8B84B' },
   'Budget':             { bg: 'rgba(34,197,94,0.15)',   color: '#4ade80' },
   'Cold water':         { bg: 'rgba(96,165,250,0.15)',  color: '#60a5fa' },
   'Open water':         { bg: 'rgba(96,165,250,0.15)',  color: '#60a5fa' },
-  'Pool':               { bg: 'rgba(0,196,180,0.15)',   color: '#00C4B4' },
-  'Triathlon-specific': { bg: 'rgba(255,90,31,0.15)',   color: '#FF5A1F' },
+  'Pool':               { bg: 'rgba(0, 181, 185,0.15)',   color: '#00B5B9' },
+  'Triathlon-specific': { bg: 'rgba(232, 115, 98,0.15)',   color: '#E87362' },
 }
 
 const CONDITION_LABELS = {
   new:       { label: 'New',       color: '#4ade80' },
-  like_new:  { label: 'Like New',  color: '#00C4B4' },
+  like_new:  { label: 'Like New',  color: '#00B5B9' },
   good:      { label: 'Good',      color: '#E8B84B' },
-  fair:      { label: 'Fair',      color: '#FF5A1F' },
+  fair:      { label: 'Fair',      color: '#E87362' },
 }
 
 // ─────────────────────────────────────────────
@@ -75,8 +75,8 @@ const S = {
     fontFamily: 'Barlow Condensed, sans-serif',
     fontSize: 13, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase',
     padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer',
-    color: active ? '#00C4B4' : '#555',
-    borderBottom: active ? '2px solid #00C4B4' : '2px solid transparent',
+    color: active ? '#00B5B9' : '#555',
+    borderBottom: active ? '2px solid #00B5B9' : '2px solid transparent',
     marginBottom: -1, transition: 'color 0.15s',
   }),
   // Cards
@@ -130,12 +130,12 @@ const S = {
     fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12,
     letterSpacing: '1px', textTransform: 'uppercase',
     padding: '9px 16px', background: 'none',
-    border: '1px solid rgba(255,61,139,0.25)',
-    borderRadius: 5, color: '#FF3D8B', cursor: 'pointer',
+    border: '1px solid rgba(232, 115, 98,0.25)',
+    borderRadius: 5, color: '#E87362', cursor: 'pointer',
   },
   errorBox: {
-    background: 'rgba(255,61,139,0.1)', border: '1px solid rgba(255,61,139,0.2)',
-    borderRadius: 6, padding: '10px 12px', color: '#FF3D8B',
+    background: 'rgba(232, 115, 98,0.1)', border: '1px solid rgba(232, 115, 98,0.2)',
+    borderRadius: 6, padding: '10px 12px', color: '#E87362',
     fontSize: 13, marginBottom: 12,
   },
   // Section headers
@@ -158,8 +158,8 @@ const S = {
     fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, fontWeight: 700,
     letterSpacing: '1.5px', textTransform: 'uppercase',
     padding: '6px 12px', background: 'none',
-    border: '1px solid rgba(0,196,180,0.3)',
-    borderRadius: 5, color: '#00C4B4', cursor: 'pointer',
+    border: '1px solid rgba(0, 181, 185,0.3)',
+    borderRadius: 5, color: '#00B5B9', cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
   tag: (tagName) => {
@@ -182,7 +182,7 @@ function AvatarCircle({ name, color, size = 28 }) {
     ? (name.split(' ')[0]?.[0] || '') + (name.split(' ')[1]?.[0] || '')
     : '?'
   const colors = {
-    'color-a': '#FF5A1F', 'color-b': '#00C4B4', 'color-c': '#FF3D8B',
+    'color-a': '#E87362', 'color-b': '#00B5B9', 'color-c': '#E87362',
     'color-d': '#E8B84B', 'color-e': '#a78bfa', 'color-f': '#60a5fa',
   }
   const bg = colors[color] || '#444'
@@ -223,9 +223,9 @@ function CopyButton({ code }) {
     <button onClick={copy} style={{
       fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700,
       letterSpacing: '1px', textTransform: 'uppercase', padding: '6px 14px',
-      background: copied ? 'rgba(0,196,180,0.15)' : 'rgba(255,255,255,0.06)',
-      border: `1px solid ${copied ? 'rgba(0,196,180,0.4)' : 'rgba(255,255,255,0.12)'}`,
-      borderRadius: '4px', color: copied ? '#00C4B4' : '#ccc', cursor: 'pointer', transition: 'all 0.15s',
+      background: copied ? 'rgba(0, 181, 185,0.15)' : 'rgba(255,255,255,0.06)',
+      border: `1px solid ${copied ? 'rgba(0, 181, 185,0.4)' : 'rgba(255,255,255,0.12)'}`,
+      borderRadius: '4px', color: copied ? '#00B5B9' : '#ccc', cursor: 'pointer', transition: 'all 0.15s',
     }}>
       {copied ? '✓ Copied' : code}
     </button>
@@ -245,7 +245,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
       {isAdmin && (
         <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '4px', zIndex: 2 }}>
           <button onClick={() => onEdit(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: '#aaa', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>Edit</button>
-          <button onClick={() => onDelete(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,61,139,0.2)', borderRadius: '4px', color: '#FF3D8B', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>×</button>
+          <button onClick={() => onDelete(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(232, 115, 98,0.2)', borderRadius: '4px', color: '#E87362', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>×</button>
         </div>
       )}
 
@@ -253,7 +253,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
         {discount.logo_url ? (
           <img src={discount.logo_url} alt={discount.brand} style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'contain', background: '#fff', padding: '4px', flexShrink: 0 }} />
         ) : (
-          <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: discount.color || 'rgba(0,196,180,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: discount.color || 'rgba(0, 181, 185,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
             {discount.brand.slice(0, 2).toUpperCase()}
           </div>
         )}
@@ -262,7 +262,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
           <div style={{ fontSize: '12px', color: '#999' }}>{discount.category}</div>
         </div>
         {discount.amount && (
-          <div style={{ flexShrink: 0, fontFamily: 'Barlow Condensed, sans-serif', fontSize: '22px', fontWeight: 800, color: '#00C4B4' }}>{discount.amount}</div>
+          <div style={{ flexShrink: 0, fontFamily: 'Barlow Condensed, sans-serif', fontSize: '22px', fontWeight: 800, color: '#00B5B9' }}>{discount.amount}</div>
         )}
       </div>
 
@@ -277,10 +277,10 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
             <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', padding: '3px 8px', background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.25)', borderRadius: '3px' }}>Single use</div>
           )}
           {discount.note === 'rolling-availability' && (
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', padding: '3px 8px', background: 'rgba(0,196,180,0.08)', color: '#00C4B4', border: '1px solid rgba(0,196,180,0.2)', borderRadius: '3px' }}>Rolling offer</div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', padding: '3px 8px', background: 'rgba(0, 181, 185,0.08)', color: '#00B5B9', border: '1px solid rgba(0, 181, 185,0.2)', borderRadius: '3px' }}>Rolling offer</div>
           )}
           {daysLeft !== null && (
-            <div style={{ fontSize: '11px', color: daysLeft <= 7 ? '#FF5A1F' : '#555', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px', marginLeft: 'auto' }}>
+            <div style={{ fontSize: '11px', color: daysLeft <= 7 ? '#E87362' : '#555', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px', marginLeft: 'auto' }}>
               {isExpired ? 'Expired' : daysLeft === 0 ? 'Expires today' : `${daysLeft}d left`}
             </div>
           )}
@@ -290,7 +290,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
   )
 }
 
-const EMPTY_DISCOUNT_FORM = { brand: '', code: '', amount: '', description: '', category: '', color: '#00C4B4', expiry: '', single_use: false, note: '', active: true, sort_order: 0 }
+const EMPTY_DISCOUNT_FORM = { brand: '', code: '', amount: '', description: '', category: '', color: '#00B5B9', expiry: '', single_use: false, note: '', active: true, sort_order: 0 }
 
 function DiscountModal({ discount, onSave, onClose }) {
   const [form, setForm] = useState(discount ? {
@@ -299,7 +299,7 @@ function DiscountModal({ discount, onSave, onClose }) {
     note: discount.note || '',
     code: discount.code || '',
     amount: discount.amount || '',
-    color: discount.color || '#00C4B4',
+    color: discount.color || '#00B5B9',
     logo_url: discount.logo_url || '',
   } : { ...EMPTY_DISCOUNT_FORM, logo_url: '' })
   const [saving, setSaving] = useState(false)
@@ -354,8 +354,8 @@ function DiscountModal({ discount, onSave, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid #00C4B4', borderRadius: '10px', padding: '2rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflow: 'auto' }}>
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#00C4B4', marginBottom: '1.5rem' }}>
+      <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid #00B5B9', borderRadius: '10px', padding: '2rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflow: 'auto' }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#00B5B9', marginBottom: '1.5rem' }}>
           {discount?.id ? 'Edit Discount' : 'Add Discount'}
         </div>
 
@@ -395,7 +395,7 @@ function DiscountModal({ discount, onSave, onClose }) {
               <div style={{ fontSize: '11px', color: '#555' }}>PNG or SVG recommended, max 1MB</div>
             </div>
             {form.logo_url && (
-              <button onClick={() => set('logo_url', '')} style={{ background: 'none', border: 'none', color: '#FF3D8B', fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
+              <button onClick={() => set('logo_url', '')} style={{ background: 'none', border: 'none', color: '#E87362', fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
             )}
           </div>
         </div>
@@ -414,7 +414,7 @@ function DiscountModal({ discount, onSave, onClose }) {
             <label style={labelStyle}>Brand Colour</label>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <input style={{ ...inputStyle, flex: 1 }} value={form.color} onChange={e => set('color', e.target.value)} placeholder="#e63946" />
-              <input type="color" value={form.color || '#00C4B4'} onChange={e => set('color', e.target.value)} style={{ width: '36px', height: '36px', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: 0 }} />
+              <input type="color" value={form.color || '#00B5B9'} onChange={e => set('color', e.target.value)} style={{ width: '36px', height: '36px', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: 0 }} />
             </div>
           </div>
           <div style={groupStyle}>
@@ -439,11 +439,11 @@ function DiscountModal({ discount, onSave, onClose }) {
           </label>
         </div>
 
-        {error && <div style={{ color: '#FF3D8B', fontSize: '13px', marginBottom: '12px' }}>{error}</div>}
+        {error && <div style={{ color: '#E87362', fontSize: '13px', marginBottom: '12px' }}>{error}</div>}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase', padding: '10px 20px', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '5px', color: '#999', cursor: 'pointer' }}>Cancel</button>
-          <button onClick={save} disabled={saving} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: '#00C4B4', border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer' }}>
+          <button onClick={save} disabled={saving} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: '#00B5B9', border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer' }}>
             {saving ? 'Saving...' : discount?.id ? 'Save Changes' : 'Add Discount'}
           </button>
         </div>
@@ -490,7 +490,7 @@ function PartnerDeals({ profile }) {
           <div style={{ fontSize: '14px', color: '#999' }}>Exclusive member benefits from our partners. Tap a code to copy it.</div>
         </div>
         {isAdmin && (
-          <button onClick={handleAdd} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 20px', background: '#00C4B4', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer', flexShrink: 0 }}>
+          <button onClick={handleAdd} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 20px', background: '#00B5B9', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer', flexShrink: 0 }}>
             + Add Discount
           </button>
         )}
@@ -622,14 +622,14 @@ function GearGuide({ profile }) {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '12px 16px', cursor: 'pointer',
-                  background: isOpen ? 'rgba(0,196,180,0.05)' : '#161616',
+                  background: isOpen ? 'rgba(0, 181, 185,0.05)' : '#161616',
                   transition: 'background 0.15s',
                 }}
                 onClick={() => toggleExpand(cat.id)}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 18 }}>{cat.icon}</span>
-                  <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: isOpen ? '#00C4B4' : '#ccc' }}>
+                  <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: isOpen ? '#00B5B9' : '#ccc' }}>
                     {cat.name}
                   </span>
                   <span style={{ fontSize: 12, color: '#555', background: 'rgba(255,255,255,0.05)', padding: '1px 7px', borderRadius: 10 }}>
@@ -752,7 +752,7 @@ function GearPickRow({ pick, reviews, netScore, myVote, onVote, onEdit, onDelete
           </div>
           <span style={{
             fontSize: 11, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700,
-            color: netScore > 0 ? '#00C4B4' : netScore < 0 ? '#FF3D8B' : '#555',
+            color: netScore > 0 ? '#00B5B9' : netScore < 0 ? '#E87362' : '#555',
             background: 'rgba(255,255,255,0.05)', borderRadius: 4, padding: '1px 6px',
             minWidth: 24, textAlign: 'center',
           }}>
@@ -773,7 +773,7 @@ function GearPickRow({ pick, reviews, netScore, myVote, onVote, onEdit, onDelete
       {/* Link */}
       <td style={{ padding: '10px 12px' }}>
         {pick.link
-          ? <a href={pick.link} target="_blank" rel="noopener noreferrer" style={{ color: '#00C4B4', fontSize: 16, textDecoration: 'none' }} title="Product link">↗</a>
+          ? <a href={pick.link} target="_blank" rel="noopener noreferrer" style={{ color: '#00B5B9', fontSize: 16, textDecoration: 'none' }} title="Product link">↗</a>
           : <span style={{ color: '#333' }}>–</span>
         }
       </td>
@@ -795,7 +795,7 @@ function GearPickRow({ pick, reviews, netScore, myVote, onVote, onEdit, onDelete
           <div key={r.id} style={{ marginBottom: reviews.length > 1 || showAddReview ? 8 : 0 }}>
             <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>
               {r.body.length > 120 && !showAllReviews
-                ? <>{r.body.slice(0, 120)}… <button onClick={() => setShowAllReviews(true)} style={{ background: 'none', border: 'none', color: '#00C4B4', cursor: 'pointer', fontSize: 12, padding: 0 }}>more ▼</button></>
+                ? <>{r.body.slice(0, 120)}… <button onClick={() => setShowAllReviews(true)} style={{ background: 'none', border: 'none', color: '#00B5B9', cursor: 'pointer', fontSize: 12, padding: 0 }}>more ▼</button></>
                 : r.body
               }
             </div>
@@ -809,7 +809,7 @@ function GearPickRow({ pick, reviews, netScore, myVote, onVote, onEdit, onDelete
         ))}
 
         {reviews.length > 1 && !showAllReviews && (
-          <button onClick={() => setShowAllReviews(true)} style={{ background: 'none', border: 'none', color: '#00C4B4', cursor: 'pointer', fontSize: 12, padding: '2px 0', display: 'block', marginBottom: 4 }}>
+          <button onClick={() => setShowAllReviews(true)} style={{ background: 'none', border: 'none', color: '#00B5B9', cursor: 'pointer', fontSize: 12, padding: '2px 0', display: 'block', marginBottom: 4 }}>
             +{reviews.length - 1} more ▼
           </button>
         )}
@@ -830,7 +830,7 @@ function GearPickRow({ pick, reviews, netScore, myVote, onVote, onEdit, onDelete
               style={{ ...S.input, resize: 'vertical', fontSize: 13 }}
             />
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button style={S.btnPrimary('#00C4B4')} onClick={submitReview} disabled={savingReview}>
+              <button style={S.btnPrimary('#00B5B9')} onClick={submitReview} disabled={savingReview}>
                 {savingReview ? 'Saving…' : 'Post'}
               </button>
               <button style={S.btnSecondary} onClick={() => { setShowAddReview(false); setReviewText('') }}>
@@ -856,7 +856,7 @@ function GearPickRow({ pick, reviews, netScore, myVote, onVote, onEdit, onDelete
               edit
             </button>
             {isAdmin && (
-              <button onClick={onDelete} style={{ background: 'none', border: '1px solid rgba(255,61,139,0.2)', borderRadius: 4, color: '#FF3D8B', cursor: 'pointer', fontSize: 11, padding: '3px 8px', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>
+              <button onClick={onDelete} style={{ background: 'none', border: '1px solid rgba(232, 115, 98,0.2)', borderRadius: 4, color: '#E87362', cursor: 'pointer', fontSize: 11, padding: '3px 8px', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>
                 delete
               </button>
             )}
@@ -1065,8 +1065,8 @@ function GarageSale({ profile }) {
           <button key={f} onClick={() => setFilter(f)} style={{
             fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12, letterSpacing: '1px', textTransform: 'uppercase',
             padding: '6px 14px', borderRadius: 5, cursor: 'pointer', background: 'none',
-            border: `1px solid ${filter === f ? 'rgba(0,196,180,0.4)' : 'rgba(255,255,255,0.1)'}`,
-            color: filter === f ? '#00C4B4' : '#555',
+            border: `1px solid ${filter === f ? 'rgba(0, 181, 185,0.4)' : 'rgba(255,255,255,0.1)'}`,
+            color: filter === f ? '#00B5B9' : '#555',
           }}>
             {f === 'available' ? 'Available' : 'All listings'}
           </button>
@@ -1076,8 +1076,8 @@ function GarageSale({ profile }) {
           <button key={c} onClick={() => setCatFilter(c)} style={{
             fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12, letterSpacing: '1px', textTransform: 'uppercase',
             padding: '6px 14px', borderRadius: 5, cursor: 'pointer', background: 'none',
-            border: `1px solid ${catFilter === c ? 'rgba(255,90,31,0.4)' : 'rgba(255,255,255,0.1)'}`,
-            color: catFilter === c ? '#FF5A1F' : '#555',
+            border: `1px solid ${catFilter === c ? 'rgba(232, 115, 98,0.4)' : 'rgba(255,255,255,0.1)'}`,
+            color: catFilter === c ? '#E87362' : '#555',
           }}>
             {c === 'all' ? 'All categories' : c}
           </button>
@@ -1135,8 +1135,8 @@ function GarageListingCard({ listing: l, profile, isAdmin, onMessageSeller, onMa
           position: 'absolute', top: 10, right: 10, fontFamily: 'Barlow Condensed, sans-serif',
           fontSize: 11, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase',
           padding: '3px 10px', borderRadius: 4,
-          background: l.status === 'sold' ? 'rgba(255,61,139,0.2)' : 'rgba(232,184,75,0.2)',
-          color: l.status === 'sold' ? '#FF3D8B' : '#E8B84B',
+          background: l.status === 'sold' ? 'rgba(232, 115, 98,0.2)' : 'rgba(232,184,75,0.2)',
+          color: l.status === 'sold' ? '#E87362' : '#E8B84B',
         }}>
           {l.status === 'sold' ? 'Sold' : 'Traded'}
         </div>
@@ -1153,7 +1153,7 @@ function GarageListingCard({ listing: l, profile, isAdmin, onMessageSeller, onMa
       <div>
         <div style={{ fontWeight: 600, fontSize: 15, color: '#fff', marginBottom: 4 }}>{l.title}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Barlow Condensed, sans-serif', color: '#00C4B4' }}>
+          <span style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Barlow Condensed, sans-serif', color: '#00B5B9' }}>
             {l.is_trade ? 'Trade / Free' : l.price != null ? `$${l.price}` : 'Free'}
           </span>
           <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: cond.color, fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>
@@ -1183,7 +1183,7 @@ function GarageListingCard({ listing: l, profile, isAdmin, onMessageSeller, onMa
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {!isMine && !isSold && (
           <button
-            style={{ ...S.btnPrimary('#00C4B4'), flex: 1, fontSize: 12, padding: '8px 12px', opacity: isMessaging ? 0.6 : 1 }}
+            style={{ ...S.btnPrimary('#00B5B9'), flex: 1, fontSize: 12, padding: '8px 12px', opacity: isMessaging ? 0.6 : 1 }}
             onClick={onMessageSeller}
             disabled={isMessaging}
           >
@@ -1199,7 +1199,7 @@ function GarageListingCard({ listing: l, profile, isAdmin, onMessageSeller, onMa
         {canEdit && (
           <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
             <button onClick={onEdit} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, color: '#555', cursor: 'pointer', fontSize: 11, padding: '4px 8px' }}>✎</button>
-            <button onClick={onDelete} style={{ background: 'none', border: '1px solid rgba(255,61,139,0.2)', borderRadius: 4, color: '#FF3D8B', cursor: 'pointer', fontSize: 11, padding: '4px 8px' }}>✕</button>
+            <button onClick={onDelete} style={{ background: 'none', border: '1px solid rgba(232, 115, 98,0.2)', borderRadius: 4, color: '#E87362', cursor: 'pointer', fontSize: 11, padding: '4px 8px' }}>✕</button>
           </div>
         )}
       </div>
@@ -1268,8 +1268,8 @@ function GarageListingModal({ listing, profile, onSave, onClose }) {
 
   return (
     <div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={S.modalBox('#FF5A1F')}>
-        <div style={S.modalTitle('#FF5A1F')}>{listing ? 'Edit Listing' : 'Post a Listing'}</div>
+      <div style={S.modalBox('#E87362')}>
+        <div style={S.modalTitle('#E87362')}>{listing ? 'Edit Listing' : 'Post a Listing'}</div>
         <div style={S.modalSub}>Sell or trade gear with your teammates.</div>
 
         {/* Image upload */}
@@ -1278,7 +1278,7 @@ function GarageListingModal({ listing, profile, onSave, onClose }) {
           <div
             onClick={() => fileRef.current?.click()}
             style={{
-              border: `1px dashed ${imagePreview ? 'rgba(0,196,180,0.4)' : 'rgba(255,255,255,0.12)'}`,
+              border: `1px dashed ${imagePreview ? 'rgba(0, 181, 185,0.4)' : 'rgba(255,255,255,0.12)'}`,
               borderRadius: 8, cursor: 'pointer', overflow: 'hidden',
               height: imagePreview ? 160 : 80,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1335,7 +1335,7 @@ function GarageListingModal({ listing, profile, onSave, onClose }) {
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 20 }}>
-            <input type="checkbox" id="isTrade" checked={form.is_trade} onChange={e => set('is_trade', e.target.checked)} style={{ accentColor: '#FF5A1F' }} />
+            <input type="checkbox" id="isTrade" checked={form.is_trade} onChange={e => set('is_trade', e.target.checked)} style={{ accentColor: '#E87362' }} />
             <label htmlFor="isTrade" style={{ ...S.label, marginBottom: 0, cursor: 'pointer' }}>Trade / Free</label>
           </div>
         </div>
@@ -1344,7 +1344,7 @@ function GarageListingModal({ listing, profile, onSave, onClose }) {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: '1.5rem' }}>
           <button style={S.btnSecondary} onClick={onClose}>Cancel</button>
-          <button style={S.btnPrimary('#FF5A1F')} onClick={handleSave} disabled={saving}>
+          <button style={S.btnPrimary('#E87362')} onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : listing ? 'Save changes' : 'Post listing'}
           </button>
         </div>

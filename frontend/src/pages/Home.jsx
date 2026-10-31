@@ -32,8 +32,8 @@ function RaceRow({ race }) {
             marginLeft: '8px',
             fontFamily: 'Barlow Condensed, sans-serif',
             fontSize: '11px', letterSpacing: '1px',
-            background: 'rgba(0,196,180,0.12)', color: '#00C4B4',
-            border: '1px solid rgba(0,196,180,0.25)',
+            background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9',
+            border: '1px solid rgba(0, 181, 185,0.25)',
             borderRadius: '3px', padding: '1px 7px',
             verticalAlign: 'middle', whiteSpace: 'nowrap',
           }}>
@@ -45,7 +45,7 @@ function RaceRow({ race }) {
           style={{
             fontFamily: 'Barlow Condensed, sans-serif',
             fontSize: '11px', letterSpacing: '1px',
-            textTransform: 'uppercase', color: '#00C4B4',
+            textTransform: 'uppercase', color: '#00B5B9',
             background: 'none', border: 'none', cursor: 'pointer',
             whiteSpace: 'nowrap', padding: 0, flexShrink: 0,
           }}
@@ -56,7 +56,7 @@ function RaceRow({ race }) {
       {expanded && (
         <div style={{
           marginTop: '6px', paddingLeft: '12px',
-          borderLeft: '2px solid rgba(0,196,180,0.2)',
+          borderLeft: '2px solid rgba(0, 181, 185,0.2)',
           fontSize: '13px', color: '#aaa', lineHeight: 1.8,
         }}>
           {names.join(', ')}
@@ -117,7 +117,7 @@ function RaceMap({ races }) {
             fontSize: '13px', color: '#ccc',
             fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px',
           }}>
-            <span style={{ color: '#00C4B4', fontSize: '16px' }}>📍</span>
+            <span style={{ color: '#00B5B9', fontSize: '16px' }}>📍</span>
             <span style={{ fontWeight: 600, color: '#fff' }}>{race.city || race.location}</span>
             <span style={{ color: '#999' }}>— {race.name}</span>
           </div>
@@ -228,7 +228,7 @@ export default function Home({ session }) {
         </h1>
         <div style={{
           width: '60px', height: '3px', marginTop: '12px',
-          background: 'linear-gradient(90deg, #00C4B4, #FF3D8B)',
+          background: 'linear-gradient(90deg, #00B5B9, #E87362)',
           borderRadius: '2px',
         }} />
       </div>
@@ -255,19 +255,19 @@ export default function Home({ session }) {
         <>
           {/* 1 — This Week summary */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(0,196,180,0.06) 0%, rgba(255,61,139,0.06) 100%)',
-            border: '1px solid rgba(0,196,180,0.2)',
+            background: 'linear-gradient(135deg, rgba(0, 181, 185,0.06) 0%, rgba(232, 115, 98,0.06) 100%)',
+            border: '1px solid rgba(0, 181, 185,0.2)',
             borderRadius: '12px', padding: '1.75rem 2rem',
             marginBottom: '1.25rem', position: 'relative', overflow: 'hidden',
           }}>
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
-              background: 'linear-gradient(90deg, #00C4B4, #FF3D8B, #E8B84B, #FF5A1F)',
+              background: 'linear-gradient(90deg, #00B5B9, #E87362, #E8B84B, #E87362)',
             }} />
             <div style={{
               fontFamily: 'Barlow Condensed, sans-serif',
               fontSize: '12px', letterSpacing: '3px',
-              textTransform: 'uppercase', color: '#00C4B4', marginBottom: '10px',
+              textTransform: 'uppercase', color: '#00B5B9', marginBottom: '10px',
             }}>
               This week
             </div>
@@ -320,7 +320,7 @@ export default function Home({ session }) {
           <div style={{
             fontFamily: 'Barlow Condensed, sans-serif',
             fontSize: '12px', letterSpacing: '3px',
-            textTransform: 'uppercase', color: '#00C4B4', marginBottom: '10px',
+            textTransform: 'uppercase', color: '#00B5B9', marginBottom: '10px',
           }}>
             On the horizon — upcoming races
           </div>
