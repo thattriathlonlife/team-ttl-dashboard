@@ -9,6 +9,8 @@ import ProfilePage from './pages/ProfilePage'
 import CompleteProfile from './pages/CompleteProfile'
 import Team from './pages/Team'
 import Content from './pages/Content'
+import Search from './pages/Search'
+import { AudioPlayerProvider } from './lib/audio'
 import Layout from './components/Layout'
 import TeamLocked from './components/TeamLocked'
 import { isTeamTier } from './lib/tier'
@@ -35,6 +37,7 @@ function AppRoutes({ session, profile, setProfile }) {
   }
 
   return (
+    <AudioPlayerProvider>
     <Layout
       session={session}
       profile={profile}
@@ -44,6 +47,7 @@ function AppRoutes({ session, profile, setProfile }) {
       <Routes>
         <Route path="/login" element={<Navigate to="/" />} />
         <Route path="/" element={<Home session={session} profile={profile} />} />
+        <Route path="/search" element={<Search profile={profile} />} />
         <Route path="/races" element={<Dashboard session={session} />} />
         <Route path="/team" element={isTeamTier(profile) ? <Team session={session} profile={profile} /> : <TeamLocked feature="Team Hub" />} />
         <Route path="/content" element={<Content />} />
@@ -56,6 +60,7 @@ function AppRoutes({ session, profile, setProfile }) {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>
+    </AudioPlayerProvider>
   )
 }
 

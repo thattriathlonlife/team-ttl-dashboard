@@ -60,6 +60,7 @@ function parseRss(xml, limit) {
   const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, limit)
   return items.map(([, block]) => {
     const enc = block.match(/<enclosure[^>]+url="([^"]+)"[^>]*type="audio[^"]*"/) || block.match(/<enclosure[^>]+url="([^"]+)"/)
+    const img = block.match(/<itunes:image[^>]+href="([^"]+)"/)
     return {
       title: tag(block, 'title'),
       link: tag(block, 'link'),
@@ -67,8 +68,17 @@ function parseRss(xml, limit) {
       audio: enc ? enc[1] : null,
       duration: tag(block, 'itunes:duration'),
       summary: (tag(block, 'description') || '').slice(0, 220),
+      image: img ? img[1] : null,
     }
   })
+}
+
+function channelImage(xml) {
+  const head = xml.split('<item>')[0]
+  const itunes = head.match(/<itunes:image[^>]+href="([^"]+)"/)
+  if (itunes) return itunes[1]
+  const img = head.match(/<image>[\s\S]*?<url>([^<]+)<\/url>/)
+  return img ? img[1].trim() : null
 }
 
 const AGE_UNITS = { minute: 60e3, hour: 3600e3, day: 86400e3, week: 7 * 86400e3, month: 30 * 86400e3, year: 365 * 86400e3 }
@@ -155,9 +165,11 @@ export default async function handler(req, res) {
 
     // Feeds change on TTL's publishing cadence, not ours — cache hard at the edge.
     res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600')
+    const podcastImage = channelImage(episodesXml)
     return res.status(200).json({
       stories: parseAtom(storiesXml, 20),
-      episodes: parseRss(episodesXml, 30),
+      episodes: parseRss(episodesXml, 30).map(ep => ({ ...ep, image: ep.image || podcastImage })),
+      podcastImage,
       videos,
       fetchedAt: new Date().toISOString(),
     })

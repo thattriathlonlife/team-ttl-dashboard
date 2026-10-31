@@ -3,6 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { raceChannelKind, isTeamOnlyChannel, channelDisplayName } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
+import { useAudio } from '../lib/audio'
+
+const FEED_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'post', label: 'Posts' },
+  { id: 'episode', label: 'Podcast' },
+  { id: 'video', label: 'Videos' },
+  { id: 'story', label: 'Stories' },
+]
 
 // Home is a ranked feed (TTL's vision, built 2026-10-31): an endless scroll
 // that intermixes team forum posts — surfaced by engagement, not just
@@ -151,8 +160,8 @@ function Avatar({ profile, size = 36 }) {
   )
 }
 
-async function loadFeedPosts(team) {
-  const { data: chans } = await supabase.from('channels').select('id, name, type, category, audience')
+async function loadFeedPosts(team, userId) {
+  const { data: chans } = await supabase.from('channels').select('id, name, type, category, audience, race_id')
   if (!chans) return []
   const byId = {}
   const allowed = []
@@ -165,6 +174,18 @@ async function loadFeedPosts(team) {
     }
   }
   if (!allowed.length) return []
+
+  // Race embeds (DESIGN-SPEC §2.2): a post in a race channel carries its
+  // race with it, so the card can show the race and link through to it.
+  const raceIds = [...new Set(allowed.map(id => byId[id].race_id).filter(Boolean))]
+  if (raceIds.length) {
+    const { data: raceRows } = await supabase.from('races')
+      .select('id, name, race_date, location').in('id', raceIds)
+    const raceById = Object.fromEntries((raceRows || []).map(r => [r.id, r]))
+    for (const id of allowed) {
+      if (byId[id].race_id) byId[id].race = raceById[byId[id].race_id] || null
+    }
+  }
 
   let msgs = []
   let cursor = null
@@ -186,17 +207,19 @@ async function loadFeedPosts(team) {
 
   const ids = msgs.map(m => m.id)
   const [{ data: reactions }, { data: replies }] = await Promise.all([
-    supabase.from('message_reactions').select('message_id, emoji').in('message_id', ids),
+    supabase.from('message_reactions').select('message_id, emoji, athlete_id').in('message_id', ids),
     supabase.from('messages').select('reply_to').in('reply_to', ids),
   ])
   const rCount = {}
   const emojiCounts = {}
+  const myHearts = new Set()
   for (const r of reactions || []) {
     rCount[r.message_id] = (rCount[r.message_id] || 0) + 1
     if (r.emoji) {
       emojiCounts[r.message_id] = emojiCounts[r.message_id] || {}
       emojiCounts[r.message_id][r.emoji] = (emojiCounts[r.message_id][r.emoji] || 0) + 1
     }
+    if (r.emoji === '❤️' && r.athlete_id === userId) myHearts.add(r.message_id)
   }
   const repCount = {}
   for (const r of replies || []) repCount[r.reply_to] = (repCount[r.reply_to] || 0) + 1
@@ -209,6 +232,7 @@ async function loadFeedPosts(team) {
       channel: byId[m.channel_id],
       reactionCount: rCount[m.id] || 0,
       topEmoji,
+      myHeart: myHearts.has(m.id),
       replyCount: repCount[m.id] || 0,
     }
     return { kind: 'post', key: `post-${m.id}`, at: new Date(m.created_at).getTime(), data, score: postScore(data) }
@@ -220,12 +244,13 @@ export default function Home({ session, profile }) {
   const [nextRace, setNextRace] = useState(null)
   const [myProfile, setMyProfile] = useState(null)
   const [feed, setFeed] = useState([])
+  const [hero, setHero] = useState(null)
+  const [filter, setFilter] = useState('all')
   const [visibleCount, setVisibleCount] = useState(FEED_BATCH)
   const [loading, setLoading] = useState(true)
-  const [playing, setPlaying] = useState(null)
-  const audioRef = useRef(null)
   const sentinelRef = useRef(null)
   const navigate = useNavigate()
+  const audio = useAudio()
   const team = isTeamTier(profile)
 
   // Reload when the tier flips (profile arrives after mount, or the demo
@@ -242,7 +267,7 @@ export default function Home({ session, profile }) {
     }, { rootMargin: '600px' })
     obs.observe(el)
     return () => obs.disconnect()
-  }, [feed.length])
+  }, [feed.length, filter])
 
   async function ensureProfile() {
     const userId = session.user.id
@@ -298,19 +323,29 @@ export default function Home({ session, profile }) {
     } catch { /* feed still runs on posts alone */ }
 
     let posts = []
-    try { posts = await loadFeedPosts(team) } catch { /* feed still runs on content alone */ }
+    try { posts = await loadFeedPosts(team, userId) } catch { /* feed still runs on content alone */ }
 
-    setFeed(buildFeed(content, posts))
+    // Hero slot (DESIGN-SPEC §5): the newest story/video with artwork
+    // headlines the river and is pulled out of the interleave.
+    const heroItem = content.find(c => (c.kind === 'story' || c.kind === 'video') && c.data.image) || null
+    setHero(heroItem)
+    setFeed(buildFeed(content, posts).filter(i => !heroItem || i.key !== heroItem.key))
     setLoading(false)
   }
 
-  function togglePlay(ep) {
-    if (playing === ep.audio) {
-      audioRef.current?.pause()
-      setPlaying(null)
+  // Live reaction from the feed (DESIGN-SPEC §5): a real write to
+  // message_reactions, optimistically reflected on the card.
+  async function toggleHeart(item) {
+    const m = item.data
+    const next = !m.myHeart
+    setFeed(prev => prev.map(i => i.key === item.key
+      ? { ...i, data: { ...i.data, myHeart: next, reactionCount: Math.max(0, i.data.reactionCount + (next ? 1 : -1)) } }
+      : i))
+    if (next) {
+      await supabase.from('message_reactions').insert({ message_id: m.id, athlete_id: session.user.id, emoji: '❤️' })
     } else {
-      setPlaying(ep.audio)
-      requestAnimationFrame(() => audioRef.current?.play())
+      await supabase.from('message_reactions').delete()
+        .eq('message_id', m.id).eq('athlete_id', session.user.id).eq('emoji', '❤️')
     }
   }
 
@@ -323,11 +358,21 @@ export default function Home({ session, profile }) {
     return 'Good evening'
   }
 
+  const pillBtn = (active) => ({
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    fontFamily: 'Barlow, sans-serif', fontSize: '13px', fontWeight: 600,
+    color: active ? '#E87362' : '#aaa',
+    background: active ? 'rgba(232, 115, 98,0.12)' : 'rgba(255,255,255,0.05)',
+    border: `1px solid ${active ? 'rgba(232, 115, 98,0.4)' : 'rgba(255,255,255,0.09)'}`,
+    borderRadius: '999px', padding: '6px 13px', cursor: 'pointer',
+  })
+
   function renderPost(item) {
     const m = item.data
     const ch = m.channel
+    const race = ch?.race
     return (
-      <button key={item.key} onClick={() => navigate(`/messages?channel=${m.channel_id}`)} style={{ ...F.card, cursor: 'pointer' }}>
+      <div key={item.key} onClick={() => navigate(`/messages?channel=${m.channel_id}`)} style={{ ...F.card, cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
           <Avatar profile={m.profiles} />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -346,35 +391,54 @@ export default function Home({ session, profile }) {
           </div>
         )}
         {m.image_url && (
-          <img src={m.image_url} alt="" loading="lazy" style={{ width: '100%', borderRadius: '8px', marginTop: m.content ? '10px' : 0, display: 'block' }} />
+          <img src={m.image_url} alt="" loading="lazy" style={{ width: '100%', borderRadius: '10px', marginTop: m.content ? '10px' : 0, display: 'block' }} />
         )}
-        <div style={{ display: 'flex', gap: '18px', marginTop: '12px', fontSize: '13px', color: '#888' }}>
-          <span>{m.topEmoji} {m.reactionCount}</span>
-          <span>💬 {m.replyCount} {m.replyCount === 1 ? 'reply' : 'replies'}</span>
+        {race && (
+          <button
+            onClick={e => { e.stopPropagation(); navigate('/races') }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left',
+              marginTop: '12px', padding: '10px 12px', cursor: 'pointer',
+              background: 'rgba(0, 181, 185,0.07)', border: '1px solid rgba(0, 181, 185,0.25)',
+              borderRadius: '10px',
+            }}
+          >
+            <span style={{ fontSize: '18px' }}>🏁</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 600, color: '#fff' }}>{race.name}</span>
+              <span style={{ display: 'block', fontSize: '12px', color: '#999' }}>{fmtDate(race.race_date)} · {race.location}</span>
+            </span>
+            <span style={{ color: '#00B5B9', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' }}>View race →</span>
+          </button>
+        )}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px' }}>
+          <button
+            style={pillBtn(m.myHeart)}
+            onClick={e => { e.stopPropagation(); toggleHeart(item) }}
+            aria-label={m.myHeart ? 'Remove your reaction' : 'React with a heart'}
+          >
+            {m.topEmoji} {m.reactionCount}
+          </button>
+          <span style={pillBtn(false)}>
+            💬 {m.replyCount} {m.replyCount === 1 ? 'reply' : 'replies'}
+          </span>
           <span style={{ marginLeft: 'auto', color: '#00B5B9', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', textTransform: 'uppercase', fontSize: '11px' }}>
             {ch?.feedKind === 'discussion' ? 'Race discussion' : 'Team channel'}
           </span>
         </div>
-      </button>
+      </div>
     )
   }
 
   function renderEpisode(item) {
     const ep = item.data
+    const isCurrent = audio.current?.audio === ep.audio
     return (
       <div key={item.key} style={F.card}>
         <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-          <button
-            onClick={() => togglePlay(ep)} aria-label={playing === ep.audio ? 'Pause' : 'Play'}
-            style={{
-              width: '46px', height: '46px', borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(0, 181, 185,0.14)', border: '1px solid rgba(0, 181, 185,0.4)',
-              color: '#00B5B9', fontSize: '16px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            {playing === ep.audio ? '❚❚' : '▶'}
-          </button>
+          {ep.image
+            ? <img src={ep.image} alt="" loading="lazy" style={{ width: '64px', height: '64px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
+            : <div style={{ width: '64px', height: '64px', borderRadius: '10px', background: 'rgba(0, 181, 185,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎧</div>}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
               <span style={F.chip('#00B5B9')}>Podcast</span>
@@ -383,6 +447,18 @@ export default function Home({ session, profile }) {
             <div style={F.cardTitle}>{ep.title}</div>
             {ep.summary && <div style={F.summary}>{ep.summary}</div>}
           </div>
+          <button
+            onClick={() => audio.playEpisode(ep)} aria-label={isCurrent && audio.playing ? 'Pause' : 'Play'}
+            style={{
+              width: '46px', height: '46px', borderRadius: '50%', flexShrink: 0, alignSelf: 'center',
+              background: '#00B5B9', border: 'none',
+              color: '#06282a', fontSize: '16px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 18px rgba(0, 181, 185,0.35)',
+            }}
+          >
+            {isCurrent && audio.playing ? '❚❚' : '▶'}
+          </button>
         </div>
       </div>
     )
@@ -417,16 +493,50 @@ export default function Home({ session, profile }) {
   function renderStory(item) {
     const st = item.data
     return (
-      <button key={item.key} onClick={() => window.open(st.link, '_blank', 'noopener')} style={{ ...F.card, cursor: 'pointer' }}>
-        <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-          {st.image && <img src={st.image} alt="" loading="lazy" style={{ width: '76px', height: '76px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
-              <span style={F.chip('#E8B84B')}>Story</span>
-              <span style={{ fontSize: '12px', color: '#777' }}>{fmtDate(st.published)}</span>
-            </div>
-            <div style={F.cardTitle}>{st.title}</div>
-            {st.summary && <div style={F.summary}>{st.summary}</div>}
+      <button key={item.key} onClick={() => window.open(st.link, '_blank', 'noopener')} style={{ ...F.card, cursor: 'pointer', padding: 0, overflow: 'hidden' }}>
+        {st.image && <img src={st.image} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '16/8', objectFit: 'cover', display: 'block' }} />}
+        <div style={{ padding: '1rem 1.25rem' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
+            <span style={F.chip('#E8B84B')}>Story</span>
+            <span style={{ fontSize: '12px', color: '#777' }}>{fmtDate(st.published)}</span>
+          </div>
+          <div style={F.cardTitle}>{st.title}</div>
+          {st.summary && <div style={F.summary}>{st.summary}</div>}
+        </div>
+      </button>
+    )
+  }
+
+  // Hero card: full-bleed artwork, gradient scrim, headline type.
+  function renderHero(item) {
+    const d = item.data
+    const isVideo = item.kind === 'video'
+    return (
+      <button
+        onClick={() => window.open(d.link, '_blank', 'noopener')}
+        style={{
+          position: 'relative', width: '100%', textAlign: 'left', cursor: 'pointer',
+          borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)',
+          padding: 0, marginBottom: '1rem', display: 'block', background: '#161616',
+        }}
+      >
+        <img src={d.image} alt="" style={{ width: '100%', aspectRatio: '16/9.5', objectFit: 'cover', display: 'block' }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0) 34%, rgba(5,8,10,0.88) 82%)',
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          padding: '1.1rem 1.25rem',
+        }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '7px' }}>
+            <span style={F.chip(isVideo ? '#E87362' : '#E8B84B')}>{isVideo ? '▶ YouTube' : 'Top story'}</span>
+            <span style={{ fontSize: '12px', color: '#cfd4da' }}>{isVideo ? (d.age || '') : fmtDate(d.published)}</span>
+          </div>
+          <div style={{
+            fontFamily: 'Barlow Condensed, sans-serif', fontSize: '27px', fontWeight: 800,
+            letterSpacing: '0.5px', lineHeight: 1.12, color: '#fff',
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {d.title}
           </div>
         </div>
       </button>
@@ -441,8 +551,12 @@ export default function Home({ session, profile }) {
   }
 
   if (loading) return (
-    <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#999', textTransform: 'uppercase' }}>
-      Loading...
+    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '2rem 1.25rem' }}>
+      <style>{`@keyframes ttlPulse { 0%,100% { opacity: .45 } 50% { opacity: .9 } }`}</style>
+      <div style={{ height: '54px', width: '55%', borderRadius: '10px', background: '#1b1b1b', animation: 'ttlPulse 1.3s ease-in-out infinite', marginBottom: '1.5rem' }} />
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{ height: i === 0 ? '210px' : '120px', borderRadius: '16px', background: '#161616', border: '1px solid rgba(255,255,255,0.05)', animation: `ttlPulse 1.3s ease-in-out ${i * 0.15}s infinite`, marginBottom: '1rem' }} />
+      ))}
     </div>
   )
 
@@ -535,34 +649,65 @@ export default function Home({ session, profile }) {
         fontFamily: 'Barlow Condensed, sans-serif',
         fontSize: '12px', letterSpacing: '3px',
         textTransform: 'uppercase', color: '#00B5B9',
-        margin: '1.75rem 0 1rem',
+        margin: '1.75rem 0 0.75rem',
       }}>
         Your feed
       </div>
 
-      {feed.length === 0 ? (
-        <div style={{
-          background: '#161616', border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '12px', padding: '2.5rem', textAlign: 'center',
-          fontSize: '14px', color: '#999',
-        }}>
-          Nothing here yet — posts from race discussions and new TTL content will land in this feed.
-        </div>
-      ) : (
-        <>
-          {feed.slice(0, visibleCount).map(renderItem)}
-          <div ref={sentinelRef} style={{ height: '1px' }} />
-          <div style={{
-            textAlign: 'center', padding: '1.5rem 0 0.5rem',
-            fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px',
-            letterSpacing: '2px', textTransform: 'uppercase', color: '#555',
-          }}>
-            {visibleCount < feed.length ? 'Loading more…' : "You're all caught up 🏁"}
-          </div>
-        </>
-      )}
+      {/* Filter chips — one lens across every source */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '0.75rem', scrollbarWidth: 'none' }}>
+        {FEED_FILTERS.map(f => {
+          const active = filter === f.id
+          return (
+            <button
+              key={f.id}
+              onClick={() => { setFilter(f.id); setVisibleCount(FEED_BATCH) }}
+              style={{
+                fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600,
+                letterSpacing: '1.5px', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                padding: '8px 16px', borderRadius: '999px', cursor: 'pointer',
+                border: `1px solid ${active ? 'rgba(0, 181, 185,0.55)' : 'rgba(255,255,255,0.12)'}`,
+                background: active ? 'rgba(0, 181, 185,0.14)' : '#161616',
+                color: active ? '#00B5B9' : '#888', transition: 'all 0.15s',
+              }}
+            >
+              {f.label}
+            </button>
+          )
+        })}
+      </div>
 
-      {playing && <audio ref={audioRef} src={playing} preload="none" onEnded={() => setPlaying(null)} />}
+      {filter === 'all' && hero && renderHero(hero)}
+
+      {(() => {
+        const visibleFeed = filter === 'all' ? feed : feed.filter(i => i.kind === filter)
+        if (visibleFeed.length === 0) {
+          return (
+            <div style={{
+              background: '#161616', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '12px', padding: '2.5rem', textAlign: 'center',
+              fontSize: '14px', color: '#999',
+            }}>
+              {feed.length === 0
+                ? 'Nothing here yet — posts from race discussions and new TTL content will land in this feed.'
+                : 'Nothing in this slice right now — try another filter.'}
+            </div>
+          )
+        }
+        return (
+          <>
+            {visibleFeed.slice(0, visibleCount).map(renderItem)}
+            <div ref={sentinelRef} style={{ height: '1px' }} />
+            <div style={{
+              textAlign: 'center', padding: '1.5rem 0 0.5rem',
+              fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px',
+              letterSpacing: '2px', textTransform: 'uppercase', color: '#555',
+            }}>
+              {visibleCount < visibleFeed.length ? 'Loading more…' : "You're all caught up 🏁"}
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }

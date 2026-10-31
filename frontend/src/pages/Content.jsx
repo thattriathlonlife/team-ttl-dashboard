@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { useAudio } from '../lib/audio'
 
 // Content tab — the TTL public content world inside the unified app.
 // Stories come from the Shopify `journal` blog Atom feed, episodes from
@@ -29,8 +30,7 @@ function fmtDate(d) {
 export default function Content() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-  const [playing, setPlaying] = useState(null) // episode audio URL
-  const audioRef = useRef(null)
+  const audio = useAudio() // global player — playback survives navigation
 
   useEffect(() => {
     fetch('/api/content/feeds')
@@ -39,35 +39,35 @@ export default function Content() {
       .catch(() => setError('Content is unavailable right now.'))
   }, [])
 
-  function togglePlay(ep) {
-    if (playing === ep.audio) {
-      audioRef.current?.pause()
-      setPlaying(null)
-    } else {
-      setPlaying(ep.audio)
-      requestAnimationFrame(() => audioRef.current?.play())
-    }
-  }
-
   if (error) return <div style={S.wrap}><div style={S.note}>{error}</div></div>
-  if (!data) return <div style={S.wrap}><div style={S.note}>Loading content…</div></div>
+  if (!data) return (
+    <div style={S.wrap}>
+      <style>{`@keyframes ttlPulse { 0%,100% { opacity: .45 } 50% { opacity: .9 } }`}</style>
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} style={{ height: '96px', borderRadius: '12px', background: '#161616', border: '1px solid rgba(255,255,255,0.05)', animation: `ttlPulse 1.3s ease-in-out ${i * 0.15}s infinite`, marginBottom: '10px' }} />
+      ))}
+    </div>
+  )
 
   return (
     <div style={S.wrap}>
       <div style={{ ...S.h, marginTop: 4 }}>Podcast</div>
-      {data.episodes.map((ep, i) => (
-        <div key={i} style={{ ...S.card, cursor: 'default' }}>
-          <button style={S.playBtn} onClick={() => togglePlay(ep)} aria-label={playing === ep.audio ? 'Pause' : 'Play'}>
-            {playing === ep.audio ? '❚❚' : '▶'}
-          </button>
-          <div>
-            <div style={S.title}>{ep.title}</div>
-            <div style={S.meta}>{fmtDate(ep.published)}{ep.duration ? ` · ${ep.duration}` : ''}</div>
-            {ep.summary && <div style={S.summary}>{ep.summary}</div>}
+      {data.episodes.map((ep, i) => {
+        const isCurrent = audio.current?.audio === ep.audio
+        return (
+          <div key={i} style={{ ...S.card, cursor: 'default' }}>
+            {ep.image && <img src={ep.image} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0, alignSelf: 'center' }} />}
+            <button style={S.playBtn} onClick={() => audio.playEpisode(ep)} aria-label={isCurrent && audio.playing ? 'Pause' : 'Play'}>
+              {isCurrent && audio.playing ? '❚❚' : '▶'}
+            </button>
+            <div>
+              <div style={S.title}>{ep.title}</div>
+              <div style={S.meta}>{fmtDate(ep.published)}{ep.duration ? ` · ${ep.duration}` : ''}</div>
+              {ep.summary && <div style={S.summary}>{ep.summary}</div>}
+            </div>
           </div>
-        </div>
-      ))}
-      {playing && <audio ref={audioRef} src={playing} preload="none" onEnded={() => setPlaying(null)} />}
+        )
+      })}
 
       {data.videos?.length > 0 && (
         <>

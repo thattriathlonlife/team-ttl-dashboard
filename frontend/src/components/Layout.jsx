@@ -1,6 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import MiniPlayer from './MiniPlayer'
+
+const SearchIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+  </svg>
+)
+const BellIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/>
+  </svg>
+)
+const iconBtnStyle = { background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', padding: '6px', display: 'flex', position: 'relative' }
+const badgeStyle = { position: 'absolute', top: '1px', right: '0px', background: '#E87362', color: '#fff', fontSize: '9px', fontWeight: 700, borderRadius: '8px', padding: '1px 4px', minWidth: '14px', textAlign: 'center', fontFamily: 'Barlow Condensed, sans-serif' }
 
 // Icons as simple SVG components
 const HomeIcon = ({ active }) => (
@@ -92,9 +106,18 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
           <button onClick={() => navigate('/')} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 900, letterSpacing: '3px', color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             <span style={{ color: '#00B5B9' }}>TEAM</span> TTL
           </button>
-          <button onClick={onNavigateProfile} aria-label="Profile" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
-            <ProfileIcon active={location.pathname === '/profile'} avatarUrl={avatarUrl} color={avatarColor} initials={initials} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button onClick={() => navigate('/search')} aria-label="Search" style={iconBtnStyle}>
+              <SearchIcon />
+            </button>
+            <button onClick={() => navigate('/messages')} aria-label="Notifications" style={iconBtnStyle}>
+              <BellIcon />
+              {unreadCount > 0 && <span style={badgeStyle}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
+            </button>
+            <button onClick={onNavigateProfile} aria-label="Profile" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 2px 4px', display: 'flex' }}>
+              <ProfileIcon active={location.pathname === '/profile'} avatarUrl={avatarUrl} color={avatarColor} initials={initials} />
+            </button>
+          </div>
         </div>
 
         {/* Page content */}
@@ -102,12 +125,18 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
           {children}
         </main>
 
-        {/* Bottom tab bar */}
+        {/* Global mini-player — playback follows you (DESIGN-SPEC §4) */}
+        <MiniPlayer />
+
+        {/* Floating pill nav (DESIGN-SPEC §4) */}
+        <div style={{ flexShrink: 0, zIndex: 100, padding: '2px 12px calc(10px + env(safe-area-inset-bottom))' }}>
         <nav style={{
-          display: 'flex', background: '#161616',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          flexShrink: 0, zIndex: 100,
+          display: 'flex', background: 'rgba(22,22,22,0.94)',
+          backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '999px',
+          boxShadow: '0 14px 34px rgba(0,0,0,0.55)',
+          padding: '6px',
         }}>
           {TABS.map(tab => {
             const active = location.pathname === tab.path
@@ -119,11 +148,12 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
                 style={{
                   flex: 1, display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center',
-                  padding: '8px 4px 6px',
-                  background: 'none', border: 'none',
-                  color: active ? '#00B5B9' : '#555',
+                  padding: '7px 2px 6px',
+                  background: active ? 'rgba(0, 181, 185,0.16)' : 'none',
+                  border: 'none', borderRadius: '999px',
+                  color: active ? '#00B5B9' : '#666',
                   cursor: 'pointer', position: 'relative',
-                  transition: 'color 0.15s',
+                  transition: 'all 0.15s',
                 }}
               >
                 {tab.path === '/' && <HomeIcon active={active} />}
@@ -131,7 +161,7 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
                 {tab.path === '/content' && <PlayIcon active={active} />}
                 {tab.path === '/messages' && <MessageIcon active={active} />}
                 {tab.path === '/team' && <TeamIcon active={active} />}
-                <span style={{ fontSize: '10px', marginTop: '3px', letterSpacing: '0.5px', fontFamily: 'Barlow Condensed, sans-serif', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: '10px', marginTop: '3px', letterSpacing: '0.5px', fontFamily: 'Barlow Condensed, sans-serif', textTransform: 'uppercase', fontWeight: active ? 700 : 400 }}>
                   {tab.label}
                 </span>
                 {isMessages && unreadCount > 0 && (
@@ -143,6 +173,7 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
             )
           })}
         </nav>
+        </div>
       </div>
     )
   }
@@ -168,7 +199,14 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/search')} aria-label="Search" style={iconBtnStyle}>
+            <SearchIcon />
+          </button>
+          <button onClick={() => navigate('/messages')} aria-label="Notifications" style={iconBtnStyle}>
+            <BellIcon />
+            {unreadCount > 0 && <span style={badgeStyle}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
+          </button>
           {/* Avatar dropdown */}
           <div style={{ position: 'relative' }}>
             <div onClick={() => setDesktopDropdown(p => !p)} style={{ cursor: 'pointer' }}>
@@ -195,6 +233,7 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
         </div>
       </nav>
       <main style={{ flex: 1 }} onClick={() => desktopDropdown && setDesktopDropdown(false)}>{children}</main>
+      <MiniPlayer floating />
     </div>
   )
 }
