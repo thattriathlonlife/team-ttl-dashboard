@@ -196,7 +196,7 @@ export default function Dashboard({ session }) {
               <div style={{ fontSize: '13px', color: '#999' }}>Switch to All Races and hit Enter on any race to add it here.</div>
             </div>
           ) : (
-            <RaceList races={filteredRaces} myEntries={myEntries} allEntries={allEntries} profiles={profiles} onToggle={toggleEntry} session={session} />
+            <RaceList races={filteredRaces} myEntries={myEntries} allEntries={allEntries} profiles={profiles} profile={profile} onToggle={toggleEntry} session={session} />
           )}
         </>
       )}

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { isTeamTier } from '../lib/tier'
+import { channelAccessLabel, channelDisplayName, isRaceChannel, isTeamOnlyChannel, raceChannelKind, RACE_LOGISTICS_TYPE } from '../lib/channels'
+import TeamLocked from '../components/TeamLocked'
 
 // Given a DM channel (with dm_members hydrated), return the other person's profile
 function dmOtherProfile(channel, userId) {
@@ -65,10 +68,12 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const [showMentions, setShowMentions] = useState(false)
   const [dmChannels, setDmChannels] = useState([])
   const [showNewDm, setShowNewDm] = useState(false)
+  const [lockedChannel, setLockedChannel] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const userId = session.user.id
   const isAdmin = profile?.role === 'admin'
+  const teamView = isTeamTier(profile)
   const selectedChannelRef = useRef(null)
   const onReadChannelRef = useRef(onReadChannel)
   useEffect(() => { onReadChannelRef.current = onReadChannel }, [onReadChannel])
@@ -137,9 +142,10 @@ export default function Messaging({ session, profile, onReadChannel }) {
     }
 
     if (channelsRes.data) {
-      // Fix: ensure race-type channels get race category
+      // Fix: ensure every race conversation gets the race category, including
+      // the legacy type and the public/logistics split.
       const fixedChannels = channelsRes.data.map(ch =>
-        ch.type === 'race' && ch.category !== 'race' ? { ...ch, category: 'race' } : ch
+        isRaceChannel(ch) && ch.category !== 'race' ? { ...ch, category: 'race' } : ch
       )
       setChannels(fixedChannels)
 
@@ -209,6 +215,15 @@ export default function Messaging({ session, profile, onReadChannel }) {
   }, [userId])
 
   async function openChannel(channel) {
+    if (!teamView && isTeamOnlyChannel(channel)) {
+      selectedChannelRef.current = null
+      setSelectedChannel(null)
+      setLockedChannel(channel)
+      setShowMentions(false)
+      if (isMobile) setShowSidebar(false)
+      return
+    }
+    setLockedChannel(null)
     selectedChannelRef.current = channel
     setSelectedChannel(channel)
     setShowMentions(false)
@@ -223,6 +238,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
   async function openMentions() {
     setShowMentions(true)
+    setLockedChannel(null)
     setSelectedChannel(null)
     if (isMobile) setShowSidebar(false)
     // Mark all mentions as seen
@@ -234,7 +250,8 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const trainingChannels = channels.filter(c => c.category === 'training')
   const interestChannels = channels.filter(c => c.category === 'interest')
   const regionChannels = channels.filter(c => c.category === 'regions')
-  const raceChannels = channels.filter(c => c.category === 'race')
+  const publicRaceChannels = channels.filter(c => raceChannelKind(c) === 'discussion')
+  const teamRaceChannels = channels.filter(c => raceChannelKind(c) === 'logistics')
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0)
 
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#999', textTransform: 'uppercase' }}>Loading...</div>
@@ -261,22 +278,36 @@ export default function Messaging({ session, profile, onReadChannel }) {
               {mentionCount > 0 && <div style={{ background: '#E87362', color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, borderRadius: '10px', padding: '2px 8px', flexShrink: 0 }}>{mentionCount}</div>}
             </button>
 
-            <ChannelGroup label="General" channels={generalChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} />
-            {trainingChannels.length > 0 && <ChannelGroup label="Training" channels={trainingChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} />}
-            {interestChannels.length > 0 && <ChannelGroup label="Groups" channels={interestChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} />}
-            {regionChannels.length > 0 && <ChannelGroup label="Regions" channels={regionChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} />}
-            {raceChannels.length > 0 && <ChannelGroup label="Race Threads" channels={raceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} />}
+            <ChannelGroup label="General" channels={generalChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} locked={!teamView} />
+            {trainingChannels.length > 0 && <ChannelGroup label="Training" channels={trainingChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
+            {interestChannels.length > 0 && <ChannelGroup label="Groups" channels={interestChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
+            {regionChannels.length > 0 && <ChannelGroup label="Regions" channels={regionChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
+            {publicRaceChannels.length > 0 && <ChannelGroup label="Race Discussions" channels={publicRaceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} />}
+            {teamRaceChannels.length > 0 && <ChannelGroup label="Race Logistics" channels={teamRaceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
 
             {/* Direct Messages */}
-            <DMGroup
-              dmChannels={dmChannels}
-              selected={selectedChannel}
-              unread={unreadCounts}
-              lastMessages={lastMessages}
-              userId={userId}
-              onSelect={openChannel}
-              onNewDm={() => setShowNewDm(true)}
-            />
+            {teamView ? (
+              <DMGroup
+                dmChannels={dmChannels}
+                selected={selectedChannel}
+                unread={unreadCounts}
+                lastMessages={lastMessages}
+                userId={userId}
+                onSelect={openChannel}
+                onNewDm={() => setShowNewDm(true)}
+              />
+            ) : (
+              <button
+                onClick={() => openChannel({ id: 'locked-dms', type: 'dm', name: 'Direct Messages' })}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span style={{ fontSize: '18px' }}>🔒</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: 'block', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, color: '#777' }}>Direct Messages</span>
+                  <span style={{ display: 'block', fontSize: '11px', color: '#444', marginTop: '1px' }}>Team members only</span>
+                </span>
+              </button>
+            )}
 
             {/* Bottom hint when no channel selected on mobile */}
             {isMobile && !selectedChannel && !showMentions && (
@@ -290,7 +321,17 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
       {/* Mentions view */}
       {(!showSidebar || !isMobile) && showMentions && (
-        <MentionsView session={session} profile={profile} isMobile={isMobile} channels={channels} onBack={() => { setShowSidebar(true); setShowMentions(false) }} onOpenChannel={openChannel} />
+        <MentionsView session={session} profile={profile} isMobile={isMobile} channels={channels} teamView={teamView} onBack={() => { setShowSidebar(true); setShowMentions(false) }} onOpenChannel={openChannel} />
+      )}
+
+      {/* Locked team surface */}
+      {(!showSidebar || !isMobile) && lockedChannel && !showMentions && (
+        <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
+          {isMobile && (
+            <button onClick={() => { setShowSidebar(true); setLockedChannel(null) }} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '14px 16px 0' }}>←</button>
+          )}
+          <TeamLocked feature={lockedChannel.type === 'dm' ? 'Direct messages' : channelDisplayName(lockedChannel)} />
+        </div>
       )}
 
       {/* Message thread */}
@@ -308,7 +349,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
       )}
 
       {/* Empty state */}
-      {!isMobile && !selectedChannel && !showMentions && (
+      {!isMobile && !selectedChannel && !showMentions && !lockedChannel && (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
           <div style={{ fontSize: '48px' }}>💬</div>
           <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', letterSpacing: '2px', textTransform: 'uppercase', color: '#555' }}>Select a channel to start chatting</div>
@@ -337,8 +378,8 @@ export default function Messaging({ session, profile, onReadChannel }) {
 }
 
 function channelInitial(ch) {
-  // For race channels use shortened race name, else channel name
-  const name = ch.type === 'race'
+  // For race channels use the shortened race name, else the channel name.
+  const name = isRaceChannel(ch)
     ? (ch.races?.name?.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '') || ch.name)
     : ch.name
   return name.trim()[0]?.toUpperCase() || '#'
@@ -377,9 +418,9 @@ function ChannelIcon({ ch, isSelected, size = 36 }) {
   )
 }
 
-function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelect, defaultOpen = true }) {
+function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelect, defaultOpen = true, locked = false }) {
   const [open, setOpen] = useState(defaultOpen)
-  const groupUnread = channels.reduce((sum, ch) => sum + (unread[ch.id] || 0), 0)
+  const groupUnread = locked ? 0 : channels.reduce((sum, ch) => sum + (unread[ch.id] || 0), 0)
 
   return (
     <div>
@@ -394,14 +435,14 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
 
       {open && channels.map((ch, idx) => {
         const isSelected = selected?.id === ch.id
-        const unreadCount = unread[ch.id] || 0
-        const last = lastMessages?.[ch.id]
-        const displayName = ch.type === 'race'
-          ? (ch.races?.name?.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '') || ch.name)
-          : ch.name
+        const unreadCount = locked ? 0 : (unread[ch.id] || 0)
+        const last = locked ? null : lastMessages?.[ch.id]
+        const displayName = channelDisplayName(ch)
         const preview = last ? (last.content || (last.image_url ? '📎 Image' : '')) : ''
         const senderName = last?.profiles?.full_name?.split(' ')[0]
-        const previewText = preview ? (senderName ? `${senderName}: ${preview}` : preview) : null
+        const previewText = locked
+          ? 'Team only — tap for details'
+          : (preview ? (senderName ? `${senderName}: ${preview}` : preview) : null)
 
         return (
           <button
@@ -429,6 +470,7 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
               )}
             </div>
 
+            {locked && <div style={{ fontSize: '13px', color: '#555', flexShrink: 0 }}>🔒</div>}
             {unreadCount > 0 && (
               <div style={{ background: '#00B5B9', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '8px', padding: '1px 7px', flexShrink: 0 }}>
                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -441,7 +483,7 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
   )
 }
 
-function MentionsView({ session, profile, isMobile, channels, onBack, onOpenChannel }) {
+function MentionsView({ session, profile, isMobile, channels, teamView, onBack, onOpenChannel }) {
   const [mentions, setMentions] = useState([])
   const [loading, setLoading] = useState(true)
   const userId = session.user.id
@@ -472,11 +514,16 @@ function MentionsView({ session, profile, isMobile, channels, onBack, onOpenChan
     const messageMap = {}
     messageData?.forEach(m => { messageMap[m.id] = m })
 
-    // Merge
+    // Merge, then apply the same presentation gate as the channel list:
+    // a non-team view never renders message content from team-only channels.
     const merged = mentionData.map(m => ({
       ...m,
       message: messageMap[m.message_id] || null,
-    }))
+    })).filter(m => {
+      if (teamView) return true
+      const fullChannel = channels.find(ch => ch.id === m.channels?.id) || m.channels
+      return !isTeamOnlyChannel(fullChannel)
+    })
 
     setMentions(merged)
     setLoading(false)
@@ -497,9 +544,9 @@ function MentionsView({ session, profile, isMobile, channels, onBack, onOpenChan
           ) : mentions.map(m => {
             const ch = m.channels
             const msg = m.message
-            const chName = ch?.type === 'race' ? (ch.races?.name || ch.name) : ch?.name
+            const chName = ch ? channelDisplayName(ch) : ''
             return (
-              <div key={m.id} onClick={() => onOpenChannel(ch)} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid #E87362', borderRadius: '8px', padding: '12px', marginBottom: '8px', cursor: 'pointer' }}>
+              <div key={m.id} onClick={() => onOpenChannel(channels.find(full => full.id === ch?.id) || ch)} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid #E87362', borderRadius: '8px', padding: '12px', marginBottom: '8px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <Avatar profile={msg?.profiles} size={24} />
                   <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600, color: '#fff' }}>{msg?.profiles?.full_name || 'Athlete'}</span>
@@ -771,7 +818,8 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     return acc
   }, [])
 
-  const displayName = channel.type === 'race' ? (channel.races?.name || channel.name) : channel.name
+  const displayName = channelDisplayName(channel)
+  const accessLabel = channelAccessLabel(channel)
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
@@ -794,10 +842,16 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           })()
         ) : (
           <>
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', color: '#555', flexShrink: 0 }}>{channel.type === 'race' ? '🏁' : '#'}</div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', color: '#555', flexShrink: 0 }}>{isRaceChannel(channel) ? '🏁' : '#'}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
-              {channel.description && <div style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{channel.description}</div>}
+              {(accessLabel || channel.description) && (
+                <div style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {accessLabel && <span style={{ color: accessLabel === 'Public discussion' ? '#00B5B9' : '#E87362', fontWeight: 600 }}>{accessLabel}</span>}
+                  {accessLabel && channel.description && <span> · </span>}
+                  {channel.description}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -962,7 +1016,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           <textarea
             ref={textareaRef}
             style={{ flex: 1, background: 'none', border: 'none', color: '#fff', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', resize: 'none', lineHeight: 1.5, minHeight: '20px', maxHeight: '120px', padding: '0' }}
-            placeholder={channel.type === 'dm' ? `Message ${dmOtherProfile(channel, session.user.id)?.full_name?.split(' ')[0] || 'DM'}…` : `Message #${channel.type === 'race' ? (channel.races?.name?.split(' ').pop() || channel.name) : channel.name} — type @ to mention`}
+            placeholder={channel.type === 'dm' ? `Message ${dmOtherProfile(channel, session.user.id)?.full_name?.split(' ')[0] || 'DM'}…` : `Message #${displayName} — type @ to mention`}
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
@@ -1148,14 +1202,14 @@ function NewChannelModal({ session, onClose, onCreated }) {
     { value: 'training', label: 'Training',        icon: '💪' },
     { value: 'interest', label: 'Groups',          icon: '👥' },
     { value: 'regions',  label: 'Regions',         icon: '📍' },
-    { value: 'race',     label: 'Race Thread',     icon: '🏁' },
+    { value: 'race',     label: 'Race Logistics',  icon: '🔒' },
   ]
 
   async function create() {
     const n = name.trim().toLowerCase().replace(/\s+/g, '-')
     if (!n) { setError('Please enter a channel name'); return }
     setSaving(true)
-    const type = category === 'general' ? 'general' : category === 'race' ? 'race' : 'topic'
+    const type = category === 'general' ? 'general' : category === 'race' ? RACE_LOGISTICS_TYPE : 'topic'
     const { data, error: err } = await supabase.from('channels')
       .insert({ name: n, type, category, description: description.trim() || null, created_by: session.user.id })
       .select('*, races(name)').single()

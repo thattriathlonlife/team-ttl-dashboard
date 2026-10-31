@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { isTeamTier, setDemoTier } from '../lib/tier'
+import { raceChannelAudience, raceChannelKind, raceChannelType } from '../lib/channels'
 
 const MEMBER_COLORS = ['#00B5B9','#E87362','#E8B84B','#E87362','#a78bfa','#34d399','#f472b6','#60a5fa']
 
@@ -71,17 +73,23 @@ const S = {
   discussBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#ccc', cursor: 'pointer', marginTop: '10px', textAlign: 'center' },
   enterBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#ccc', cursor: 'pointer', marginTop: '10px' },
   enterBtnJoined: { borderColor: '#00B5B9', color: '#00B5B9' },
+  logisticsBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'rgba(0, 181, 185,0.07)', border: '1px solid rgba(0, 181, 185,0.35)', borderRadius: '8px', color: '#00B5B9', cursor: 'pointer', marginTop: '10px' },
+  lockNote: { marginTop: '10px', padding: '12px', background: 'rgba(232, 115, 98,0.08)', border: '1px solid rgba(232, 115, 98,0.25)', borderRadius: '8px', color: '#bbb', fontSize: '13px', lineHeight: 1.55 },
+  lockLink: { color: '#E87362', fontWeight: 700, textDecoration: 'none' },
+  demoSwitch: { background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '12px', padding: 0, textDecoration: 'underline' },
   loading: { fontSize: '13px', color: '#555', padding: '4px 0' },
   emptyText: { fontSize: '13px', color: '#555', fontStyle: 'italic' },
 }
 
-export default function RaceDetail({ race, session, onClose, onToggleEntry, isEntered }) {
+export default function RaceDetail({ race, session, profile, onClose, onToggleEntry, isEntered }) {
   const [entries, setEntries] = useState([])
   const [raceDetails, setRaceDetails] = useState(null)
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [loadingDetails, setLoadingDetails] = useState(true)
-  const [openingThread, setOpeningThread] = useState(false)
+  const [openingThread, setOpeningThread] = useState(null)
+  const [showLogisticsLock, setShowLogisticsLock] = useState(false)
   const navigate = useNavigate()
+  const teamView = isTeamTier(profile)
 
   useEffect(() => {
     loadEntries()
@@ -106,17 +114,74 @@ export default function RaceDetail({ race, session, onClose, onToggleEntry, isEn
     setLoadingDetails(false)
   }
 
-  async function discussRace() {
-    setOpeningThread(true)
-    let { data: channel } = await supabase.from('channels').select('id').eq('race_id', race.id).single()
+  async function openRaceChannel(kind) {
+    if (kind === 'logistics' && !teamView) {
+      setShowLogisticsLock(true)
+      return
+    }
+
+    setOpeningThread(kind)
+    const { data: existingChannels, error: loadError } = await supabase
+      .from('channels')
+      .select('id, name, type, category, race_id')
+      .eq('race_id', race.id)
+
+    if (loadError) {
+      console.error('[openRaceChannel]', loadError.message)
+      setOpeningThread(null)
+      return
+    }
+
+    // Legacy type='race' channels normalize to logistics in lib/channels;
+    // they keep their history instead of being duplicated or made public.
+    let channel = (existingChannels || []).find(ch => raceChannelKind(ch) === kind)
+
     if (!channel) {
       const slug = race.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-      const { data: newChannel, error } = await supabase.from('channels')
-        .insert({ name: slug, type: 'race', race_id: race.id, description: `Race thread for ${race.name}`, created_by: session.user.id })
+      const suffix = kind === 'discussion' ? 'discussion' : 'logistics'
+      const payload = {
+        name: `${slug}-${suffix}`,
+        type: raceChannelType(kind),
+        category: 'race',
+        race_id: race.id,
+        description: kind === 'discussion'
+          ? `Public race discussion for ${race.name}`
+          : `Team-only logistics for ${race.name}: travel, lodging, and meetups`,
+        created_by: session.user.id,
+      }
+
+      // Migration 0003 adds the explicit audience column. Try the canonical
+      // payload first, then retry without it so the preview keeps working
+      // against the not-yet-migrated live database.
+      let { data: newChannel, error } = await supabase.from('channels')
+        .insert({ ...payload, audience: raceChannelAudience(kind) })
         .select('id').single()
-      if (error) { console.error('[discussRace]', error.message); setOpeningThread(false); return }
-      channel = newChannel
+
+      if (error && /audience|schema cache|column/i.test(error.message || '')) {
+        ;({ data: newChannel, error } = await supabase.from('channels')
+          .insert(payload)
+          .select('id').single())
+      }
+
+      if (error) {
+        // Another client may have created the channel in parallel. Re-read
+        // before treating the click as a failure.
+        const { data: retryChannels } = await supabase
+          .from('channels')
+          .select('id, name, type, category, race_id')
+          .eq('race_id', race.id)
+        channel = (retryChannels || []).find(ch => raceChannelKind(ch) === kind)
+        if (!channel) {
+          console.error('[openRaceChannel]', error.message)
+          setOpeningThread(null)
+          return
+        }
+      } else {
+        channel = newChannel
+      }
     }
+
+    setOpeningThread(null)
     onClose()
     navigate(`/messages?channel=${channel.id}`)
   }
@@ -197,9 +262,22 @@ export default function RaceDetail({ race, session, onClose, onToggleEntry, isEn
                   View Race / Register →
                 </a>
               )}
-              <button style={S.discussBtn} onClick={discussRace} disabled={openingThread}>
-                💬 {openingThread ? 'Opening...' : 'Discuss This Race'}
+              <button style={S.discussBtn} onClick={() => openRaceChannel('discussion')} disabled={openingThread !== null}>
+                💬 {openingThread === 'discussion' ? 'Opening...' : 'Public Race Discussion'}
               </button>
+              <button style={S.logisticsBtn} onClick={() => openRaceChannel('logistics')} disabled={openingThread !== null}>
+                {teamView ? '🧭 ' : '🔒 '}{openingThread === 'logistics' ? 'Opening...' : 'Team Logistics'}
+              </button>
+              {showLogisticsLock && !teamView && (
+                <div style={S.lockNote}>
+                  <strong style={{ color: '#fff' }}>Team-only.</strong> Members use this private channel for travel,
+                  lodging, and race-weekend meetups. The public discussion above stays open to everyone.{' '}
+                  <a style={S.lockLink} href="https://thattriathlonlife.com" target="_blank" rel="noopener noreferrer">Apply for Team TTL</a>
+                  <div style={{ marginTop: '8px' }}>
+                    <button style={S.demoSwitch} onClick={() => setDemoTier('team')}>Demo: preview the member view</button>
+                  </div>
+                </div>
+              )}
               <button
                 style={{ ...S.enterBtn, ...(isEntered ? S.enterBtnJoined : {}) }}
                 onClick={async () => { await onToggleEntry(race.id); loadEntries() }}

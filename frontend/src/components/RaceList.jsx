@@ -70,7 +70,7 @@ function getBadgeStyle(type) {
   return { ...S.badge, ...S.badgeOther }
 }
 
-export default function RaceList({ races, myEntries, allEntries, profiles, onToggle, session }) {
+export default function RaceList({ races, myEntries, allEntries, profiles, profile, onToggle, session }) {
   const [selectedRace, setSelectedRace] = useState(null)
 
   if (races.length === 0) return <div style={S.empty}>No upcoming races found</div>
@@ -144,6 +144,7 @@ export default function RaceList({ races, myEntries, allEntries, profiles, onTog
         <RaceDetail
           race={selectedRace}
           session={session}
+          profile={profile}
           isEntered={myEntries.includes(selectedRace.id)}
           onClose={() => setSelectedRace(null)}
           onToggleEntry={async (raceId) => {

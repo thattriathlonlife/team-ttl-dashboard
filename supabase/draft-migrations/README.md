@@ -16,6 +16,11 @@ Confidence tags per table in the SQL: **CONFIRMED** (source 1 or 2 states it), *
 - Triggers, generated columns beyond `profiles.initials`, and any tables the current code no longer touches (e.g. `notification_log` may be legacy)
 - Storage bucket policies (buckets known: `avatars`, `garage-images`, `logos`; the parity spec adds `message-media`)
 
+## Later Phase 0 drafts
+
+- `0002_auth_amendment_draft.sql` adds the identity/entitlement model.
+- `0003_race_channel_split.sql` adds the explicit channel `audience` field and canonical race-channel types: `race_discussion` (public) and `race_logistics` (team-only). Legacy `type='race'` channels migrate to logistics because they originated inside the members-only prototype. Its RLS section is an acceptance target, not an executable policy replacement, until the live policy set has been exported.
+
 ## Inventory corrections vs the raw code scan
 
 - `avatars` and `logos` appear as `.from('...')` in code but are **storage buckets**, not tables.
