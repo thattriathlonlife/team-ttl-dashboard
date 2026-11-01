@@ -56,6 +56,15 @@ export default function StoryReader({ story, onClose }) {
   // the article with the finger; past ~90px it dismisses, short of that
   // it snaps back. Transform only — the scroll position never fights it
   // because engagement requires horizontal dominance.
+  const endSwipe = () => {
+    const d = dragRef.current
+    const el = overlayRef.current
+    dragRef.current = null
+    if (!el) return
+    if (d?.active && d.dx > 90) { onClose(); return }
+    el.style.transition = 'transform 0.22s ease'
+    el.style.transform = ''
+  }
   const swipe = {
     onTouchStart: (e) => {
       const t = e.touches[0]
@@ -75,15 +84,10 @@ export default function StoryReader({ story, onClose }) {
         el.style.transform = `translateX(${dx}px)`
       }
     },
-    onTouchEnd: () => {
-      const d = dragRef.current
-      const el = overlayRef.current
-      dragRef.current = null
-      if (!el) return
-      if (d?.active && d.dx > 90) { onClose(); return }
-      el.style.transition = 'transform 0.22s ease'
-      el.style.transform = ''
-    },
+    onTouchEnd: endSwipe,
+    // If the OS claims the gesture mid-drag (scroll takeover), reset
+    // the same way — never leave the article parked mid-pull.
+    onTouchCancel: endSwipe,
   }
 
   useEffect(() => {
