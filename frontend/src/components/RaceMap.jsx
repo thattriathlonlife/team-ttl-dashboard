@@ -17,22 +17,29 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const MEMBER_COLORS = ['#2BB3A3', '#E87362', '#E8B84B', '#FF5A1F', '#a78bfa', '#34d399', '#f472b6', '#60a5fa']
 
 const MAP_CSS = `
-.leaflet-container { background: #0d1316; font-family: 'Barlow', sans-serif; }
+.leaflet-container { background: #0a0f12; font-family: 'Barlow', sans-serif; }
+/* Design treatment (2026-10-31, after "still looks basic"): deepen the
+   Esri grey toward slate and pull its saturation down so the basemap sits
+   inside the app's palette instead of reading as a stock embed. Tiles
+   only — markers live in other panes and keep their true colours. */
+.leaflet-tile-pane { filter: brightness(.82) contrast(1.18) saturate(.6) hue-rotate(5deg); }
 .leaflet-div-icon { background: transparent; border: none; }
 .ttl-pin { transform: translate(-50%, -100%); text-align: center; cursor: pointer; }
-.ttl-pin .pill { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 12.5px; letter-spacing: .4px; padding: 4px 10px; border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.55); white-space: nowrap; background: var(--brand); color: #03292b; }
-.ttl-pin.coral .pill { background: var(--accent); color: #2b0f0b; }
-.ttl-pin.compact .pill { background: #1c262b; color: #cfe3e1; border: 1px solid rgba(255,255,255,.25); }
-.ttl-pin.mine .pill { background: #101314; color: #fff; border: 2px solid var(--highlight); }
-.ttl-pin .dot { width: 8px; height: 8px; border-radius: 50%; margin: 3px auto 0; background: var(--brand); border: 2px solid rgba(0,0,0,.35); }
+.ttl-pin .pill { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: .4px; padding: 5px 12px; border-radius: 999px; white-space: nowrap; background: var(--brand); color: #03292b; box-shadow: 0 0 0 4px rgba(var(--brand-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
+.ttl-pin.coral .pill { background: var(--accent); color: #2b0f0b; box-shadow: 0 0 0 4px rgba(var(--accent-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
+.ttl-pin.compact .pill { background: rgba(var(--brand-rgb),.18); color: #d8f2f0; border: 1px solid rgba(var(--brand-rgb),.45); box-shadow: 0 0 0 3px rgba(var(--brand-rgb),.1), 0 8px 20px rgba(0,0,0,.5); backdrop-filter: blur(2px); }
+.ttl-pin.mine .pill { background: #101314; color: #fff; border: 2px solid var(--highlight); box-shadow: 0 0 0 4px rgba(232,184,75,.15), 0 10px 24px rgba(0,0,0,.55); }
+.ttl-pin .dot { width: 9px; height: 9px; border-radius: 50%; margin: 4px auto 0; background: var(--brand); border: 2px solid rgba(255,255,255,.75); box-shadow: 0 2px 8px rgba(0,0,0,.6); }
 .ttl-pin.coral .dot { background: var(--accent); }
-.ttl-pin.compact .dot { background: #8fb5b2; }
+.ttl-pin.compact .dot { background: #a8ccc9; }
 .ttl-pin.mine .dot { background: var(--highlight); }
-.ttl-pin.zero .dot { width: 11px; height: 11px; background: rgba(var(--brand-rgb),.35); border: 2px solid rgba(var(--brand-rgb),.7); margin: 0 auto; }
+.ttl-pin.zero .dot { width: 12px; height: 12px; background: rgba(var(--brand-rgb),.3); border: 2px solid rgba(var(--brand-rgb),.85); margin: 0 auto; box-shadow: 0 0 10px rgba(var(--brand-rgb),.45); }
+.ttl-pin .pulse { position: absolute; left: 50%; bottom: -1px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid rgba(232,184,75,.65); animation: ttlPinPulse 2.2s ease-out infinite; }
+@keyframes ttlPinPulse { 0% { transform: scale(.55); opacity: .9; } 70% { transform: scale(2.1); opacity: 0; } 100% { transform: scale(2.1); opacity: 0; } }
 .leaflet-control-attribution { background: rgba(10,12,13,.72) !important; color: #5c6a68 !important; font-size: 9px !important; padding: 1px 5px; }
 .leaflet-control-attribution a { color: #7d8f8c !important; }
-.leaflet-bar a { background: #15181a !important; color: #cfd8d6 !important; border-color: rgba(255,255,255,.12) !important; }
-.leaflet-bar { border: 1px solid rgba(255,255,255,.12) !important; box-shadow: 0 8px 22px rgba(0,0,0,.45) !important; }
+.leaflet-bar a { background: rgba(18,21,23,.92) !important; color: #cfd8d6 !important; border-color: rgba(255,255,255,.1) !important; backdrop-filter: blur(6px); }
+.leaflet-bar { border: 1px solid rgba(255,255,255,.12) !important; border-radius: 10px !important; overflow: hidden; box-shadow: 0 10px 26px rgba(0,0,0,.5) !important; }
 `
 
 function pinIcon(race, count, mine) {
@@ -45,7 +52,7 @@ function pinIcon(race, count, mine) {
     html = `<div class="${cls} zero"><div class="dot"></div></div>`
   } else {
     const label = mine ? `★ ${count}` : count >= 5 ? `${count} racing` : `${count}`
-    html = `<div class="${cls}"><span class="pill">${label}</span><div class="dot"></div></div>`
+    html = `<div class="${cls}" style="position: relative"><span class="pill">${label}</span><div class="dot"></div>${mine ? '<span class="pulse"></span>' : ''}</div>`
   }
   return L.divIcon({ html, className: '', iconSize: [0, 0] })
 }
@@ -121,7 +128,7 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
     if (bounds.length && fitKey !== fitKeyRef.current) {
       fitKeyRef.current = fitKey
       if (bounds.length === 1) map.setView(bounds[0], 6)
-      else map.fitBounds(bounds, { padding: [34, 34] })
+      else map.fitBounds(bounds, { padding: [28, 28] })
     }
   }, [racesWithCoords, entriesByRace, myEntries])
 
@@ -168,10 +175,20 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
     <div style={{
       borderRadius: '16px', overflow: 'hidden',
       border: '1px solid rgba(255,255,255,0.1)',
-      position: 'relative', background: '#0d1316',
+      position: 'relative', background: '#0a0f12',
+      boxShadow: '0 20px 46px rgba(0,0,0,0.5)',
     }}>
       <style>{MAP_CSS}</style>
-      <div ref={mapRef} style={{ width: '100%', height: '252px', zIndex: 0 }} />
+      <div ref={mapRef} style={{ width: '100%', height: '262px', zIndex: 0 }} />
+
+      {/* Vignette + edge fades: the panel melts into the page instead of
+          ending at a hard rectangle — the difference between an embed and
+          a designed surface. Pointer-transparent; the race card (z 600)
+          renders above it. */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 450, pointerEvents: 'none',
+        background: 'radial-gradient(125% 95% at 50% 38%, transparent 56%, rgba(4,6,8,0.5)), linear-gradient(180deg, rgba(10,13,14,0.28), transparent 16%, transparent 84%, rgba(10,13,14,0.5))',
+      }} />
 
       {/* In-place race card */}
       {selected && (
