@@ -5,6 +5,7 @@ import VideoPlayer from '../components/VideoPlayer'
 import StoryReader from '../components/StoryReader'
 import { channelDisplayName, channelAccessLabel, raceChannelKind, isTeamOnlyChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
+import MemberChips from '../components/MemberChips'
 
 // Global search (DESIGN-SPEC §2.6): one box across races, athletes,
 // channels, and TTL content (podcast / videos / stories). Indexes are small
@@ -68,7 +69,7 @@ export default function Search({ profile }) {
     ;(async () => {
       const [racesRes, profilesRes, channelsRes, entriesRes] = await Promise.all([
         supabase.from('races').select('id, name, race_date, location').order('race_date'),
-        supabase.from('profiles').select('id, full_name, avatar_color'),
+        supabase.from('profiles').select('id, full_name, avatar_color, role'),
         supabase.from('channels').select('id, name, type, category, audience').neq('type', 'dm'),
         supabase.from('race_entries').select('race_id'),
       ])
@@ -163,6 +164,7 @@ export default function Search({ profile }) {
                 {(a.full_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2)}
               </span>
               <span style={S.title}>{a.full_name}</span>
+              <MemberChips profile={a} />
             </button>
           ))}
         </>

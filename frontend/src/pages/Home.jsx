@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { raceChannelKind, isTeamOnlyChannel, channelDisplayName } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
 import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
+import MemberChips from '../components/MemberChips'
 import { useAudio } from '../lib/audio'
 import VideoPlayer from '../components/VideoPlayer'
 import StoryReader from '../components/StoryReader'
@@ -351,7 +352,7 @@ async function loadFeedPosts(team, userId) {
   let cursor = null
   for (let page = 0; page < 3; page++) {
     let q = supabase.from('messages')
-      .select('id, content, image_url, created_at, athlete_id, channel_id, profiles(full_name, avatar_color, avatar_url)')
+      .select('id, content, image_url, created_at, athlete_id, channel_id, profiles(full_name, avatar_color, avatar_url, role)')
       .in('channel_id', allowed)
       .order('created_at', { ascending: false })
       .limit(40)
@@ -656,7 +657,10 @@ export default function Home({ session, profile }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
           <Avatar profile={m.profiles} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>{m.profiles?.full_name || 'Teammate'}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>{m.profiles?.full_name || 'Teammate'}</span>
+              <MemberChips profile={m.profiles} />
+            </div>
             <div style={{ fontSize: '12px', color: '#777' }}>{timeAgo(m.created_at)}</div>
           </div>
           {ch && (

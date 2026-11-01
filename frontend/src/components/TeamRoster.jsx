@@ -1,3 +1,5 @@
+import MemberChips from './MemberChips'
+
 const MEMBER_COLORS = ['var(--brand)','var(--accent)','var(--highlight)','var(--accent)','#a78bfa','#34d399','#f472b6','#60a5fa']
 
 const S = {
@@ -70,8 +72,8 @@ export default function TeamRoster({ profiles, allEntries, races }) {
           <div key={member.id} style={S.card}>
             <div style={{ ...S.avatar, background: color }}>{initials}</div>
             <div style={S.name}>{displayName}</div>
+            <div style={{ marginTop: '4px' }}><MemberChips profile={member} /></div>
             <div style={S.raceCount}>{memberEntries.length} {memberEntries.length === 1 ? 'race' : 'races'} entered</div>
-            {member.role === 'admin' && <div style={S.role}>Admin</div>}
             {types.length > 0 && (
               <div style={S.tags}>
                 {types.map(type => (

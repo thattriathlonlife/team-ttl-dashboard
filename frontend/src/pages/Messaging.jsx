@@ -6,6 +6,7 @@ import { channelAccessLabel, channelDisplayName, isRaceChannel, isTeamOnlyChanne
 import TeamLocked from '../components/TeamLocked'
 import { moderateOutgoing, shouldHide } from '../lib/moderation'
 import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
+import MemberChips from '../components/MemberChips'
 
 // Given a DM channel (with dm_members hydrated), return the other person's profile
 function dmOtherProfile(channel, userId) {
@@ -820,7 +821,7 @@ function MentionsView({ session, profile, isMobile, channels, teamView, onBack, 
     const messageIds = mentionData.map(m => m.message_id).filter(Boolean)
     const { data: messageData, error: messageError } = await supabase
       .from('messages')
-      .select('id, content, created_at, athlete_id, profiles(full_name, avatar_color, avatar_url)')
+      .select('id, content, created_at, athlete_id, profiles(full_name, avatar_color, avatar_url, role)')
       .in('id', messageIds)
 
     if (messageError) console.error('[Mentions] message query error:', messageError.message)
@@ -864,6 +865,7 @@ function MentionsView({ session, profile, isMobile, channels, teamView, onBack, 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <Avatar profile={msg?.profiles} size={24} />
                   <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600, color: '#fff' }}>{msg?.profiles?.full_name || 'Athlete'}</span>
+                  <MemberChips profile={msg?.profiles} />
                   <span style={{ fontSize: '11px', color: '#555' }}>in #{chName}</span>
                   <span style={{ fontSize: '11px', color: '#555', marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>
                 </div>
@@ -910,7 +912,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         async (payload) => {
           setMessages(prev => {
             if (prev.some(m => m.id === payload.new.id)) return prev
-            supabase.from('messages').select('*, profiles(full_name, avatar_color, avatar_url), reply_msg:reply_to(id, content, profiles(full_name))').eq('id', payload.new.id).single()
+            supabase.from('messages').select('*, profiles(full_name, avatar_color, avatar_url, role), reply_msg:reply_to(id, content, profiles(full_name))').eq('id', payload.new.id).single()
               .then(({ data }) => {
                 if (data) {
                   setMessages(p => p.some(m => m.id === data.id) ? p : [...p, data])
@@ -941,7 +943,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   }
 
   const MSG_PAGE = 100
-  const MSG_SELECT = '*, profiles(full_name, avatar_color, avatar_url), reply_msg:reply_to(id, content, profiles(full_name))'
+  const MSG_SELECT = '*, profiles(full_name, avatar_color, avatar_url, role), reply_msg:reply_to(id, content, profiles(full_name))'
 
   async function mergeReactions(messageIds) {
     if (!messageIds.length) return
@@ -1041,7 +1043,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       channel_id: channel.id, athlete_id: userId,
       content: content || null, image_url: imageUrl || null,
       reply_to: replyTo?.id || null,
-    }).select('*, profiles(full_name, avatar_color, avatar_url), reply_msg:reply_to(id, content, profiles(full_name))').single()
+    }).select('*, profiles(full_name, avatar_color, avatar_url, role), reply_msg:reply_to(id, content, profiles(full_name))').single()
 
     if (!error && data) {
       setMessages(prev => prev.map(m => m.id === optimisticId ? data : m))
@@ -1257,7 +1259,10 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                     minWidth: '92px',
                   }}>
                     {!isOwn && msg.showHeader && channel.type !== 'dm' && (
-                      <div style={{ fontSize: '13px', fontWeight: 700, color: msg.profiles?.avatar_color || 'var(--brand)', marginBottom: '2px' }}>{msg.profiles?.full_name || 'Athlete'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: msg.profiles?.avatar_color || 'var(--brand)' }}>{msg.profiles?.full_name || 'Athlete'}</span>
+                        <MemberChips profile={msg.profiles} />
+                      </div>
                     )}
                     {msg.reply_msg && (
                       <div style={{ background: 'rgba(0,0,0,0.28)', borderLeft: '3px solid var(--brand)', borderRadius: '6px', padding: '5px 8px', marginBottom: '5px' }}>
