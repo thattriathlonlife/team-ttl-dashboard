@@ -32,25 +32,26 @@ const MAP_CSS = `
 .maplibregl-ctrl-attrib-button { filter: invert(0.7); background-color: transparent !important; }
 .ttl-pin { text-align: center; cursor: pointer; }
 .ttl-pin .pill { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: .4px; padding: 5px 12px; border-radius: 999px; white-space: nowrap; background: var(--brand); color: #03292b; box-shadow: 0 0 0 4px rgba(var(--brand-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
-.ttl-pin.coral .pill { background: var(--accent); color: #2b0f0b; box-shadow: 0 0 0 4px rgba(var(--accent-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
-.ttl-pin.compact .pill { background: rgba(var(--brand-rgb),.18); color: #d8f2f0; border: 1px solid rgba(var(--brand-rgb),.45); box-shadow: 0 0 0 3px rgba(var(--brand-rgb),.1), 0 8px 20px rgba(0,0,0,.5); backdrop-filter: blur(2px); }
+.ttl-pin.comm .pill { background: rgba(8,18,24,.8); color: #c4d6dd; border: 1.5px solid rgba(196,214,221,.55); box-shadow: 0 0 0 3px rgba(196,214,221,.08), 0 8px 20px rgba(0,0,0,.5); }
 .ttl-pin.mine .pill { background: #101314; color: #fff; border: 2px solid var(--highlight); box-shadow: 0 0 0 4px rgba(232,184,75,.15), 0 10px 24px rgba(0,0,0,.55); }
 .ttl-pin .dot { width: 9px; height: 9px; border-radius: 50%; margin: 4px auto 0; background: var(--brand); border: 2px solid rgba(255,255,255,.75); box-shadow: 0 2px 8px rgba(0,0,0,.6); }
-.ttl-pin.coral .dot { background: var(--accent); }
-.ttl-pin.compact .dot { background: #a8ccc9; }
+.ttl-pin.comm .dot { background: #8fa9b5; }
 .ttl-pin.mine .dot { background: var(--highlight); }
 .ttl-pin.zero .dot { width: 12px; height: 12px; background: rgba(var(--brand-rgb),.3); border: 2px solid rgba(var(--brand-rgb),.85); margin: 0 auto; box-shadow: 0 0 10px rgba(var(--brand-rgb),.45); }
 .ttl-pin .pulse { position: absolute; left: 50%; bottom: -1px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid rgba(232,184,75,.65); animation: ttlPinPulse 2.2s ease-out infinite; }
 @keyframes ttlPinPulse { 0% { transform: scale(.55); opacity: .9; } 70% { transform: scale(2.1); opacity: 0; } 100% { transform: scale(2.1); opacity: 0; } }
 `
 
-function pinHtml(count, mine) {
+// Pin language (Zack, 2026-11-01): filled = team members racing,
+// hollow = community participants, gold ring + star = you're in. A
+// gold ⚑ activation flag joins the language when TTL ops data exists;
+// no source sets it yet, so no flag renders today.
+function pinHtml(count, mine, kind) {
   let cls = 'ttl-pin'
   if (mine) cls += ' mine'
-  else if (count >= 15) cls += ' coral'
-  else if (count > 0 && count < 5) cls += ' compact'
+  else if (kind === 'community') cls += ' comm'
   if (count === 0 && !mine) return `<div class="${cls} zero"><div class="dot"></div></div>`
-  const label = mine ? `★ ${count}` : count >= 5 ? `${count} racing` : `${count}`
+  const label = mine ? `★ ${count}` : `${count}`
   return `<div class="${cls}" style="position: relative"><span class="pill">${label}</span><div class="dot"></div>${mine ? '<span class="pulse"></span>' : ''}</div>`
 }
 
@@ -100,7 +101,7 @@ function recolor(map) {
   }
 }
 
-function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, onToggle, onFail, mapMode = 'community' }) {
+function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, onToggle, onFail, teamIds = [] }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -191,10 +192,12 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
     markersRef.current = []
     const pts = []
     for (const race of racesWithCoords) {
-      const count = (entriesByRace[race.id] || []).length
+      const raceEntries = entriesByRace[race.id] || []
+      const count = raceEntries.length
+      const kind = raceEntries.some(e => teamIds.includes(e.athlete_id)) ? 'team' : 'community'
       const mine = myEntries.includes(race.id)
       const el = document.createElement('div')
-      el.innerHTML = pinHtml(count, mine)
+      el.innerHTML = pinHtml(count, mine, kind)
       el.addEventListener('click', (ev) => { ev.stopPropagation(); setSelected(race); setNote('') })
     const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([race.longitude, race.latitude])
@@ -263,7 +266,7 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
           fontSize: '14px', letterSpacing: '2px',
           textTransform: 'uppercase', color: '#5c6a68',
         }}>
-          No location data for these races
+          No start lines on the map yet
         </div>
       </div>
     )
@@ -330,7 +333,7 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
             </div>
             <button onClick={() => setSelected(null)} aria-label="Close race card" style={{ background: 'none', border: 'none', color: '#777', fontSize: '17px', cursor: 'pointer', alignSelf: 'flex-start', padding: '2px 4px' }}>✕</button>
           </div>
-          {mapMode === 'team' && (
+          {isTeamTier(profile) && (
             <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '9px' }}>
               {selEntries.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>

@@ -31,12 +31,10 @@ const MAP_CSS = `
 .leaflet-div-icon { background: transparent; border: none; }
 .ttl-pin { transform: translate(-50%, -100%); text-align: center; cursor: pointer; }
 .ttl-pin .pill { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: .4px; padding: 5px 12px; border-radius: 999px; white-space: nowrap; background: var(--brand); color: #03292b; box-shadow: 0 0 0 4px rgba(var(--brand-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
-.ttl-pin.coral .pill { background: var(--accent); color: #2b0f0b; box-shadow: 0 0 0 4px rgba(var(--accent-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
-.ttl-pin.compact .pill { background: rgba(var(--brand-rgb),.18); color: #d8f2f0; border: 1px solid rgba(var(--brand-rgb),.45); box-shadow: 0 0 0 3px rgba(var(--brand-rgb),.1), 0 8px 20px rgba(0,0,0,.5); backdrop-filter: blur(2px); }
+.ttl-pin.comm .pill { background: rgba(8,18,24,.8); color: #c4d6dd; border: 1.5px solid rgba(196,214,221,.55); box-shadow: 0 0 0 3px rgba(196,214,221,.08), 0 8px 20px rgba(0,0,0,.5); }
 .ttl-pin.mine .pill { background: #101314; color: #fff; border: 2px solid var(--highlight); box-shadow: 0 0 0 4px rgba(232,184,75,.15), 0 10px 24px rgba(0,0,0,.55); }
 .ttl-pin .dot { width: 9px; height: 9px; border-radius: 50%; margin: 4px auto 0; background: var(--brand); border: 2px solid rgba(255,255,255,.75); box-shadow: 0 2px 8px rgba(0,0,0,.6); }
-.ttl-pin.coral .dot { background: var(--accent); }
-.ttl-pin.compact .dot { background: #a8ccc9; }
+.ttl-pin.comm .dot { background: #8fa9b5; }
 .ttl-pin.mine .dot { background: var(--highlight); }
 .ttl-pin.zero .dot { width: 12px; height: 12px; background: rgba(var(--brand-rgb),.3); border: 2px solid rgba(var(--brand-rgb),.85); margin: 0 auto; box-shadow: 0 0 10px rgba(var(--brand-rgb),.45); }
 .ttl-pin .pulse { position: absolute; left: 50%; bottom: -1px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid rgba(232,184,75,.65); animation: ttlPinPulse 2.2s ease-out infinite; }
@@ -47,16 +45,17 @@ const MAP_CSS = `
 .leaflet-bar { border: 1px solid rgba(255,255,255,.12) !important; border-radius: 10px !important; overflow: hidden; box-shadow: 0 10px 26px rgba(0,0,0,.5) !important; }
 `
 
-function pinIcon(race, count, mine) {
+// Pin language (Zack, 2026-11-01): filled = team, hollow = community,
+// gold ring + star = you're in. See RaceMap.jsx for the same rules.
+function pinIcon(race, count, mine, kind) {
   let cls = 'ttl-pin'
   if (mine) cls += ' mine'
-  else if (count >= 15) cls += ' coral'
-  else if (count > 0 && count < 5) cls += ' compact'
+  else if (kind === 'community') cls += ' comm'
   let html
   if (count === 0 && !mine) {
     html = `<div class="${cls} zero"><div class="dot"></div></div>`
   } else {
-    const label = mine ? `★ ${count}` : count >= 5 ? `${count} racing` : `${count}`
+    const label = mine ? `★ ${count}` : `${count}`
     html = `<div class="${cls}" style="position: relative"><span class="pill">${label}</span><div class="dot"></div>${mine ? '<span class="pulse"></span>' : ''}</div>`
   }
   return L.divIcon({ html, className: '', iconSize: [0, 0] })
@@ -81,7 +80,7 @@ function frameRaces(map, pts) {
   else map.fitBounds(use, { padding: [30, 30], maxZoom: 5 })
 }
 
-export default function RaceMapLeaflet({ races, allEntries = [], myEntries = [], profile, session, onToggle, mapMode = 'community' }) {
+export default function RaceMapLeaflet({ races, allEntries = [], myEntries = [], profile, session, onToggle, teamIds = [] }) {
   const mapRef = useRef(null)
   const mapObjRef = useRef(null)
   const layerRef = useRef(null)
@@ -146,9 +145,11 @@ export default function RaceMapLeaflet({ races, allEntries = [], myEntries = [],
     layer.clearLayers()
     const bounds = []
     for (const race of racesWithCoords) {
-      const count = (entriesByRace[race.id] || []).length
+      const raceEntries = entriesByRace[race.id] || []
+      const count = raceEntries.length
+      const kind = raceEntries.some(e => teamIds.includes(e.athlete_id)) ? 'team' : 'community'
       const mine = myEntries.includes(race.id)
-      const marker = L.marker([race.latitude, race.longitude], { icon: pinIcon(race, count, mine) })
+      const marker = L.marker([race.latitude, race.longitude], { icon: pinIcon(race, count, mine, kind) })
       marker.on('click', () => { setSelected(race); setNote('') })
       marker.addTo(layer)
       bounds.push([race.latitude, race.longitude])
@@ -189,7 +190,7 @@ export default function RaceMapLeaflet({ races, allEntries = [], myEntries = [],
           fontSize: '14px', letterSpacing: '2px',
           textTransform: 'uppercase', color: '#5c6a68',
         }}>
-          No location data for these races
+          No start lines on the map yet
         </div>
       </div>
     )
@@ -259,7 +260,7 @@ export default function RaceMapLeaflet({ races, allEntries = [], myEntries = [],
             </div>
             <button onClick={() => setSelected(null)} aria-label="Close race card" style={{ background: 'none', border: 'none', color: '#777', fontSize: '17px', cursor: 'pointer', alignSelf: 'flex-start', padding: '2px 4px' }}>✕</button>
           </div>
-          {mapMode === 'team' && (
+          {isTeamTier(profile) && (
             <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '9px' }}>
               {selEntries.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>

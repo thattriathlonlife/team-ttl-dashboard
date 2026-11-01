@@ -4,7 +4,6 @@ import RaceList from '../components/RaceList'
 import CalendarView from '../components/CalendarView'
 import AddRaceModal from '../components/AddRaceModal'
 import RaceMap from '../components/RaceMap'
-import { isTeamTier, setDemoTier } from '../lib/tier'
 import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 
 const S = {
@@ -37,13 +36,12 @@ const S = {
   viewBtnActive: { background: 'var(--brand)', color: '#000', fontWeight: 600 },
 }
 
-const ORG_OPTIONS = [{ value: 'all', label: 'All' }, { value: 'ironman', label: 'IRONMAN' }, { value: 'triathlon_api', label: 'World Tri' }, { value: 'manual', label: 'Manual' }]
+const FILTER_CHIPS = [{ value: 'all', label: 'All' }, { value: 'ironman', label: 'IRONMAN' }, { value: '703', label: '70.3' }, { value: 'full', label: 'Full' }, { value: 'worldtri', label: 'World Tri' }, { value: 'mine', label: "I'm racing" }]
 // The IRONMAN org group spans both branded sources: the curated seed
 // (ironman_calendar, Phase C) and the retired PTO scrape's rows, which
 // still carry history. Matching the chip to 'pto_scrape' alone hid all
 // 159 seed races — the map read 'no location data' on the default view.
 const ORG_SOURCES = { ironman: ['ironman_calendar', 'pto_scrape'] }
-const TYPE_OPTIONS = [{ value: 'all', label: 'All Types' }, { value: 'IRONMAN', label: 'Full' }, { value: '70.3', label: '70.3' }, { value: 'Olympic', label: 'Olympic' }, { value: 'Sprint', label: 'Sprint' }, { value: 'Other', label: 'Other' }]
 
 export default function Dashboard({ session }) {
   // Stale-while-revalidate (see lib/pageCache): instant render from the
@@ -57,14 +55,11 @@ export default function Dashboard({ session }) {
   const [profile, setProfile] = useState(() => cachedDash?.profile || null)
   const [loading, setLoading] = useState(() => !cachedDash)
   const [showAddRace, setShowAddRace] = useState(false)
-  const [orgFilter, setOrgFilter] = useState('ironman')
-  // Map view mode (Zack, 2026-11-01): Community shows counts for
-  // everyone; Team names the roster on the map. Remembered per device.
-  const [mapMode, setMapModeState] = useState(() => { try { return localStorage.getItem('ttl-map-mode') || 'community' } catch { return 'community' } })
-  const setMapMode = (m) => { setMapModeState(m); try { localStorage.setItem('ttl-map-mode', m) } catch { /* private mode */ } }
-  const [typeFilter, setTypeFilter] = useState('all')
+  // One filter lens for the whole page (Zack, 2026-11-01: the org row,
+  // type row, All/Mine toggle and map-mode toggle were four control rows
+  // of chrome). Values: all | ironman | 703 | full | worldtri | mine.
+  const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState('all') // 'all' | 'mine'
 
   const userId = session.user.id
 
@@ -120,13 +115,24 @@ export default function Dashboard({ session }) {
   }
 
   const filteredRaces = races.filter(r => {
-    const orgMatch = orgFilter === 'all' || (ORG_SOURCES[orgFilter] ? ORG_SOURCES[orgFilter].includes(r.source) : r.source === orgFilter)
-    const typeMatch = typeFilter === 'all' || r.type === typeFilter
+    let lens = true
+    if (filter === 'ironman') lens = ORG_SOURCES.ironman.includes(r.source)
+    else if (filter === 'worldtri') lens = r.source === 'triathlon_api'
+    else if (filter === '703') lens = r.type === '70.3'
+    else if (filter === 'full') lens = r.type === 'IRONMAN'
+    else if (filter === 'mine') lens = myEntries.includes(r.id)
     const q = searchQuery.toLowerCase().trim()
     const searchMatch = !q || r.name?.toLowerCase().includes(q) || r.location?.toLowerCase().includes(q) || r.city?.toLowerCase().includes(q) || r.country?.toLowerCase().includes(q) || r.type?.toLowerCase().includes(q)
-    const mineMatch = viewMode === 'all' || myEntries.includes(r.id)
-    return orgMatch && typeMatch && searchMatch && mineMatch
+    return lens && searchMatch
   })
+
+  // The map is the team's footprint, not the calendar (Zack, 2026-11-01):
+  // only races with at least one person entered earn a pin, and pins are
+  // classified team vs community by who's entered. The list below keeps
+  // the full calendar; the map never follows the list's filter.
+  const enteredRaceIds = new Set(allEntries.map(e => e.race_id))
+  const mapRaces = races.filter(r => enteredRaceIds.has(r.id) && r.latitude && r.longitude)
+  const teamIds = profiles.filter(p => p.team_entitled !== false).map(p => p.id)
 
   const myRaceCount = myEntries.length
   const nextRace = races.find(r => myEntries.includes(r.id))
@@ -146,39 +152,35 @@ export default function Dashboard({ session }) {
   const hasEntryTimestamps = scopedEntries.some(e => e.created_at)
   const nextRaceCrew = nextRace ? allEntries.filter(e => e.race_id === nextRace.id).length : 0
 
-  const teamView = isTeamTier(profile)
-
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#555', textTransform: 'uppercase' }}>Loading...</div>
 
   return (
     <div style={S.page}>
-      {/* Map — the Races page is the map's home; it reflects the same
-          filters as the list. */}
+      {/* Map — the team's footprint, not the calendar (Zack, 2026-11-01):
+          only races with people entered earn pins; the full calendar
+          lives in the list below. One map for everyone — names in the
+          tapped card are shaped by membership, not a mode toggle. */}
       <div style={{ marginBottom: '1.1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.55rem' }}>
-          <div style={S.viewToggle} role="group" aria-label="Map view">
-            <button style={{ ...S.viewBtn, ...(mapMode === 'community' ? S.viewBtnActive : {}) }} onClick={() => setMapMode('community')}>Community</button>
-            <button style={{ ...S.viewBtn, ...(mapMode === 'team' ? S.viewBtnActive : {}) }} onClick={() => setMapMode('team')}>Team{teamView ? '' : ' 🔒'}</button>
-          </div>
-          <span style={{ fontSize: '12px', color: '#666' }}>{mapMode === 'team' ? (teamView ? "Who's racing, by name" : 'Named rosters are a team view') : 'Where the team races — counts for everyone'}</span>
+        <div style={{ position: 'relative' }}>
+          <RaceMap races={mapRaces} allEntries={allEntries} myEntries={myEntries} profile={profile} session={session} onToggle={toggleEntry} teamIds={teamIds} />
+          {mapRaces.length > 0 && (
+            <div style={{ position: 'absolute', left: '10px', bottom: '10px', background: 'rgba(5,12,18,0.82)', border: '1px solid rgba(255,255,255,0.12)', color: '#dfe', fontSize: '11px', padding: '5px 9px', borderRadius: '999px', pointerEvents: 'none', zIndex: 5 }}>
+              {mapRaces.length} race{mapRaces.length !== 1 ? 's' : ''} with TTLers in them
+            </div>
+          )}
         </div>
-        {mapMode === 'team' && !teamView ? (
-          <div style={{ height: '300px', background: '#05090e', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px' }}>
-            <div style={{ fontSize: '26px', marginBottom: '8px' }}>🔒</div>
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#fff', marginBottom: '6px' }}>The team map is for Team TTL members</div>
-            <p style={{ fontSize: '13.5px', color: '#999', lineHeight: 1.55, maxWidth: '420px', margin: '0 0 16px' }}>The community map shows how many TTLers are on each start line. The team map names them — who's racing where, on every pin.</p>
-            <a href="https://thattriathlonlife.com" target="_blank" rel="noopener" style={{ background: 'var(--brand)', color: '#06282a', borderRadius: '6px', padding: '10px 20px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', textDecoration: 'none', marginBottom: '10px' }}>Apply for Team TTL</a>
-            <button onClick={() => setDemoTier('team')} style={{ background: 'none', border: 'none', color: '#666', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>Demo: preview the member view</button>
-          </div>
-        ) : (
-          <RaceMap races={filteredRaces} allEntries={allEntries} myEntries={myEntries} profile={profile} session={session} onToggle={toggleEntry} mapMode={mapMode} />
-        )}
+        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '11.5px', color: '#9aa', margin: '8px 2px 0' }}>
+          <span><span style={{ color: 'var(--brand)' }}>●</span> Team racing</span>
+          <span><span style={{ color: '#b9cdd6' }}>○</span> Community racing</span>
+          <span><span style={{ color: 'var(--highlight)' }}>⚑</span> TTL activation</span>
+          <span><span style={{ color: 'var(--highlight)' }}>★</span> You're in</span>
+        </div>
       </div>
 
       {/* Hero: your next race countdown (Concept A) */}
       {nextRace && (
         <button
-          onClick={() => { setView('list'); setViewMode('mine') }}
+          onClick={() => { setView('list'); setFilter('mine') }}
           style={{
             display: 'flex', gap: '14px', alignItems: 'center', width: '100%', textAlign: 'left',
             borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', cursor: 'pointer',
@@ -205,41 +207,38 @@ export default function Dashboard({ session }) {
         </button>
       )}
 
-      {/* Metric strip: horizon · exposure · participation */}
-      <div style={{ display: 'flex', gap: '9px', marginBottom: '1.25rem' }}>
-        {[
-          { v: races.length, l: 'Upcoming races', s: `${next90Count} in the next 90 days`, sc: '#999' },
-          { v: startLines, l: 'Start lines', s: hasEntryTimestamps && entriesThisWeek > 0 ? `▲ ${entriesThisWeek} this week` : 'across upcoming races', sc: hasEntryTimestamps && entriesThisWeek > 0 ? '#3ecf8e' : '#999' },
-          { v: ttlersRacing, l: 'TTLers racing', s: `of ${profiles.length} members`, sc: '#999' },
-        ].map(m => (
-          <div key={m.l} style={{ flex: 1, background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '10px 6px 8px', textAlign: 'center', minWidth: 0 }}>
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '22px', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{m.v}</div>
-            <div style={{ fontSize: '9.5px', letterSpacing: '1.2px', textTransform: 'uppercase', color: '#6d6d6d', marginTop: '4px' }}>{m.l}</div>
-            <div style={{ fontSize: '10.5px', marginTop: '3px', fontWeight: 600, color: m.sc, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.s}</div>
-          </div>
-        ))}
+      {/* The Concept A metric strip, folded into one line (Zack,
+          2026-11-01: three boxes was more chrome than information). */}
+      <div style={{ fontSize: '12px', color: '#999', marginBottom: '1.25rem' }}>
+        <b style={{ color: '#ddd' }}>{races.length}</b> upcoming races · <b style={{ color: '#ddd' }}>{startLines}</b> start lines · <b style={{ color: '#ddd' }}>{ttlersRacing}</b> TTLers racing
+        {hasEntryTimestamps && entriesThisWeek > 0 && <span style={{ color: '#3ecf8e' }}> · ▲ {entriesThisWeek} this week</span>}
+        <span> · {next90Count} in the next 90 days</span>
       </div>
 
-      {/* Controls row: List/Calendar segmented toggle + the All / I'm
-          racing lens as chips in the one system (mockups, 2026-10-31). */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
-        <div style={{ ...S.viewToggle, marginBottom: 0 }}>
-          <button style={{ ...S.viewBtn, ...(view === 'list' ? S.viewBtnActive : {}) }} onClick={() => setView('list')}>List</button>
-          <button style={{ ...S.viewBtn, ...(view === 'calendar' ? S.viewBtnActive : {}) }} onClick={() => setView('calendar')}>Calendar</button>
+      <div style={S.sectionHead}>
+        <div style={S.sectionTitle}>Upcoming <span style={S.sectionTitleSpan}>Races</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <span style={{ fontSize: '12.5px', color: '#777' }}>
+            <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12.5px', padding: 0, color: view === 'list' ? 'var(--brand)' : '#777', fontWeight: view === 'list' ? 700 : 400 }}>List</button>
+            {' · '}
+            <button onClick={() => setView('calendar')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12.5px', padding: 0, color: view === 'calendar' ? 'var(--brand)' : '#777', fontWeight: view === 'calendar' ? 700 : 400 }}>Calendar</button>
+          </span>
+          <button style={S.btnGhost} onClick={() => setShowAddRace(true)}>+ Add Race</button>
         </div>
-        <button style={{ ...S.filterBtn, ...(viewMode === 'all' ? S.filterBtnActive : {}) }} onClick={() => setViewMode('all')}>All races</button>
-        <button style={{ ...S.filterBtn, ...(viewMode === 'mine' ? S.filterBtnActive : {}) }} onClick={() => setViewMode('mine')}>
-          I'm racing {myRaceCount > 0 ? `(${myRaceCount})` : ''}
-        </button>
+      </div>
+
+      {/* One filter row: org, type and the I'm-racing lens in a single
+          chip set (Zack, 2026-11-01). */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none', marginBottom: '1rem', paddingBottom: '2px' }}>
+        {FILTER_CHIPS.map(c => (
+          <button key={c.value} style={{ ...S.filterBtn, ...(filter === c.value ? S.filterBtnActive : {}) }} onClick={() => setFilter(c.value)}>
+            {c.value === 'mine' && myRaceCount > 0 ? `I'm racing (${myRaceCount})` : c.label}
+          </button>
+        ))}
       </div>
 
       {view === 'list' && (
         <>
-          <div style={S.sectionHead}>
-            <div style={S.sectionTitle}>Upcoming <span style={S.sectionTitleSpan}>Races</span></div>
-            <button style={S.btnGhost} onClick={() => setShowAddRace(true)}>+ Add Race</button>
-          </div>
-
           {/* Search */}
           <div style={S.searchWrap}>
             <span style={S.searchIcon}>🔍</span>
@@ -248,24 +247,11 @@ export default function Dashboard({ session }) {
           </div>
           {searchQuery && <div style={S.searchResults}>{filteredRaces.length} result{filteredRaces.length !== 1 ? 's' : ''} for "{searchQuery}"</div>}
 
-          {/* Filters */}
-          <div style={S.filters}>
-            <span style={S.filterLabel}>Org</span>
-            {ORG_OPTIONS.map(o => (
-              <button key={o.value} style={{ ...S.filterBtn, ...(orgFilter === o.value ? S.filterBtnActive : {}) }} onClick={() => setOrgFilter(o.value)}>{o.label}</button>
-            ))}
-            <div style={S.filterDivider} />
-            <span style={S.filterLabel}>Type</span>
-            {TYPE_OPTIONS.map(o => (
-              <button key={o.value} style={{ ...S.filterBtn, ...(typeFilter === o.value ? S.filterBtnActive : {}) }} onClick={() => setTypeFilter(o.value)}>{o.label}</button>
-            ))}
-          </div>
-
-          {viewMode === 'mine' && myRaceCount === 0 ? (
+          {filter === 'mine' && myRaceCount === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', background: '#161616', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
               <div style={{ fontSize: '32px', marginBottom: '12px' }}>🏊</div>
               <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff', marginBottom: '8px' }}>No races entered yet</div>
-              <div style={{ fontSize: '13px', color: '#999' }}>Switch to All Races and hit Enter on any race to add it here.</div>
+              <div style={{ fontSize: '13px', color: '#999' }}>Tap All above, then hit Enter on any race to add it here.</div>
             </div>
           ) : (
             <RaceList races={filteredRaces} myEntries={myEntries} allEntries={allEntries} profiles={profiles} profile={profile} onToggle={toggleEntry} session={session} />
