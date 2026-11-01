@@ -236,6 +236,9 @@ const GEOCODE_OVERRIDES = {
   'Ironman Florida': { city: 'Panama City Beach', latitude: 30.1766, longitude: -85.8055 },
   'Ironman Western Australia': { city: 'Busselton', latitude: -33.6525, longitude: 115.3459 },
   'Ironman Malaysia': { city: 'Langkawi', latitude: 6.3364, longitude: 99.7280 },
+  'Ironman World Championship': { city: 'Kailua-Kona', latitude: 19.6397, longitude: -155.9969 },
+  'Ironman 70.3 Indian Wells': { city: 'Indian Wells', latitude: 33.7207, longitude: -116.3426 },
+  'Ironman 70.3 Melbourne': { city: 'St. Kilda', latitude: -37.8667, longitude: 144.9789 },
   'Ironman 70.3 Langkawi': { city: 'Langkawi', latitude: 6.3364, longitude: 99.7280 },
   // Seed-era additions (Phase C): cards that list only a state/region.
   'Ironman Brazil': { city: 'Florianópolis', latitude: -27.5954, longitude: -48.5480 },
