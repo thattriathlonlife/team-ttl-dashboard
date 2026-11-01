@@ -246,6 +246,7 @@ export default function Home({ session, profile }) {
   const [feed, setFeed] = useState([])
   const [hero, setHero] = useState(null)
   const [filter, setFilter] = useState('all')
+  const [archiveMeta, setArchiveMeta] = useState(null)
   const filterBarRef = useRef(null)
   const barHiddenRef = useRef(false)
   const lastScrollByTarget = useRef(new Map())
@@ -363,6 +364,11 @@ export default function Home({ session, profile }) {
         ...(data.videos || []).map(d => toItem('video', d)),
         ...(data.stories || []).map(d => toItem('story', d)),
       ].sort((a, b) => b.at - a.at)
+      setArchiveMeta({
+        episodesTotal: data.episodesTotal ?? (data.episodes || []).length,
+        videosTotal: (data.videos || []).length,
+        storiesTotal: data.storiesTotal ?? (data.stories || []).length,
+      })
     } catch { /* feed still runs on posts alone */ }
 
     let posts = []
@@ -723,8 +729,31 @@ export default function Home({ session, profile }) {
             </div>
           )
         }
+        const archiveTarget = filter === 'episode'
+          ? { hash: 'podcast', label: `Browse all ${archiveMeta?.episodesTotal ?? ''} episodes in the archive` }
+          : filter === 'video'
+            ? { hash: 'videos', label: `Browse all ${archiveMeta?.videosTotal ?? ''} videos in the archive` }
+            : filter === 'story'
+              ? { hash: 'stories', label: `Browse all ${archiveMeta?.storiesTotal ?? ''} stories in the archive` }
+              : null
         return (
           <>
+            {archiveTarget && (
+              <button
+                onClick={() => navigate(`/content#${archiveTarget.hash}`)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left',
+                  padding: '13px 16px', marginBottom: '1rem', cursor: 'pointer',
+                  background: 'rgba(var(--brand-rgb),0.07)', border: '1px solid rgba(var(--brand-rgb),0.28)',
+                  borderRadius: '12px', color: '#fff',
+                  fontFamily: 'Barlow, sans-serif', fontSize: '14px', fontWeight: 600,
+                }}
+              >
+                <span style={{ fontSize: '17px' }}>🗂️</span>
+                <span style={{ flex: 1 }}>{archiveTarget.label}</span>
+                <span style={{ color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase' }}>Archive →</span>
+              </button>
+            )}
             {visibleFeed.slice(0, visibleCount).map(renderItem)}
             <div ref={sentinelRef} style={{ height: '1px' }} />
             <div style={{

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useAudio } from '../lib/audio'
 
-// Content tab — the TTL public content world inside the unified app.
+// The Archive — TTL's complete public catalogue, one tap deep from the
+// Home feed (the Watch tab was retired 2026-10-31: the feed covers
+// discovery; this page is for browsing the back catalogue in order).
 // Stories come from the Shopify `journal` blog Atom feed, episodes from
 // the Buzzsprout podcast RSS, and videos from the TTL YouTube channel's
 // /videos page (YouTube's channel RSS 404s for this channel), all
-// normalised by /api/content/feeds.
+// normalised by /api/content/feeds?full=1.
 // TTL keeps publishing exactly where it already publishes; nothing here
 // depends on the legacy app or Firebase.
 
@@ -33,11 +35,18 @@ export default function Content() {
   const audio = useAudio() // global player — playback survives navigation
 
   useEffect(() => {
-    fetch('/api/content/feeds')
+    fetch('/api/content/feeds?full=1')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('feed'))))
       .then(setData)
       .catch(() => setError('Content is unavailable right now.'))
   }, [])
+
+  // Deep links from Home's filter views and Search land on a section.
+  useEffect(() => {
+    if (!data || !window.location.hash) return
+    const el = document.querySelector(window.location.hash)
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }))
+  }, [data])
 
   if (error) return <div style={S.wrap}><div style={S.note}>{error}</div></div>
   if (!data) return (
@@ -51,7 +60,18 @@ export default function Content() {
 
   return (
     <div style={S.wrap}>
-      <div style={{ ...S.h, marginTop: 4 }}>Podcast</div>
+      <h1 style={{
+        fontFamily: 'Barlow Condensed, sans-serif', fontSize: '32px', fontWeight: 900,
+        letterSpacing: '2px', lineHeight: 1, color: '#fff', marginTop: '2px',
+      }}>
+        THE ARCHIVE
+      </h1>
+      <div style={{ fontSize: '13.5px', color: '#999', marginTop: '7px', lineHeight: 1.5 }}>
+        Everything That Triathlon Life publishes, in order —{' '}
+        {data.episodesTotal ?? data.episodes.length} episodes · {data.videos?.length || 0} videos · {data.storiesTotal ?? data.stories.length} stories.
+      </div>
+
+      <div id="podcast" style={{ ...S.h, scrollMarginTop: '12px' }}>Podcast · {data.episodesTotal ?? data.episodes.length}</div>
       {data.episodes.map((ep, i) => {
         const isCurrent = audio.current?.audio === ep.audio
         return (
@@ -71,7 +91,7 @@ export default function Content() {
 
       {data.videos?.length > 0 && (
         <>
-          <div style={S.h}>Videos</div>
+          <div id="videos" style={{ ...S.h, scrollMarginTop: '12px' }}>Videos · {data.videos.length}</div>
           {data.videos.map((v) => (
             <button key={v.id} style={{ ...S.card, flexDirection: 'column', gap: 10 }} onClick={() => window.open(v.link, '_blank', 'noopener')}>
               {v.image && (
@@ -89,7 +109,7 @@ export default function Content() {
         </>
       )}
 
-      <div style={S.h}>TTL Stories</div>
+      <div id="stories" style={{ ...S.h, scrollMarginTop: '12px' }}>TTL Stories · {data.storiesTotal ?? data.stories.length}</div>
       {data.stories.map((st, i) => (
         <button key={i} style={S.card} onClick={() => window.open(st.link, '_blank', 'noopener')}>
           {st.image && <img style={S.img} src={st.image} alt="" loading="lazy" />}

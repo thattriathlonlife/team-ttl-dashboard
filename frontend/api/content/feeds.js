@@ -166,9 +166,15 @@ export default async function handler(req, res) {
     // Feeds change on TTL's publishing cadence, not ours — cache hard at the edge.
     res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600')
     const podcastImage = channelImage(episodesXml)
+    // Default payload serves the Home feed (recent slices). ?full=1 serves
+    // the archive page: complete catalogues, in order. Totals always ride
+    // along so the feed can label its archive entry points truthfully.
+    const full = (req.url || '').includes('full=1')
     return res.status(200).json({
-      stories: parseAtom(storiesXml, 20),
-      episodes: parseRss(episodesXml, 30).map(ep => ({ ...ep, image: ep.image || podcastImage })),
+      stories: parseAtom(storiesXml, full ? 60 : 20),
+      storiesTotal: (storiesXml.match(/<entry>/g) || []).length,
+      episodes: parseRss(episodesXml, full ? 300 : 30).map(ep => ({ ...ep, image: ep.image || podcastImage })),
+      episodesTotal: (episodesXml.match(/<item>/g) || []).length,
       podcastImage,
       videos,
       fetchedAt: new Date().toISOString(),

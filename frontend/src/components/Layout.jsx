@@ -35,11 +35,6 @@ const MessageIcon = ({ active }) => (
     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
   </svg>
 )
-const PlayIcon = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4V8z"/>
-  </svg>
-)
 const TeamIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -57,12 +52,12 @@ const ProfileIcon = ({ active, avatarUrl, color, initials }) => {
   )
 }
 
-// 5-tab model (ACCESS-AND-UI-SPEC, built 2026-10-31): Home, Races, Watch,
-// Chat, Team hub. Profile is not a tab — it lives behind the avatar.
+// 4-tab model (ACCESS-AND-UI-SPEC; Watch tab retired 2026-10-31 — the
+// Home feed + its filters cover discovery, and /content survives as the
+// archive page one tap deep). Profile is not a tab — behind the avatar.
 const TABS = [
   { path: '/', label: 'Home' },
   { path: '/races', label: 'Races' },
-  { path: '/content', label: 'Watch' },
   { path: '/messages', label: 'Chat' },
   { path: '/team', label: 'Team' },
 ]
@@ -70,7 +65,6 @@ const TABS = [
 const DESKTOP_NAV = [
   { path: '/', label: 'Home' },
   { path: '/races', label: 'Races' },
-  { path: '/content', label: 'Watch' },
   { path: '/messages', label: 'Chat' },
   { path: '/team', label: 'Team' },
 ]
@@ -162,7 +156,6 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
               >
                 {tab.path === '/' && <HomeIcon active={active} />}
                 {tab.path === '/races' && <RaceIcon active={active} />}
-                {tab.path === '/content' && <PlayIcon active={active} />}
                 {tab.path === '/messages' && <MessageIcon active={active} />}
                 {tab.path === '/team' && <TeamIcon active={active} />}
                 <span style={{ fontSize: '10px', marginTop: '3px', letterSpacing: '0.5px', fontFamily: 'Barlow Condensed, sans-serif', textTransform: 'uppercase', fontWeight: active ? 700 : 400 }}>

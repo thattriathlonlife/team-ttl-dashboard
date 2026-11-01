@@ -134,7 +134,7 @@ export default function Search({ profile }) {
         <>
           <div style={S.h}>Podcast</div>
           {results.episodes.map((e, i) => (
-            <button key={i} style={S.row} onClick={() => navigate('/content')}>
+            <button key={i} style={S.row} onClick={() => navigate('/content#podcast')}>
               <span style={S.icon}>🎧</span>
               <span style={S.title}>{e.title}</span>
             </button>
