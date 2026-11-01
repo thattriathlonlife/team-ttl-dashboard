@@ -246,7 +246,8 @@ export default function Home({ session, profile }) {
   const [feed, setFeed] = useState([])
   const [hero, setHero] = useState(null)
   const [filter, setFilter] = useState('all')
-  const [chipsHidden, setChipsHidden] = useState(false)
+  const filterBarRef = useRef(null)
+  const barHiddenRef = useRef(false)
   const lastScrollByTarget = useRef(new Map())
   const [visibleCount, setVisibleCount] = useState(FEED_BATCH)
   const [loading, setLoading] = useState(true)
@@ -260,11 +261,22 @@ export default function Home({ session, profile }) {
   useEffect(() => { loadAll() }, [team])
 
   // Filter bar behaviour: hide on scroll down, reappear on scroll up
-  // (always visible near the top). Scroll events are captured at the
-  // document because the scroller is Layout's <main> on mobile and the
-  // window on desktop; per-target positions keep nested scrollers
-  // (the chips row itself) from interfering.
+  // (always visible near the top). Performance rules learned from the
+  // first version's jank: NEVER animate layout (the old margin collapse
+  // pumped the whole feed), NEVER setState from a scroll handler (every
+  // flip re-rendered the feed mid-scroll), no backdrop blur. The bar is
+  // a zero-flow-height overlay; the handler writes transform/opacity
+  // straight to its DOM node, rAF-throttled — compositor-only motion.
   useEffect(() => {
+    let raf = 0
+    function apply(hidden) {
+      if (barHiddenRef.current === hidden) return
+      barHiddenRef.current = hidden
+      const el = filterBarRef.current
+      if (!el) return
+      el.style.transform = hidden ? 'translateY(-130%)' : 'translateY(0)'
+      el.style.opacity = hidden ? '0' : '1'
+    }
     function onScroll(e) {
       const t = e.target
       const y = t === document
@@ -272,13 +284,20 @@ export default function Home({ session, profile }) {
         : t?.scrollTop
       if (typeof y !== 'number') return
       const last = lastScrollByTarget.current.get(t) ?? 0
-      if (y < 60) setChipsHidden(false)
-      else if (y > last + 6) setChipsHidden(true)
-      else if (y < last - 6) setChipsHidden(false)
       lastScrollByTarget.current.set(t, y)
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        if (y < 60) apply(false)
+        else if (y > last + 6) apply(true)
+        else if (y < last - 6) apply(false)
+      })
     }
     document.addEventListener('scroll', onScroll, { capture: true, passive: true })
-    return () => document.removeEventListener('scroll', onScroll, { capture: true })
+    return () => {
+      document.removeEventListener('scroll', onScroll, { capture: true })
+      if (raf) cancelAnimationFrame(raf)
+    }
   }, [])
 
   useEffect(() => {
@@ -647,19 +666,20 @@ export default function Home({ session, profile }) {
         Your feed
       </div>
 
-      {/* Filter chips — one lens across every source. Sticky under the
-          header; slides away while scrolling down, returns on scroll up.
-          The negative top margin when hidden collapses its slot so the
-          feed doesn't keep a dead band. */}
-      <div style={{
+      {/* Filter chips — one lens across every source. A sticky overlay:
+          fixed height with an equal negative bottom margin, so it takes
+          zero flow space (the spacer below holds its at-rest slot) and
+          hiding it is pure transform — the feed never reflows. The
+          scroll handler drives it via ref, never via React state. */}
+      <div ref={filterBarRef} style={{
         position: 'sticky', top: 0, zIndex: 50,
-        margin: chipsHidden ? '-58px -1.25rem 0.6rem' : '0 -1.25rem 0.6rem',
-        padding: '0.45rem 1.25rem',
-        background: 'rgba(13,13,13,0.94)',
-        backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
-        transform: chipsHidden ? 'translateY(-130%)' : 'translateY(0)',
-        opacity: chipsHidden ? 0 : 1,
-        transition: 'transform 0.28s ease, opacity 0.22s ease, margin 0.28s ease',
+        height: '52px', margin: '0 -1.25rem -52px',
+        padding: '0 1.25rem',
+        display: 'flex', alignItems: 'center',
+        background: 'rgba(13,13,13,0.97)',
+        transform: 'translateY(0)', opacity: 1,
+        transition: 'transform 0.25s ease, opacity 0.2s ease',
+        willChange: 'transform',
       }}>
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
         {FEED_FILTERS.map(f => {
@@ -683,6 +703,8 @@ export default function Home({ session, profile }) {
         })}
       </div>
       </div>
+      {/* Spacer: holds the filter bar's at-rest slot in the flow. */}
+      <div style={{ height: '52px', marginBottom: '0.35rem' }} />
 
       {filter === 'all' && hero && renderHero(hero)}
 
