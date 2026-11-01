@@ -262,6 +262,16 @@ async function fetchCoordCache() {
   return cache;
 }
 
+// Accent/punctuation-insensitive city comparison ("Poreč" ~ "Porec",
+// "São Paulo" ~ "Sao Paulo"). Containment counts as a match so
+// "Galveston" ~ "Galveston Island" passes.
+function sameCity(a, b) {
+  if (!a || !b) return false;
+  const norm = x => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const na = norm(a), nb = norm(b);
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
 async function geocodeRaces(races, coordCache = new Map()) {
   console.log(`[Geocode] Geocoding ${races.length} races...`);
   const results = [];
@@ -280,8 +290,13 @@ async function geocodeRaces(races, coordCache = new Map()) {
 
     const cached = coordCache.get(race.external_id);
     if (cached) {
-      results.push({ ...race, city: race.city || cached.city, latitude: parseFloat(cached.latitude), longitude: parseFloat(cached.longitude) });
-      continue;
+      const ownCity = race.city || extractCityFromLocation(race.location);
+      if (cached.city && ownCity && !sameCity(cached.city, ownCity)) {
+        console.log(`[Geocode] Ignoring cached coords for "${race.name}": cached city "${cached.city}" != race city "${ownCity}"`);
+      } else {
+        results.push({ ...race, city: race.city || cached.city, latitude: parseFloat(cached.latitude), longitude: parseFloat(cached.longitude) });
+        continue;
+      }
     }
 
     if (geocodeLookupsThisRun >= GEOCODE_MAX_NEW_PER_RUN) {
@@ -300,9 +315,15 @@ async function geocodeRaces(races, coordCache = new Map()) {
       continue;
     }
 
+    // City priority (Phase C fix): the race's structured city and its
+    // location string carry the real venue; the name-derived guess is
+    // a last resort. Name-first was a PTO-era workaround and it poisoned
+    // seed geocodes — "Northern California" (a region, from the name)
+    // beat "Redding" (the venue, from the location) and Nominatim
+    // happily returned San Francisco as a city-level match.
     const cityFromName = extractCityFromName(race.name);
     const cityFromLocation = extractCityFromLocation(race.location);
-    const bestCity = cityFromName || cityFromLocation || null;
+    const bestCity = race.city || cityFromLocation || cityFromName || null;
 
     const geocodeQuery = bestCity && race.country
       ? `${bestCity}, ${race.country}`
@@ -344,8 +365,8 @@ async function geocodeRaces(races, coordCache = new Map()) {
           'state', 'country', 'continent', 'county', 'district', 'administrative'];
         const isInvalidType = invalidTypes.includes(placeType);
 
-        if (!geocodedCity || isInvalidType) {
-          console.log(`[Geocode] "${race.name}" → type "${placeType}", no city-level result — skipping coords`);
+        if (!geocodedCity || isInvalidType || (bestCity && !sameCity(geocodedCity, bestCity))) {
+          console.log(`[Geocode] "${race.name}" → type "${placeType}", city "${geocodedCity}" (wanted "${bestCity}") — no verified city-level result, skipping coords`);
           results.push({ ...race, city: bestCity ?? race.city ?? null, latitude: null, longitude: null });
         } else {
           results.push({
