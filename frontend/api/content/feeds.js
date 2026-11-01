@@ -120,7 +120,10 @@ function parseYouTubeVideos(html, limit) {
     const parts = rows.flatMap(r => r.metadataParts || [])
     const views = parts[0]?.accessibilityLabel || null
     const age = parts.map(p => p.accessibilityLabel).find(t => /ago/.test(t || '')) || null
-    const image = lk.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url || null
+    // Canonical thumbnail from the video id — the signed hq720 URLs in
+    // the page markup expire, which broke thumbnails in the app whenever
+    // a cached feed response outlived the signature (2026-11-01).
+    const image = id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null
     videos.push({
       id,
       title: meta.title?.content || null,

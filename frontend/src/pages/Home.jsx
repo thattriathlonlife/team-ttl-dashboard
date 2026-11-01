@@ -630,7 +630,7 @@ export default function Home({ session, profile }) {
   function renderVideo(item) {
     const v = item.data
     return (
-      <button key={item.key} onClick={() => window.open(v.link, '_blank', 'noopener')} style={{ ...F.card, cursor: 'pointer', padding: 0, overflow: 'hidden' }}>
+      <button key={item.key} onClick={() => setPlayingVideo(v)} style={{ ...F.card, cursor: 'pointer', padding: 0, overflow: 'hidden' }}>
         {v.image && (
           <div style={{ position: 'relative' }}>
             <img src={v.image} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
@@ -676,7 +676,7 @@ export default function Home({ session, profile }) {
     const isVideo = item.kind === 'video'
     return (
       <button
-        onClick={() => setPlayingVideo(d)}
+        onClick={() => { if (isVideo) setPlayingVideo(d); else window.open(d.link, '_blank', 'noopener') }}
         style={{
           position: 'relative', width: '100%', textAlign: 'left', cursor: 'pointer',
           borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)',

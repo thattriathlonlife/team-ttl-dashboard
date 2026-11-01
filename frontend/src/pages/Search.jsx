@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import VideoPlayer from '../components/VideoPlayer'
 import { channelDisplayName, channelAccessLabel, raceChannelKind, isTeamOnlyChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
 
@@ -43,6 +44,7 @@ const RECENT_KEY = 'ttl-recent-searches'
 
 export default function Search({ profile }) {
   const [query, setQuery] = useState('')
+  const [playingVideo, setPlayingVideo] = useState(null)
   const [index, setIndex] = useState(null)
   const [recents, setRecents] = useState(() => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') } catch { return [] }
@@ -204,7 +206,7 @@ export default function Search({ profile }) {
         <>
           <div style={S.h}>Videos</div>
           {results.videos.map(v => (
-            <button key={v.id} style={S.row} onClick={() => window.open(v.link, '_blank', 'noopener')}>
+            <button key={v.id} style={S.row} onClick={() => setPlayingVideo(v)}>
               <span style={S.icon}>▶️</span>
               <span style={S.title}>{v.title}</span>
             </button>
@@ -223,6 +225,7 @@ export default function Search({ profile }) {
           ))}
         </>
       )}
+      <VideoPlayer video={playingVideo} onClose={() => setPlayingVideo(null)} />
     </div>
   )
 }
