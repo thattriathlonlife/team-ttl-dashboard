@@ -77,16 +77,16 @@ function recolor(map) {
       else if (id.includes('water') || id.includes('ocean') || id.includes('sea')) {
         // Water pushed DEEPER than the land (fix pass, 2026-10-31: the
         // first values made continents read as black holes in the sea).
-        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#071a2c')
-        if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', '#0e2c44')
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#0a2a44')
+        if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', '#14456b')
       } else if (id.includes('landcover')) {
-        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#131e28')
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#223242')
       } else if (id.includes('landuse')) {
-        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#17222c')
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#25384a')
       } else if (id.includes('land') || id.includes('earth')) {
-        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#1b2733')
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#2a3d4f')
       } else if (id.includes('building')) {
-        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#232f3b')
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#2f4356')
       } else if (id.includes('boundary') || id.includes('border') || id.includes('admin')) {
         if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', 'rgba(158,184,198,0.3)')
       } else if (layer.type === 'line' && (id.includes('road') || id.includes('street') || id.includes('highway') || id.includes('transport') || id.includes('bridge') || id.includes('tunnel'))) {
@@ -106,6 +106,7 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
   const markersRef = useRef([])
   const fitKeyRef = useRef('')
   const loadedRef = useRef(false)
+  const pendingFrameRef = useRef(null)
   const [selected, setSelected] = useState(null)
   const [opening, setOpening] = useState(null)
   const [note, setNote] = useState('')
@@ -133,8 +134,8 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
       map = new maplibregl.Map({
         container: containerRef.current,
         style: STYLE_URL,
-        center: [-98, 33],
-        zoom: 2.3,
+        center: [-98, 24],
+        zoom: 2.0,
         pitch: PITCH,
         bearing: -8,
         attributionControl: { compact: true },
@@ -161,14 +162,21 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
       try {
         map.setFog({
           range: [0.4, 9],
-          color: '#0a1a28',
-          'high-color': '#14405c',
+          color: '#0d2233',
+          'high-color': '#1a4a66',
           'space-color': '#020507',
           'horizon-blend': 0.14,
           'star-intensity': 0.3,
         })
       } catch { /* atmosphere is decoration */ }
       recolor(map)
+      // Apply framing only now (fix pass 2): an easeTo issued before
+      // load runs in Mercator, then setProjection('globe') re-interprets
+      // the camera — which is how the map could open over empty ocean.
+      if (pendingFrameRef.current) {
+        map.jumpTo(pendingFrameRef.current)
+        pendingFrameRef.current = null
+      }
     })
     map.on('error', () => { if (!loadedRef.current) { clearTimeout(watchdog); onFail() } })
     return () => { clearTimeout(watchdog); map.remove(); mapRef.current = null }
@@ -199,24 +207,29 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
       fitKeyRef.current = fitKey
       const cluster = clusterOf(pts)
       if (cluster.length === 1) {
-        map.easeTo({ center: cluster[0], zoom: 5, pitch: PITCH, duration: 0 })
+        const frame = { center: cluster[0], zoom: 5, pitch: PITCH }
+        if (loadedRef.current) map.jumpTo(frame)
+        else pendingFrameRef.current = frame
       } else {
-        // Frame by computed center + zoom (fix pass, 2026-10-31):
-        // fitBounds under globe projection + 48 deg pitch pulled back
-        // to a near-world view and shrank the cluster to dots. Instead,
-        // centre on the cluster and pick the zoom that makes its span
-        // fill ~60% of the panel, floored at 2.55 so labels exist.
+        // Frame by computed center + zoom on the cluster's hemisphere
+        // (Zack's reference, 2026-10-31 23:29: the Americas disc with
+        // the pins in frame — the Lovable globe framing). Span fills
+        // ~40% of the world-width so neighbouring continents stay on
+        // the disc; the frame is applied via jumpTo AFTER the style +
+        // globe projection load (see pendingFrameRef), never before.
         const lngs = cluster.map(p => p[0])
         const lats = cluster.map(p => p[1])
         const spanLng = Math.max(...lngs) - Math.min(...lngs)
         const spanLat = Math.max(...lats) - Math.min(...lats)
-        const zLng = Math.log2((360 * 0.62) / Math.max(spanLng, 4))
-        const zLat = Math.log2((170 * 0.55) / Math.max(spanLat, 3))
-        const zoom = Math.min(5, Math.max(2.55, Math.min(zLng, zLat)))
-        map.easeTo({
+        const zLng = Math.log2((360 * 0.40) / Math.max(spanLng, 4))
+        const zLat = Math.log2((170 * 0.36) / Math.max(spanLat, 3))
+        const zoom = Math.min(5, Math.max(1.9, Math.min(zLng, zLat)))
+        const frame = {
           center: [(Math.min(...lngs) + Math.max(...lngs)) / 2, (Math.min(...lats) + Math.max(...lats)) / 2],
-          zoom, pitch: PITCH, bearing: -8, duration: 0,
-        })
+          zoom, pitch: PITCH, bearing: -8,
+        }
+        if (loadedRef.current) map.jumpTo(frame)
+        else pendingFrameRef.current = frame
       }
     }
   }, [racesWithCoords, entriesByRace, myEntries])

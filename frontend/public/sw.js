@@ -2,7 +2,7 @@
 // Strategy: navigations network-first with cache fallback (fresh app wins,
 // offline still opens); static assets cache-first; API calls network-first
 // with a short-lived cache fallback for the content feed only.
-const VERSION = 'ttl-sw-v2'
+const VERSION = 'ttl-sw-v3'
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png']
 
 self.addEventListener('install', (e) => {
