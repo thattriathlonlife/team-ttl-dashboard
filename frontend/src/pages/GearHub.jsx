@@ -254,7 +254,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
           <img src={discount.logo_url} alt={discount.brand} style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'contain', background: '#fff', padding: '4px', flexShrink: 0 }} />
         ) : (
           <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: discount.color || 'rgba(var(--brand-rgb),0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
-            {discount.brand.slice(0, 2).toUpperCase()}
+            {discount.brand ? discount.brand.slice(0, 2).toUpperCase() : 'TTL'}
           </div>
         )}
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -487,7 +487,7 @@ function PartnerDeals({ profile }) {
       {/* No page-title header (Zack, 2026-10-31 — the hub pill already
           names the segment). Only the deals tab's admin action survives,
           as a slim right-aligned row. */}
-      {tab === 'deals' && isAdmin && (
+      {isAdmin && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.9rem' }}>
           <button onClick={handleAdd} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '8px 16px', background: 'var(--brand)', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer' }}>
             + Add Discount
