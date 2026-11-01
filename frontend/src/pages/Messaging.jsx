@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { isTeamTier } from '../lib/tier'
 import { channelAccessLabel, channelDisplayName, isRaceChannel, isTeamOnlyChannel, raceChannelKind } from '../lib/channels'
 import TeamLocked from '../components/TeamLocked'
+import { moderateOutgoing, shouldHide } from '../lib/moderation'
 
 // Given a DM channel (with dm_members hydrated), return the other person's profile
 function dmOtherProfile(channel, userId) {
@@ -262,30 +263,109 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0)
   const showGroup = (key) => sideFilter === 'all' || sideFilter === key
 
-  // WhatsApp-flat list (2026-10-31): channels and DMs in ONE recency-
-  // sorted stream under the active chip; announcement channels live only
-  // in the pinned row above it.
+  // Clean three-way separation (Zack, 2026-10-31, after the mixed stream
+  // put DMs under a "Groups you're in" header): GROUP CHATS = public race
+  // discussions anyone can join; TEAM CHATS = members-only channels
+  // (general/training/interest/regions + race logistics); DIRECT
+  // MESSAGES = 1:1s in their own section so they're trivial to find.
+  // Each section is recency-sorted internally; the chips narrow which
+  // slices show. Announcements stay pinned above the sections.
   const isAnnouncementCh = (c) => c.is_readonly || c.category === 'announcements'
   const tsOf = (id) => { const t = lastMessages?.[id]?.created_at; return t ? new Date(t).getTime() : 0 }
-  const flatList = (() => {
-    let chans = channels.filter(c => !isAnnouncementCh(c))
-    if (sideFilter === 'races') chans = chans.filter(c => raceChannelKind(c))
-    else if (sideFilter === 'regions') chans = chans.filter(c => c.category === 'regions' && !raceChannelKind(c))
-    else if (sideFilter === 'training') chans = chans.filter(c => c.category === 'training' && !raceChannelKind(c))
-    else if (sideFilter === 'groups') chans = chans.filter(c => ['general', 'interest'].includes(c.category) && !raceChannelKind(c))
-    else if (sideFilter === 'dms') chans = []
-    const items = chans.map(ch => ({ kind: 'channel', ch }))
-    if (sideFilter === 'all' || sideFilter === 'dms') {
-      if (teamView) items.push(...dmChannels.map(ch => ({ kind: 'dm', ch })))
-      else items.push({ kind: 'lockedDm', ch: { id: 'locked-dms', type: 'dm', name: 'Direct Messages' } })
+  const sections = (() => {
+    const allChans = channels.filter(c => !isAnnouncementCh(c))
+    const byKind = (k) => allChans.filter(c => raceChannelKind(c) === k)
+    const byCats = (cats) => allChans.filter(c => cats.includes(c.category) && !raceChannelKind(c))
+    const dmItems = teamView
+      ? dmChannels.map(ch => ({ kind: 'dm', ch }))
+      : [{ kind: 'lockedDm', ch: { id: 'locked-dms', type: 'dm', name: 'Direct Messages' } }]
+    let groups = []
+    let team = []
+    let dms = []
+    if (sideFilter === 'all') {
+      groups = byKind('discussion').map(ch => ({ kind: 'channel', ch }))
+      team = allChans.filter(c => raceChannelKind(c) !== 'discussion').map(ch => ({ kind: 'channel', ch }))
+      dms = dmItems
+    } else if (sideFilter === 'races') {
+      groups = byKind('discussion').map(ch => ({ kind: 'channel', ch }))
+      team = byKind('logistics').map(ch => ({ kind: 'channel', ch }))
+    } else if (sideFilter === 'regions') {
+      team = byCats(['regions']).map(ch => ({ kind: 'channel', ch }))
+    } else if (sideFilter === 'training') {
+      team = byCats(['training']).map(ch => ({ kind: 'channel', ch }))
+    } else if (sideFilter === 'dms') {
+      dms = dmItems
     }
     const nameOf = (it) => it.kind === 'dm'
       ? (dmOtherProfile(it.ch, userId)?.full_name || 'DM')
       : (raceChannelKind(it.ch) ? channelDisplayName(it.ch) : prettyName(it.ch.name))
-    items.sort((a, b) => (tsOf(b.ch.id) - tsOf(a.ch.id)) || nameOf(a).localeCompare(nameOf(b)))
-    return items
+    const sortItems = (arr) => arr.sort((a, b) => (tsOf(b.ch.id) - tsOf(a.ch.id)) || nameOf(a).localeCompare(nameOf(b)))
+    return [
+      { id: 'groups', label: 'Group chats', items: sortItems(groups) },
+      { id: 'team', label: 'Team chats', items: sortItems(team) },
+      { id: 'dms', label: 'Direct messages', items: sortItems(dms) },
+    ].filter(s => s.items.length > 0)
   })()
-  const flatHeader = { all: "Groups you're in", races: 'Race chats', regions: 'Regions', training: 'Training', groups: 'Groups', dms: 'Direct messages' }[sideFilter]
+
+  function renderChatItem(item) {
+            const ch = item.ch
+            const last = lastMessages?.[ch.id]
+            const unread = unreadCounts[ch.id] || 0
+            const isSelected = selectedChannel?.id === ch.id
+
+            if (item.kind === 'lockedDm') {
+              return (
+                <ChatRow
+                  key="locked-dms"
+                  avatar={<div style={{ width: 52, height: 52, borderRadius: '50%', background: '#1b1b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>🔒</div>}
+                  name="Direct Messages"
+                  preview="Team members only"
+                  dimmed
+                  onClick={() => openChannel({ id: 'locked-dms', type: 'dm', name: 'Direct Messages' })}
+                />
+              )
+            }
+
+            if (item.kind === 'dm') {
+              const other = dmOtherProfile(ch, userId)
+              const senderPrefix = last ? (last.athlete_id === userId ? 'You: ' : '') : ''
+              return (
+                <ChatRow
+                  key={ch.id}
+                  avatar={<Avatar profile={other} size={52} />}
+                  name={other?.full_name || 'Direct message'}
+                  preview={last ? `${senderPrefix}${last.content || '📷 Photo'}` : 'No messages yet'}
+                  time={waListTime(last?.created_at)}
+                  unread={unread}
+                  selected={isSelected}
+                  onClick={() => openChannel(ch)}
+                />
+              )
+            }
+
+            const locked = !teamView && isTeamOnlyChannel(ch)
+            const kind = raceChannelKind(ch)
+            const sender = last ? (last.athlete_id === userId ? 'You' : last.profiles?.full_name?.split(' ')[0]) : null
+            const badge = kind === 'discussion'
+              ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--highlight-rgb),0.13)', color: 'var(--highlight)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Public</span>
+              : kind === 'logistics'
+                ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--brand-rgb),0.13)', color: 'var(--brand)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Team</span>
+                : null
+            return (
+              <ChatRow
+                key={ch.id}
+                avatar={<ChannelDisc ch={ch} />}
+                name={kind ? channelDisplayName(ch) : prettyName(ch.name)}
+                preview={locked ? '🔒 Team only' : last ? `${sender ? `${sender}: ` : ''}${last.content || '📷 Photo'}` : 'No messages yet'}
+                time={locked ? '' : waListTime(last?.created_at)}
+                unread={locked ? 0 : unread}
+                selected={isSelected}
+                badge={badge}
+                dimmed={locked}
+                onClick={() => openChannel(ch)}
+              />
+            )
+          }
 
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#999', textTransform: 'uppercase' }}>Loading...</div>
 
@@ -295,12 +375,6 @@ export default function Messaging({ session, profile, onReadChannel }) {
       {/* Sidebar */}
       {(showSidebar || !isMobile) && (
         <div style={{ width: isMobile ? '100%' : '280px', background: '#111', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'relative' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff' }}>Messages</div>
-            {/* Channel creation moved to the floating "+ New chat" pill
-                (Zack, 2026-10-31) — the header stays clean. */}
-          </div>
-
           <div style={{ flex: 1, overflow: 'auto' }}>
             {/* Category chips — one lens over the channel list */}
             <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', padding: '12px 16px 4px', scrollbarWidth: 'none' }}>
@@ -309,7 +383,6 @@ export default function Messaging({ session, profile, onReadChannel }) {
                 { id: 'races', label: 'Races' },
                 { id: 'regions', label: 'Regions' },
                 { id: 'training', label: 'Training' },
-                { id: 'groups', label: 'Groups' },
                 { id: 'dms', label: 'DMs' },
               ].map(f => {
                 const active = sideFilter === f.id
@@ -350,80 +423,26 @@ export default function Messaging({ session, profile, onReadChannel }) {
               )
             })()}
 
-            {/* Mentions row */}
-            <ChatRow
+            {/* Mentions row (All view only — sections carry the rest) */}
+            {sideFilter === 'all' && <ChatRow
               avatar={<div style={{ width: 52, height: 52, borderRadius: '50%', background: '#232323', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0, color: '#999' }}>@</div>}
               name="Mentions"
               preview="Messages where you're tagged"
               unread={mentionCount}
               selected={showMentions}
               onClick={openMentions}
-            />
+            />}
 
-            {/* The flat WhatsApp list — one recency stream */}
-            <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: '16px', fontWeight: 600, color: '#8a8a8a', padding: '16px 16px 2px' }}>
-              {flatHeader}
-            </div>
-            {flatList.map(item => {
-              const ch = item.ch
-              const last = lastMessages?.[ch.id]
-              const unread = unreadCounts[ch.id] || 0
-              const isSelected = selectedChannel?.id === ch.id
-
-              if (item.kind === 'lockedDm') {
-                return (
-                  <ChatRow
-                    key="locked-dms"
-                    avatar={<div style={{ width: 52, height: 52, borderRadius: '50%', background: '#1b1b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>🔒</div>}
-                    name="Direct Messages"
-                    preview="Team members only"
-                    dimmed
-                    onClick={() => openChannel({ id: 'locked-dms', type: 'dm', name: 'Direct Messages' })}
-                  />
-                )
-              }
-
-              if (item.kind === 'dm') {
-                const other = dmOtherProfile(ch, userId)
-                const senderPrefix = last ? (last.athlete_id === userId ? 'You: ' : '') : ''
-                return (
-                  <ChatRow
-                    key={ch.id}
-                    avatar={<Avatar profile={other} size={52} />}
-                    name={other?.full_name || 'Direct message'}
-                    preview={last ? `${senderPrefix}${last.content || '📷 Photo'}` : 'No messages yet'}
-                    time={waListTime(last?.created_at)}
-                    unread={unread}
-                    selected={isSelected}
-                    onClick={() => openChannel(ch)}
-                  />
-                )
-              }
-
-              const locked = !teamView && isTeamOnlyChannel(ch)
-              const kind = raceChannelKind(ch)
-              const sender = last ? (last.athlete_id === userId ? 'You' : last.profiles?.full_name?.split(' ')[0]) : null
-              const badge = kind === 'discussion'
-                ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--highlight-rgb),0.13)', color: 'var(--highlight)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Public</span>
-                : kind === 'logistics'
-                  ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--brand-rgb),0.13)', color: 'var(--brand)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Team</span>
-                  : null
-              return (
-                <ChatRow
-                  key={ch.id}
-                  avatar={<ChannelDisc ch={ch} />}
-                  name={kind ? channelDisplayName(ch) : prettyName(ch.name)}
-                  preview={locked ? '🔒 Team only' : last ? `${sender ? `${sender}: ` : ''}${last.content || '📷 Photo'}` : 'No messages yet'}
-                  time={locked ? '' : waListTime(last?.created_at)}
-                  unread={locked ? 0 : unread}
-                  selected={isSelected}
-                  badge={badge}
-                  dimmed={locked}
-                  onClick={() => openChannel(ch)}
-                />
-              )
-            })}
-            {flatList.length === 0 && (
+            {/* The three clean sections (Zack, 2026-10-31) */}
+            {sections.map(section => (
+              <div key={section.id}>
+                <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: '16px', fontWeight: 600, color: '#8a8a8a', padding: '16px 16px 2px' }}>
+                  {section.label}
+                </div>
+                {section.items.map(renderChatItem)}
+              </div>
+            ))}
+            {sections.length === 0 && (
               <div style={{ padding: '18px 16px', fontSize: '13.5px', color: '#555' }}>Nothing here yet.</div>
             )}
 
@@ -624,8 +643,9 @@ export function waDayLabel(dateStr) {
 // human names (Community Chat). Only transform obvious slugs.
 export function prettyName(name) {
   if (!name) return ''
-  if (/\s/.test(name) || !name.includes('-')) return name
-  return name.split('-').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  if (/\s/.test(name) && name !== name.toLowerCase()) return name
+  if (!/\s/.test(name) && !name.includes('-') && name !== name.toLowerCase()) return name
+  return name.split(/[-\s]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 const CATEGORY_RGB = {
@@ -860,6 +880,8 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   const [mentionQuery, setMentionQuery] = useState(null)
   const [mentionIndex, setMentionIndex] = useState(0)
   const [hoveredMsg, setHoveredMsg] = useState(null)
+  const [modNotice, setModNotice] = useState(null)
+  const [revealedHidden, setRevealedHidden] = useState(() => new Set())
   const [editingMsg, setEditingMsg] = useState(null) // { id, content }
   const [hasEarlier, setHasEarlier] = useState(false)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
@@ -972,6 +994,26 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   async function sendMessage(imageUrl = null) {
     const content = text.trim()
     if (!content && !imageUrl) return
+
+    // Auto-moderation gate (lib/moderation): severe language, spam,
+    // flooding and rapid-fire sends are stopped before they land;
+    // warnings send but tell the user. Image-only posts skip text rules.
+    if (content) {
+      const mentionCount = (content.match(/@/g) || []).length
+      const verdict = moderateOutgoing(content, {
+        channelId: channel.id,
+        recentMine: messages.filter(m => m.athlete_id === userId).slice(-6).map(m => m.content),
+        mentionCount,
+      })
+      if (verdict.action === 'block') {
+        setModNotice(verdict.reason)
+        return
+      }
+      if (verdict.action === 'warn') {
+        setModNotice(verdict.reason)
+        setTimeout(() => setModNotice(null), 5000)
+      }
+    }
 
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMsg = {
@@ -1161,6 +1203,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           const grouped = msgReactions.reduce((acc, r) => { if (!acc[r.emoji]) acc[r.emoji] = []; acc[r.emoji].push(r.athlete_id); return acc }, {})
           const isHovered = hoveredMsg === msg.id
           const isOwn = msg.athlete_id === userId
+          const modHidden = !msg.optimistic && shouldHide(msg.content) && !revealedHidden.has(msg.id)
 
           return (
             <div key={msg.id} style={{ marginTop: msg.showHeader ? '10px' : '2px', position: 'relative' }}
@@ -1176,6 +1219,16 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
 
               {/* WhatsApp bubble row: own messages right in a brand-deep
                   bubble, everyone else left with sender name in-bubble. */}
+              {modHidden ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}>
+                  <button
+                    onClick={() => setRevealedHidden(prev => new Set(prev).add(msg.id))}
+                    style={{ background: '#181818', border: '1px dashed rgba(255,255,255,0.16)', borderRadius: '999px', padding: '6px 14px', fontSize: '12px', color: '#8a8a8a', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+                  >
+                    🛡️ Hidden by auto-moderation · Show
+                  </button>
+                </div>
+              ) : (
               <div style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '7px' }}>
                 {!isOwn && (
                   <div style={{ width: 28, flexShrink: 0, visibility: msg.showHeader ? 'visible' : 'hidden' }}>
@@ -1249,10 +1302,10 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                   </div>
                 )}
                 </div>{/* /bubble column */}
-              </div>{/* /bubble row */}
+              </div>)}{/* /bubble row */}
 
               {/* Hover actions */}
-              {isHovered && !msg.optimistic && (
+              {isHovered && !msg.optimistic && !modHidden && (
                 <div style={{ position: 'absolute', right: 0, top: '-8px', display: 'flex', gap: '2px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px 6px', zIndex: 5 }}>
                   {QUICK_EMOJIS.slice(0, 4).map(e => (
                     <button key={e} onClick={() => toggleReaction(msg.id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '2px', lineHeight: 1 }}>{e}</button>
@@ -1298,6 +1351,15 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
             <span style={{ fontSize: '12px', color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600 }}>{replyTo.profiles?.full_name || 'Athlete'}</span>
             <span style={{ fontSize: '12px', color: '#555', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyTo.content}</span>
             <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#555', fontSize: '16px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
+          </div>
+        )}
+
+        {/* Auto-moderation notice */}
+        {modNotice && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(var(--highlight-rgb),0.1)', border: '1px solid rgba(var(--highlight-rgb),0.35)', borderRadius: '10px', padding: '8px 12px', marginBottom: '6px' }}>
+            <span style={{ fontSize: '13px' }}>🛡️</span>
+            <span style={{ flex: 1, fontSize: '12.5px', color: '#e8d9a8', lineHeight: 1.4 }}>{modNotice}</span>
+            <button onClick={() => setModNotice(null)} style={{ background: 'none', border: 'none', color: '#999', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
           </div>
         )}
 
