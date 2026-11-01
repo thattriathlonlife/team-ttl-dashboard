@@ -6,11 +6,13 @@ import { supabase } from '../lib/supabase'
 import { ensureRaceChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
 
-// The modern map (Concept A, approved 2026-10-31): Leaflet on CARTO dark
-// tiles — a real dark basemap instead of the light OpenStreetMap iframe —
-// with count pins as first-class data: pills carry start-line counts, big
-// fields go coral, races the member has entered get a gold ring, and
-// tapping a pin opens the race's card in place with its roster.
+// The modern map (Concept A, approved 2026-10-31): Leaflet on Esri's
+// World Dark Gray basemap — a real dark map instead of the light
+// OpenStreetMap iframe — with count pins as first-class data: pills carry
+// start-line counts, big fields go coral, races the member has entered
+// get a gold ring, and tapping a pin opens the race's card in place with
+// its roster. (Originally CARTO dark tiles; that CDN began watermarking
+// free tiles "API KEY REQUIRED", so the source moved to Esri.)
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MEMBER_COLORS = ['#2BB3A3', '#E87362', '#E8B84B', '#FF5A1F', '#a78bfa', '#34d399', '#f472b6', '#60a5fa']
 
@@ -83,9 +85,17 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
       attributionControl: true,
     })
     L.control.zoom({ position: 'topright' }).addTo(map)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      maxZoom: 19,
+    // Esri World Dark Gray (base + label reference). CARTO's free basemap
+    // CDN started serving "API KEY REQUIRED" watermark tiles (Zack's
+    // screenshot, 2026-10-31 22:13) — an HTTP 200 with watermark content,
+    // which is why a status check missed it. Esri tiles were verified by
+    // content (real Portland tile imagery) before this swap.
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+      maxZoom: 16,
+    }).addTo(map)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16,
     }).addTo(map)
     layerRef.current = L.layerGroup().addTo(map)
     mapObjRef.current = map
@@ -161,26 +171,7 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
       position: 'relative', background: '#0d1316',
     }}>
       <style>{MAP_CSS}</style>
-      <div ref={mapRef} style={{ width: '100%', height: '320px', zIndex: 0 }} />
-
-      {/* On-map title chip */}
-      <div style={{
-        position: 'absolute', left: '12px', top: '12px', zIndex: 500,
-        background: 'rgba(13,17,19,0.88)', border: '1px solid rgba(255,255,255,0.14)',
-        backdropFilter: 'blur(6px)', borderRadius: '999px', padding: '5px 12px',
-        fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700,
-        letterSpacing: '1.8px', textTransform: 'uppercase', color: '#d7e8e6', pointerEvents: 'none',
-      }}>
-        Where the team races
-      </div>
-      <div style={{
-        position: 'absolute', left: '12px', bottom: '12px', zIndex: 500,
-        background: 'rgba(13,17,19,0.88)', border: '1px solid rgba(255,255,255,0.12)',
-        backdropFilter: 'blur(6px)', borderRadius: '10px', padding: '6px 11px',
-        fontSize: '11.5px', color: '#a9c4c1', pointerEvents: 'none',
-      }}>
-        {racesWithCoords.length} races pinned · tap a pin for the roster
-      </div>
+      <div ref={mapRef} style={{ width: '100%', height: '252px', zIndex: 0 }} />
 
       {/* In-place race card */}
       {selected && (

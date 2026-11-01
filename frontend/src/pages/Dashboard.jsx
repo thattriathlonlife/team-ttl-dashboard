@@ -19,8 +19,8 @@ const S = {
   sectionTitle: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '2px', textTransform: 'uppercase', color: '#555' },
   sectionTitleSpan: { color: '#fff' },
   btnGhost: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '8px 16px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#ccc', cursor: 'pointer', transition: 'all 0.15s' },
-  filters: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' },
-  filterBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12.5px', fontWeight: 600, letterSpacing: '1.2px', textTransform: 'uppercase', padding: '7px 15px', background: '#161616', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '999px', color: '#8f8f8f', cursor: 'pointer', transition: 'all 0.15s' },
+  filters: { display: 'flex', gap: '6px', flexWrap: 'nowrap', overflowX: 'auto', marginBottom: '1rem', alignItems: 'center', scrollbarWidth: 'none', paddingBottom: '2px' },
+  filterBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12.5px', fontWeight: 600, letterSpacing: '1.2px', textTransform: 'uppercase', padding: '7px 15px', background: '#161616', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '999px', color: '#8f8f8f', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 },
   filterBtnActive: { border: '1px solid rgba(var(--brand-rgb),0.5)', color: 'var(--brand)', background: 'rgba(var(--brand-rgb),0.08)' },
   filterDivider: { width: '1px', background: 'rgba(255,255,255,0.08)', height: '20px', margin: '0 4px' },
   filterLabel: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#333', marginRight: '2px' },
@@ -176,8 +176,8 @@ export default function Dashboard({ session }) {
           { v: startLines, l: 'Start lines', s: hasEntryTimestamps && entriesThisWeek > 0 ? `▲ ${entriesThisWeek} this week` : 'across upcoming races', sc: hasEntryTimestamps && entriesThisWeek > 0 ? '#3ecf8e' : '#999' },
           { v: ttlersRacing, l: 'TTLers racing', s: `of ${profiles.length} members`, sc: '#999' },
         ].map(m => (
-          <div key={m.l} style={{ flex: 1, background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px 6px 10px', textAlign: 'center', minWidth: 0 }}>
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '24px', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{m.v}</div>
+          <div key={m.l} style={{ flex: 1, background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '10px 6px 8px', textAlign: 'center', minWidth: 0 }}>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '22px', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{m.v}</div>
             <div style={{ fontSize: '9.5px', letterSpacing: '1.2px', textTransform: 'uppercase', color: '#6d6d6d', marginTop: '4px' }}>{m.l}</div>
             <div style={{ fontSize: '10.5px', marginTop: '3px', fontWeight: 600, color: m.sc, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.s}</div>
           </div>
