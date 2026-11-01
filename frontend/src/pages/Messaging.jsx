@@ -113,7 +113,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
       supabase.from('channel_reads').select('*').eq('athlete_id', userId),
       supabase.from('message_mentions').select('*', { count: 'exact', head: true }).eq('mentioned_user_id', userId).is('seen_at', null),
       // Fetch last message per channel in one query using a recent window
-      supabase.from('messages').select('channel_id, content, image_url, created_at, profiles(full_name)').order('created_at', { ascending: false }).limit(300),
+      supabase.from('messages').select('channel_id, content, image_url, created_at, athlete_id, profiles(full_name)').order('created_at', { ascending: false }).limit(300),
       // Fetch this user's DM channel memberships + the other member's profile
       supabase.from('channel_members').select('channel_id, channels!inner(id, type, created_at), athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)').eq('athlete_id', userId),
     ])
@@ -261,6 +261,31 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0)
   const showGroup = (key) => sideFilter === 'all' || sideFilter === key
 
+  // WhatsApp-flat list (2026-10-31): channels and DMs in ONE recency-
+  // sorted stream under the active chip; announcement channels live only
+  // in the pinned row above it.
+  const isAnnouncementCh = (c) => c.is_readonly || c.category === 'announcements'
+  const tsOf = (id) => { const t = lastMessages?.[id]?.created_at; return t ? new Date(t).getTime() : 0 }
+  const flatList = (() => {
+    let chans = channels.filter(c => !isAnnouncementCh(c))
+    if (sideFilter === 'races') chans = chans.filter(c => raceChannelKind(c))
+    else if (sideFilter === 'regions') chans = chans.filter(c => c.category === 'regions' && !raceChannelKind(c))
+    else if (sideFilter === 'training') chans = chans.filter(c => c.category === 'training' && !raceChannelKind(c))
+    else if (sideFilter === 'groups') chans = chans.filter(c => ['general', 'interest'].includes(c.category) && !raceChannelKind(c))
+    else if (sideFilter === 'dms') chans = []
+    const items = chans.map(ch => ({ kind: 'channel', ch }))
+    if (sideFilter === 'all' || sideFilter === 'dms') {
+      if (teamView) items.push(...dmChannels.map(ch => ({ kind: 'dm', ch })))
+      else items.push({ kind: 'lockedDm', ch: { id: 'locked-dms', type: 'dm', name: 'Direct Messages' } })
+    }
+    const nameOf = (it) => it.kind === 'dm'
+      ? (dmOtherProfile(it.ch, userId)?.full_name || 'DM')
+      : (raceChannelKind(it.ch) ? channelDisplayName(it.ch) : prettyName(it.ch.name))
+    items.sort((a, b) => (tsOf(b.ch.id) - tsOf(a.ch.id)) || nameOf(a).localeCompare(nameOf(b)))
+    return items
+  })()
+  const flatHeader = { all: "Groups you're in", races: 'Race chats', regions: 'Regions', training: 'Training', groups: 'Groups', dms: 'Direct messages' }[sideFilter]
+
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#999', textTransform: 'uppercase' }}>Loading...</div>
 
   return (
@@ -305,70 +330,100 @@ export default function Messaging({ session, profile, onReadChannel }) {
               })}
             </div>
 
-            {/* Pinned announcement — the latest staff post, as a gold card */}
+            {/* Announcements — pinned WhatsApp-style row (megaphone disc),
+                exactly where it sits in the real WhatsApp Community. */}
             {pinnedAnnouncement && sideFilter === 'all' && (() => {
               const last = lastMessages?.[pinnedAnnouncement.id]
+              const sender = last?.athlete_id === userId ? 'You' : last?.profiles?.full_name?.split(' ')[0]
               return (
-                <button
+                <ChatRow
+                  avatar={<ChannelDisc ch={pinnedAnnouncement} />}
+                  name="Announcements"
+                  preview={last ? (sender ? `~${sender}: ${last.content || '📷 Photo'}` : (last.content || '📷 Photo')) : 'Tap for the latest announcement'}
+                  time={waListTime(last?.created_at)}
+                  unread={unreadCounts[pinnedAnnouncement.id] || 0}
+                  selected={selectedChannel?.id === pinnedAnnouncement.id}
                   onClick={() => openChannel(pinnedAnnouncement)}
-                  style={{
-                    display: 'block', width: 'calc(100% - 32px)', margin: '10px 16px 4px', textAlign: 'left',
-                    background: 'linear-gradient(135deg, rgba(var(--highlight-rgb),0.1), rgba(var(--highlight-rgb),0.02))',
-                    border: '1px solid rgba(var(--highlight-rgb),0.35)', borderRadius: '14px',
-                    padding: '12px 14px', cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
-                    <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10.5px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', background: 'rgba(var(--highlight-rgb),0.14)', color: 'var(--highlight)', padding: '3px 8px', borderRadius: '5px' }}>📌 Announcement</span>
-                    {last?.profiles?.full_name && <span style={{ fontSize: '11.5px', color: '#777' }}>{last.profiles.full_name.split(' ')[0]}</span>}
-                  </div>
-                  <div style={{ fontSize: '13.5px', lineHeight: 1.45, color: '#e8e8e8', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {last ? (last.content || '📎 Image') : `Open ${channelDisplayName(pinnedAnnouncement)} for the latest announcement.`}
-                  </div>
-                </button>
+                />
               )
             })()}
 
             {/* Mentions row */}
-            <button onClick={openMentions} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '14px 20px', background: showMentions ? 'rgba(var(--accent-rgb),0.08)' : 'none', border: 'none', borderLeft: showMentions ? '3px solid var(--accent)' : '3px solid transparent', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: showMentions ? 'rgba(var(--accent-rgb),0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0, color: showMentions ? 'var(--accent)' : '#666' }}>@</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 600, color: showMentions ? '#fff' : mentionCount > 0 ? '#fff' : '#888' }}>Mentions</div>
-                <div style={{ fontSize: '12px', color: '#555', marginTop: '1px' }}>Messages where you're tagged</div>
-              </div>
-              {mentionCount > 0 && <div style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, borderRadius: '10px', padding: '2px 8px', flexShrink: 0 }}>{mentionCount}</div>}
-            </button>
+            <ChatRow
+              avatar={<div style={{ width: 52, height: 52, borderRadius: '50%', background: '#232323', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0, color: '#999' }}>@</div>}
+              name="Mentions"
+              preview="Messages where you're tagged"
+              unread={mentionCount}
+              selected={showMentions}
+              onClick={openMentions}
+            />
 
-            {showGroup('groups') && <ChannelGroup label="General" channels={generalChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} locked={!teamView} />}
-            {showGroup('training') && trainingChannels.length > 0 && <ChannelGroup label="Training" channels={trainingChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
-            {showGroup('groups') && interestChannels.length > 0 && <ChannelGroup label="Groups" channels={interestChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
-            {showGroup('regions') && regionChannels.length > 0 && <ChannelGroup label="Regions" channels={regionChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
-            {showGroup('races') && publicRaceChannels.length > 0 && <ChannelGroup label="Race Discussions" channels={publicRaceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} />}
-            {showGroup('races') && teamRaceChannels.length > 0 && <ChannelGroup label="Race Logistics" channels={teamRaceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
+            {/* The flat WhatsApp list — one recency stream */}
+            <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: '16px', fontWeight: 600, color: '#8a8a8a', padding: '16px 16px 2px' }}>
+              {flatHeader}
+            </div>
+            {flatList.map(item => {
+              const ch = item.ch
+              const last = lastMessages?.[ch.id]
+              const unread = unreadCounts[ch.id] || 0
+              const isSelected = selectedChannel?.id === ch.id
 
-            {/* Direct Messages */}
-            {showGroup('dms') && (teamView ? (
-              <DMGroup
-                dmChannels={dmChannels}
-                selected={selectedChannel}
-                unread={unreadCounts}
-                lastMessages={lastMessages}
-                userId={userId}
-                onSelect={openChannel}
-                onNewDm={() => setShowNewDm(true)}
-              />
-            ) : (
-              <button
-                onClick={() => openChannel({ id: 'locked-dms', type: 'dm', name: 'Direct Messages' })}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-              >
-                <span style={{ fontSize: '18px' }}>🔒</span>
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: 'block', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, color: '#777' }}>Direct Messages</span>
-                  <span style={{ display: 'block', fontSize: '11px', color: '#444', marginTop: '1px' }}>Team members only</span>
-                </span>
-              </button>
-            ))}
+              if (item.kind === 'lockedDm') {
+                return (
+                  <ChatRow
+                    key="locked-dms"
+                    avatar={<div style={{ width: 52, height: 52, borderRadius: '50%', background: '#1b1b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>🔒</div>}
+                    name="Direct Messages"
+                    preview="Team members only"
+                    dimmed
+                    onClick={() => openChannel({ id: 'locked-dms', type: 'dm', name: 'Direct Messages' })}
+                  />
+                )
+              }
+
+              if (item.kind === 'dm') {
+                const other = dmOtherProfile(ch, userId)
+                const senderPrefix = last ? (last.athlete_id === userId ? 'You: ' : '') : ''
+                return (
+                  <ChatRow
+                    key={ch.id}
+                    avatar={<Avatar profile={other} size={52} />}
+                    name={other?.full_name || 'Direct message'}
+                    preview={last ? `${senderPrefix}${last.content || '📷 Photo'}` : 'No messages yet'}
+                    time={waListTime(last?.created_at)}
+                    unread={unread}
+                    selected={isSelected}
+                    onClick={() => openChannel(ch)}
+                  />
+                )
+              }
+
+              const locked = !teamView && isTeamOnlyChannel(ch)
+              const kind = raceChannelKind(ch)
+              const sender = last ? (last.athlete_id === userId ? 'You' : last.profiles?.full_name?.split(' ')[0]) : null
+              const badge = kind === 'discussion'
+                ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--highlight-rgb),0.13)', color: 'var(--highlight)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Public</span>
+                : kind === 'logistics'
+                  ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--brand-rgb),0.13)', color: 'var(--brand)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Team</span>
+                  : null
+              return (
+                <ChatRow
+                  key={ch.id}
+                  avatar={<ChannelDisc ch={ch} />}
+                  name={kind ? channelDisplayName(ch) : prettyName(ch.name)}
+                  preview={locked ? '🔒 Team only' : last ? `${sender ? `${sender}: ` : ''}${last.content || '📷 Photo'}` : 'No messages yet'}
+                  time={locked ? '' : waListTime(last?.created_at)}
+                  unread={locked ? 0 : unread}
+                  selected={isSelected}
+                  badge={badge}
+                  dimmed={locked}
+                  onClick={() => openChannel(ch)}
+                />
+              )
+            })}
+            {flatList.length === 0 && (
+              <div style={{ padding: '18px 16px', fontSize: '13.5px', color: '#555' }}>Nothing here yet.</div>
+            )}
 
             {/* Bottom hint when no channel selected on mobile */}
             {isMobile && !selectedChannel && !showMentions && (
@@ -494,6 +549,112 @@ function ChannelIcon({ ch, isSelected, size = 36 }) {
     }}>
       {letter}
     </div>
+  )
+}
+
+// ─── WhatsApp-style list (Zack, 2026-10-31: "make messaging look like
+// WhatsApp", reference = the Team TTL WhatsApp Community view) ───────────
+// Flat, recency-sorted rows: big round avatar, human name, right-aligned
+// timestamp (brand-coloured when unread), sender-prefixed preview, round
+// unread badge, hairline divider under the text column only.
+export function waListTime(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const now = new Date()
+  const startOf = (x) => { const t = new Date(x); t.setHours(0, 0, 0, 0); return t }
+  const days = Math.round((startOf(now) - startOf(d)) / 86400000)
+  if (days <= 0) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return d.toLocaleDateString('en-US', { weekday: 'long' })
+  return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+}
+
+export function waClock(dateStr) {
+  return new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+export function waDayLabel(dateStr) {
+  const d = new Date(dateStr)
+  const now = new Date()
+  const startOf = (x) => { const t = new Date(x); t.setHours(0, 0, 0, 0); return t }
+  const days = Math.round((startOf(now) - startOf(d)) / 86400000)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+}
+
+// Channel names in the database are slugs (community-chat); WhatsApp shows
+// human names (Community Chat). Only transform obvious slugs.
+export function prettyName(name) {
+  if (!name) return ''
+  if (/\s/.test(name) || !name.includes('-')) return name
+  return name.split('-').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+const CATEGORY_RGB = {
+  general: 'var(--brand-rgb)',
+  training: 'var(--highlight-rgb)',
+  interest: '167,139,250',
+  regions: '96,165,250',
+  race: 'var(--accent-rgb)',
+}
+
+export function ChannelDisc({ ch, size = 52 }) {
+  if (ch.is_readonly || ch.category === 'announcements') {
+    return (
+      <div style={{ width: size, height: size, borderRadius: '50%', background: 'rgba(37,211,102,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.46, flexShrink: 0 }}>📢</div>
+    )
+  }
+  const rgb = CATEGORY_RGB[ch.category] || 'var(--brand-rgb)'
+  const color = CATEGORY_COLORS[ch.category] || 'var(--brand)'
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      background: `rgba(${rgb},0.18)`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800,
+      fontSize: size * 0.42, color,
+    }}>
+      {channelInitial(ch)}
+    </div>
+  )
+}
+
+export function ChatRow({ avatar, name, preview, time, unread = 0, selected = false, onClick, badge = null, dimmed = false }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', gap: '12px', width: '100%', padding: '10px 16px 0',
+        background: selected ? 'rgba(255,255,255,0.05)' : 'none',
+        border: 'none', cursor: 'pointer', textAlign: 'left', alignItems: 'flex-start',
+      }}
+    >
+      {avatar}
+      <div style={{ flex: 1, minWidth: 0, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '11px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <span style={{ flex: 1, minWidth: 0, fontFamily: 'Barlow, sans-serif', fontSize: '16px', fontWeight: unread > 0 ? 700 : 600, color: dimmed ? '#777' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.25 }}>
+            {name}
+          </span>
+          {badge}
+          {time && (
+            <span style={{ fontSize: '12px', color: unread > 0 ? 'var(--brand)' : '#777', flexShrink: 0, fontWeight: unread > 0 ? 600 : 400 }}>
+              {time}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: '13.5px', color: dimmed ? '#555' : unread > 0 ? '#bbb' : '#8a8a8a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.35 }}>
+            {preview || ' '}
+          </span>
+          {unread > 0 && (
+            <span style={{ background: 'var(--brand)', color: '#03292b', fontSize: '11.5px', fontWeight: 700, borderRadius: '999px', minWidth: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', flexShrink: 0 }}>
+              {unread > 99 ? '99+' : unread}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
   )
 }
 
@@ -901,7 +1062,9 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     const prev = messages[i - 1]
     const sameAuthor = prev?.athlete_id === msg.athlete_id && !msg.reply_to
     const closeInTime = prev && (new Date(msg.created_at) - new Date(prev.created_at)) < 5 * 60 * 1000
-    acc.push({ ...msg, showHeader: !sameAuthor || !closeInTime || !!msg.reply_to })
+    // WhatsApp date divider: breaks the run and labels the day.
+    const newDay = !prev || new Date(prev.created_at).toDateString() !== new Date(msg.created_at).toDateString()
+    acc.push({ ...msg, showHeader: !sameAuthor || !closeInTime || !!msg.reply_to || newDay, showDate: newDay, dateLabel: newDay ? waDayLabel(msg.created_at) : null })
     return acc
   }, [])
 
@@ -929,7 +1092,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           })()
         ) : (
           <>
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', color: '#555', flexShrink: 0 }}>{isRaceChannel(channel) ? '🏁' : '#'}</div>
+            <ChannelDisc ch={channel} size={38} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
               {(accessLabel || channel.description) && (
@@ -960,35 +1123,48 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           const msgReactions = reactions[msg.id] || []
           const grouped = msgReactions.reduce((acc, r) => { if (!acc[r.emoji]) acc[r.emoji] = []; acc[r.emoji].push(r.athlete_id); return acc }, {})
           const isHovered = hoveredMsg === msg.id
+          const isOwn = msg.athlete_id === userId
 
           return (
-            <div key={msg.id} style={{ marginTop: msg.showHeader ? '12px' : '1px', position: 'relative' }}
+            <div key={msg.id} style={{ marginTop: msg.showHeader ? '10px' : '2px', position: 'relative' }}
               onMouseEnter={() => setHoveredMsg(msg.id)}
               onMouseLeave={() => { setHoveredMsg(null); setShowEmojiPicker(null) }}
             >
-              {/* Reply quote */}
-              {msg.reply_msg && (
-                <div style={{ paddingLeft: '42px', marginBottom: '2px' }}>
-                  <div style={{ borderLeft: '2px solid var(--brand)', paddingLeft: '8px', fontSize: '12px', color: '#555', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--brand)', fontWeight: 600, fontFamily: 'Barlow Condensed, sans-serif' }}>{msg.reply_msg.profiles?.full_name || 'Athlete'}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>{msg.reply_msg.content}</span>
-                  </div>
+              {/* WhatsApp date divider */}
+              {msg.showDate && (
+                <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0 12px' }}>
+                  <span style={{ background: '#1d1d1d', border: '1px solid rgba(255,255,255,0.07)', color: '#9a9a9a', fontSize: '11.5px', fontWeight: 600, padding: '4px 12px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>{msg.dateLabel}</span>
                 </div>
               )}
 
-              {msg.showHeader && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '2px' }}>
-                  <Avatar profile={msg.profiles} size={32} />
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                      <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 700, color: '#fff' }}>{msg.profiles?.full_name || 'Athlete'}</span>
-                      <span style={{ fontSize: '11px', color: '#555' }}>{timeAgo(msg.created_at)}</span>
-                    </div>
+              {/* WhatsApp bubble row: own messages right in a brand-deep
+                  bubble, everyone else left with sender name in-bubble. */}
+              <div style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '7px' }}>
+                {!isOwn && (
+                  <div style={{ width: 28, flexShrink: 0, visibility: msg.showHeader ? 'visible' : 'hidden' }}>
+                    <Avatar profile={msg.profiles} size={28} />
                   </div>
-                </div>
-              )}
-
-              <div style={{ paddingLeft: msg.showHeader ? '0' : '42px' }}>
+                )}
+                <div style={{ maxWidth: '78%', display: 'flex', flexDirection: 'column', alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    background: isOwn ? 'rgba(var(--brand-rgb),0.24)' : '#1e1e1e',
+                    borderRadius: '14px',
+                    borderBottomRightRadius: isOwn ? '4px' : '14px',
+                    borderBottomLeftRadius: isOwn ? '14px' : '4px',
+                    padding: '7px 10px 5px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    opacity: msg.optimistic ? 0.55 : 1,
+                    minWidth: '92px',
+                  }}>
+                    {!isOwn && msg.showHeader && channel.type !== 'dm' && (
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: msg.profiles?.avatar_color || 'var(--brand)', marginBottom: '2px' }}>{msg.profiles?.full_name || 'Athlete'}</div>
+                    )}
+                    {msg.reply_msg && (
+                      <div style={{ background: 'rgba(0,0,0,0.28)', borderLeft: '3px solid var(--brand)', borderRadius: '6px', padding: '5px 8px', marginBottom: '5px' }}>
+                        <div style={{ color: 'var(--brand)', fontWeight: 600, fontSize: '12px', fontFamily: 'Barlow Condensed, sans-serif' }}>{msg.reply_msg.profiles?.full_name || 'Athlete'}</div>
+                        <div style={{ fontSize: '12.5px', color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '260px' }}>{msg.reply_msg.content}</div>
+                      </div>
+                    )}
                 {msg.content && editingMsg?.id === msg.id ? (
                   // Inline edit input
                   <div style={{ marginTop: '4px' }}>
@@ -1019,7 +1195,10 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                 {msg.image_url && (
                   <img src={msg.image_url} alt="shared" style={{ maxWidth: '280px', maxHeight: '300px', borderRadius: '8px', marginTop: '4px', display: 'block', cursor: 'pointer', objectFit: 'cover', opacity: msg.optimistic ? 0.5 : 1, transition: 'opacity 0.2s' }} onClick={() => window.open(msg.image_url, '_blank')} />
                 )}
-                {msg.optimistic && <div style={{ fontSize: '10px', color: '#555', marginTop: '2px', fontFamily: 'Barlow Condensed, sans-serif' }}>Sending...</div>}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '3px' }}>
+                      <span style={{ fontSize: '10.5px', color: 'rgba(255,255,255,0.52)' }}>{msg.optimistic ? 'Sending…' : waClock(msg.created_at)}</span>
+                    </div>
+                  </div>{/* /bubble */}
 
                 {/* Reaction pills */}
                 {Object.keys(grouped).length > 0 && (
@@ -1032,7 +1211,8 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                     ))}
                   </div>
                 )}
-              </div>
+                </div>{/* /bubble column */}
+              </div>{/* /bubble row */}
 
               {/* Hover actions */}
               {isHovered && !msg.optimistic && (
@@ -1097,7 +1277,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: replyTo ? '0 0 12px 12px' : '12px', padding: '8px 12px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.09)', borderRadius: replyTo ? '0 0 24px 24px' : '24px', padding: '6px 8px 6px 14px' }}>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
           <button onClick={() => fileRef.current.click()} style={{ background: 'none', border: 'none', color: '#555', fontSize: '20px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>📎</button>
           <textarea
@@ -1120,9 +1300,9 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
             )}
           </div>
           {(text.trim() || uploading) && (
-            <button onClick={() => sendMessage()} disabled={sending || uploading}
-              style={{ background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', padding: '6px 12px', cursor: 'pointer', flexShrink: 0 }}>
-              {uploading ? '...' : sending ? '...' : 'Send'}
+            <button onClick={() => sendMessage()} disabled={sending || uploading} aria-label="Send message"
+              style={{ background: 'var(--brand)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', color: '#03292b', fontSize: '16px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(var(--brand-rgb),0.35)' }}>
+              {uploading || sending ? '…' : '➤'}
             </button>
           )}
         </div>
