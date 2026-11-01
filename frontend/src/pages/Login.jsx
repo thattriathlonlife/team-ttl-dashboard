@@ -194,7 +194,7 @@ export default function Login() {
       <div style={styles.stripesTop} />
       <div style={styles.stripes} />
       <div style={styles.card}>
-        <div style={styles.logo}>TTL</div>
+        <img src="/icons/icon-512.png" alt="That Triathlon Life" style={{ width: '92px', height: '92px', borderRadius: '20px', marginBottom: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.45)' }} />
         <div style={styles.logoSub}>That Triathlon Life</div>
 
         {sent ? (

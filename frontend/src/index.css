@@ -17,8 +17,8 @@
      components write rgba(var(--brand-rgb), 0.12) inline. */
   --brand: #2BB3A3;
   --brand-rgb: 43, 179, 163;
-  --accent: #E9C46A;
-  --accent-rgb: 233, 196, 106;
+  --accent: #D18B4D;
+  --accent-rgb: 209, 139, 77;
   --highlight: #E8B84B;
   --highlight-rgb: 232, 184, 75;
   --ink: #1F212D;

@@ -17,8 +17,10 @@
 // swap in the official designer hexes when they arrive — see brand-2027 notes).
 
 export const BRAND_THEME = {
-  brand: '#2BB3A3', // masterbrand aqua (deeper/greener than the kit teal)
-  accent: '#E9C46A', // sun gold — the warm accent role, from the mark's sun
+  // Sampled from the real TTL logo (~/workspace/team-ttl/brand/):
+  // waves #A1CDC0, sun #D18B4D, disc grey #797979 on white.
+  brand: '#2BB3A3', // wave aqua deepened for contrast on dark surfaces
+  accent: '#D18B4D', // the logo's actual sun
   highlight: '#E8B84B', // shared sun gold
   ink: '#1F212D',
   paper: '#FFFFFF',
