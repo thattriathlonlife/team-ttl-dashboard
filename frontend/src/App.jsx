@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import ErrorBoundary from './components/ErrorBoundary'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
@@ -56,6 +57,7 @@ function AppRoutes({ session, profile, setProfile }) {
       onNavigateProfile={() => navigate('/profile')}
       unreadCount={unreadCount}
     >
+      <ErrorBoundary label="page" resetKey={window.location.pathname}>
       <Routes>
         <Route path="/login" element={<Navigate to="/" />} />
         <Route path="/" element={<Home session={session} profile={profile} />} />
@@ -71,6 +73,7 @@ function AppRoutes({ session, profile, setProfile }) {
         <Route path="/profile" element={<ProfilePage session={session} profile={profile} onSave={handleProfileSave} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      </ErrorBoundary>
     </Layout>
     </AudioPlayerProvider>
   )

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Training from './Training'
@@ -121,13 +122,20 @@ export default function Team({ session, profile }) {
         </div>
       )}
 
-      {segment === 'training' && <Training session={session} profile={profile} />}
+      {segment === 'training' && (
+        <ErrorBoundary label="segment:training" resetKey={segment}>
+          <Training session={session} profile={profile} />
+        </ErrorBoundary>
+      )}
 
       {GEAR_TAB[segment] && (
-        <GearHub key={segment} profile={profile} initialTab={GEAR_TAB[segment]} lockTab />
+        <ErrorBoundary label={`segment:${segment}`} resetKey={segment}>
+          <GearHub key={segment} profile={profile} initialTab={GEAR_TAB[segment]} lockTab />
+        </ErrorBoundary>
       )}
 
       {segment === 'roster' && (
+        <ErrorBoundary label="segment:roster" resetKey={segment}>
         <div style={{ ...S.wrap, paddingTop: 0 }}>
           <div style={S.sectionHead}>
             <div style={S.sectionTitle}>Team <span style={{ color: '#fff' }}>Members</span></div>
@@ -139,6 +147,7 @@ export default function Team({ session, profile }) {
             ? <div style={S.loading}>Loading...</div>
             : <TeamRoster profiles={roster.profiles} allEntries={roster.allEntries} races={roster.races} />}
         </div>
+        </ErrorBoundary>
       )}
 
       {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
