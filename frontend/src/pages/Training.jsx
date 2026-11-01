@@ -1,6 +1,7 @@
 import { useState, useEffect, Component } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 import ChallengeCard from '../components/ChallengeCard'
 import ChallengeAdminModal from '../components/ChallengeAdminModal'
 
@@ -459,20 +460,26 @@ function ConnectBanner({ userId }) {
 
 // ── Main ──────────────────────────────────────────────────────────
 function TrainingPage({ session, profile }) {
-  const [activities, setActivities]         = useState([])
-  const [profiles, setProfiles]             = useState({})   // map of id → profile
-  const [upcomingRaces, setUpcomingRaces]   = useState([])
-  const [challenges, setChallenges]         = useState([])
+  // Stale-while-revalidate (see lib/pageCache).
+  const cachedTrain = pageCacheGet('training')
+  const [activities, setActivities]         = useState(() => cachedTrain?.activities || [])
+  const [profiles, setProfiles]             = useState(() => cachedTrain?.profiles || {})   // map of id → profile
+  const [upcomingRaces, setUpcomingRaces]   = useState(() => cachedTrain?.upcomingRaces || [])
+  const [challenges, setChallenges]         = useState(() => cachedTrain?.challenges || [])
   const [showChallengeModal, setShowChallengeModal] = useState(false)
   const [syncing, setSyncing]               = useState(false)
-  const [lastSync, setLastSync]             = useState(null)
-  const [loading, setLoading]               = useState(true)
+  const [lastSync, setLastSync]             = useState(() => cachedTrain?.lastSync || null)
+  const [loading, setLoading]               = useState(() => !cachedTrain)
   const [searchParams]                      = useSearchParams()
 
   const userId      = session?.user?.id
   const isConnected = !!profile?.strava_athlete_id
 
   useEffect(() => { loadAll() }, [])
+
+  useEffect(() => {
+    if (!loading) pageCacheSet('training', { activities, profiles, upcomingRaces, challenges, lastSync })
+  }, [loading, activities, profiles, upcomingRaces, challenges, lastSync])
 
   // Poll for bootstrap completion if any athlete is still pending
   useEffect(() => {
@@ -483,7 +490,6 @@ function TrainingPage({ session, profile }) {
   }, [profiles])
 
   async function loadAll() {
-    setLoading(true)
     await Promise.all([loadActivities(), loadProfiles(), loadRaces(), loadChallenge()])
     setLoading(false)
   }

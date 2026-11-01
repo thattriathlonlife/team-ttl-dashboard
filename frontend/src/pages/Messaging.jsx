@@ -5,6 +5,7 @@ import { isTeamTier } from '../lib/tier'
 import { channelAccessLabel, channelDisplayName, isRaceChannel, isTeamOnlyChannel, raceChannelKind } from '../lib/channels'
 import TeamLocked from '../components/TeamLocked'
 import { moderateOutgoing, shouldHide } from '../lib/moderation'
+import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 
 // Given a DM channel (with dm_members hydrated), return the other person's profile
 function dmOtherProfile(channel, userId) {
@@ -59,20 +60,23 @@ function MessageContent({ content, currentUserId, profiles }) {
 }
 
 export default function Messaging({ session, profile, onReadChannel }) {
-  const [channels, setChannels] = useState([])
+  // Stale-while-revalidate (see lib/pageCache): the chat list renders
+  // from the last visit instantly; loadChannels refreshes behind it.
+  const cachedMsg = pageCacheGet('msg')
+  const [channels, setChannels] = useState(() => cachedMsg?.channels || [])
   const [selectedChannel, setSelectedChannel] = useState(null)
-  const [unreadCounts, setUnreadCounts] = useState({})
-  const [mentionCount, setMentionCount] = useState(0)
+  const [unreadCounts, setUnreadCounts] = useState(() => cachedMsg?.unreadCounts || {})
+  const [mentionCount, setMentionCount] = useState(() => cachedMsg?.mentionCount || 0)
   const [showSidebar, setShowSidebar] = useState(true)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 680)
   const [showNewChannel, setShowNewChannel] = useState(false)
   const [showMentions, setShowMentions] = useState(false)
   const [sideFilter, setSideFilter] = useState('all') // sidebar category chips
-  const [dmChannels, setDmChannels] = useState([])
+  const [dmChannels, setDmChannels] = useState(() => cachedMsg?.dmChannels || [])
   const [showNewDm, setShowNewDm] = useState(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [lockedChannel, setLockedChannel] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cachedMsg)
   const [searchParams] = useSearchParams()
   const userId = session.user.id
   const isAdmin = profile?.role === 'admin'
@@ -106,7 +110,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
     }
   }, [searchParams, channels, dmChannels])
 
-  const [lastMessages, setLastMessages] = useState({})
+  const [lastMessages, setLastMessages] = useState(() => cachedMsg?.lastMessages || {})
 
   async function loadChannels() {
     // 3 parallel queries instead of N+1
@@ -191,6 +195,11 @@ export default function Messaging({ session, profile, onReadChannel }) {
     }
     setLoading(false)
   }
+
+  // Keep the return-visit cache current (realtime unread bumps included).
+  useEffect(() => {
+    if (!loading) pageCacheSet('msg', { channels, dmChannels, unreadCounts, mentionCount, lastMessages })
+  }, [loading, channels, dmChannels, unreadCounts, mentionCount, lastMessages])
 
   // Realtime: increment sidebar unread badge instantly when a new message arrives
   // in any channel the user is not currently viewing

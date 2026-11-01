@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { raceChannelKind, isTeamOnlyChannel, channelDisplayName } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
+import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 import { useAudio } from '../lib/audio'
 import VideoPlayer from '../components/VideoPlayer'
 import StoryReader from '../components/StoryReader'
@@ -399,26 +400,30 @@ async function loadFeedPosts(team, userId) {
 }
 
 export default function Home({ session, profile }) {
-  const [weekRaces, setWeekRaces] = useState([])
-  const [nextRace, setNextRace] = useState(null)
-  const [myProfile, setMyProfile] = useState(null)
+  // Stale-while-revalidate: render the last known feed instantly on
+  // return visits; loadAll below still refreshes in the background.
+  const homeCacheKey = `home:${isTeamTier(profile) ? 'team' : 'fan'}`
+  const cachedHome = pageCacheGet(homeCacheKey)
+  const [weekRaces, setWeekRaces] = useState(() => cachedHome?.weekRaces || [])
+  const [nextRace, setNextRace] = useState(() => cachedHome?.nextRace || null)
+  const [myProfile, setMyProfile] = useState(() => cachedHome?.myProfile || null)
   const [feed, setFeed] = useState([])
-  const [hero, setHero] = useState(null)
+  const [hero, setHero] = useState(() => cachedHome?.hero || null)
   // Location-aware serving: raw feed inputs are kept so the river can be
   // re-ranked when the member's position resolves (or is enabled).
-  const [feedSource, setFeedSource] = useState(null)
+  const [feedSource, setFeedSource] = useState(() => cachedHome?.feedSource || null)
   const [geo, setGeo] = useState(null)
   const [geoPrompt, setGeoPrompt] = useState(false)
   const [nearCount, setNearCount] = useState(0)
   const [filter, setFilter] = useState('all')
-  const [archiveMeta, setArchiveMeta] = useState(null)
+  const [archiveMeta, setArchiveMeta] = useState(() => cachedHome?.archiveMeta || null)
   const [playingVideo, setPlayingVideo] = useState(null)
   const [readingStory, setReadingStory] = useState(null)
   const filterBarRef = useRef(null)
   const barHiddenRef = useRef(false)
   const lastScrollByTarget = useRef(new Map())
   const [visibleCount, setVisibleCount] = useState(FEED_BATCH)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cachedHome)
   const sentinelRef = useRef(null)
   const navigate = useNavigate()
   const audio = useAudio()
@@ -427,6 +432,13 @@ export default function Home({ session, profile }) {
   // Reload when the tier flips (profile arrives after mount, or the demo
   // switch is flipped) so team channels join/leave the post mix correctly.
   useEffect(() => { loadAll() }, [team])
+
+  // Keep the return-visit cache current with whatever is on screen.
+  useEffect(() => {
+    if (!loading && feedSource) {
+      pageCacheSet(homeCacheKey, { weekRaces, nextRace, myProfile, hero, feedSource, archiveMeta })
+    }
+  }, [loading, feedSource, weekRaces, nextRace, myProfile, hero, archiveMeta])
 
   // Filter bar behaviour: hide on scroll down, reappear on scroll up
   // (always visible near the top). Performance rules learned from the
@@ -517,32 +529,34 @@ export default function Home({ session, profile }) {
       }
     } catch { /* pinned card only */ }
 
-    // The river: content feeds + ranked forum posts, best-effort per source.
-    let content = []
-    try {
-      const res = await fetch('/api/content/feeds')
-      const data = await res.json()
-      const toItem = (kind, d) => ({
-        kind, key: `${kind}-${d.id || d.link || d.title}`,
-        at: d.published ? new Date(d.published).getTime() || 0 : 0, data: d,
-      })
-      content = [
-        ...(data.episodes || []).map(d => toItem('episode', d)),
-        ...(data.videos || []).map(d => toItem('video', d)),
-        ...(data.stories || []).map(d => toItem('story', d)),
-      ].sort((a, b) => b.at - a.at)
-      setArchiveMeta({
-        episodesTotal: data.episodesTotal ?? (data.episodes || []).length,
-        videosTotal: (data.videos || []).length,
-        storiesTotal: data.storiesTotal ?? (data.stories || []).length,
-      })
-    } catch { /* feed still runs on posts alone */ }
-
-    let posts = []
-    try { posts = await loadFeedPosts(team, userId) } catch { /* feed still runs on content alone */ }
-
-    let activity = []
-    try { activity = await loadActivityItems(supabase) } catch { /* dressing only */ }
+    // The river: content feeds + ranked forum posts + activity, fetched
+    // CONCURRENTLY (they are independent) — this used to be a sequential
+    // waterfall that kept the loading skeleton up for the sum of all three.
+    const [content, posts, activity] = await Promise.all([
+      (async () => {
+        try {
+          const res = await fetch('/api/content/feeds')
+          const data = await res.json()
+          const toItem = (kind, d) => ({
+            kind, key: `${kind}-${d.id || d.link || d.title}`,
+            at: d.published ? new Date(d.published).getTime() || 0 : 0, data: d,
+          })
+          const items = [
+            ...(data.episodes || []).map(d => toItem('episode', d)),
+            ...(data.videos || []).map(d => toItem('video', d)),
+            ...(data.stories || []).map(d => toItem('story', d)),
+          ].sort((a, b) => b.at - a.at)
+          setArchiveMeta({
+            episodesTotal: data.episodesTotal ?? (data.episodes || []).length,
+            videosTotal: (data.videos || []).length,
+            storiesTotal: data.storiesTotal ?? (data.stories || []).length,
+          })
+          return items
+        } catch { return [] /* feed still runs on posts alone */ }
+      })(),
+      (async () => { try { return await loadFeedPosts(team, userId) } catch { return [] } })(),
+      (async () => { try { return await loadActivityItems(supabase) } catch { return [] } })(),
+    ])
 
     // Hero slot (DESIGN-SPEC §5): the newest story/video with artwork
     // headlines the river and is pulled out of the interleave.

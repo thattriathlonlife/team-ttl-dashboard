@@ -5,6 +5,7 @@ import CalendarView from '../components/CalendarView'
 import AddRaceModal from '../components/AddRaceModal'
 import RaceMap from '../components/RaceMap'
 import { isTeamTier, setDemoTier } from '../lib/tier'
+import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 
 const S = {
   page: { maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' },
@@ -45,13 +46,16 @@ const ORG_SOURCES = { ironman: ['ironman_calendar', 'pto_scrape'] }
 const TYPE_OPTIONS = [{ value: 'all', label: 'All Types' }, { value: 'IRONMAN', label: 'Full' }, { value: '70.3', label: '70.3' }, { value: 'Olympic', label: 'Olympic' }, { value: 'Sprint', label: 'Sprint' }, { value: 'Other', label: 'Other' }]
 
 export default function Dashboard({ session }) {
+  // Stale-while-revalidate (see lib/pageCache): instant render from the
+  // last visit's data while loadAll refreshes in the background.
+  const cachedDash = pageCacheGet('dash')
   const [view, setView] = useState('list') // 'list' | 'calendar'
-  const [races, setRaces] = useState([])
-  const [myEntries, setMyEntries] = useState([])
-  const [allEntries, setAllEntries] = useState([])
-  const [profiles, setProfiles] = useState([])
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [races, setRaces] = useState(() => cachedDash?.races || [])
+  const [myEntries, setMyEntries] = useState(() => cachedDash?.myEntries || [])
+  const [allEntries, setAllEntries] = useState(() => cachedDash?.allEntries || [])
+  const [profiles, setProfiles] = useState(() => cachedDash?.profiles || [])
+  const [profile, setProfile] = useState(() => cachedDash?.profile || null)
+  const [loading, setLoading] = useState(() => !cachedDash)
   const [showAddRace, setShowAddRace] = useState(false)
   const [orgFilter, setOrgFilter] = useState('ironman')
   // Map view mode (Zack, 2026-11-01): Community shows counts for
@@ -66,6 +70,10 @@ export default function Dashboard({ session }) {
 
   useEffect(() => { loadAll() }, [])
 
+  useEffect(() => {
+    if (!loading) pageCacheSet('dash', { races, myEntries, allEntries, profiles, profile })
+  }, [loading, races, myEntries, allEntries, profiles, profile])
+
   async function ensureProfile() {
     const { data: existing } = await supabase.from('profiles').select('id').eq('id', userId).single()
     if (!existing) {
@@ -76,7 +84,6 @@ export default function Dashboard({ session }) {
   }
 
   async function loadAll() {
-    setLoading(true)
     await ensureProfile()
     const [racesRes, entriesRes, profilesRes, myProfileRes] = await Promise.all([
       supabase.from('races').select('*').gte('race_date', new Date().toISOString().split('T')[0]).order('race_date'),
