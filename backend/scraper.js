@@ -511,8 +511,8 @@ async function migratePtoIdentities(incomingPto) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/races?id=eq.${row.id}`, {
       method: 'PATCH',
       headers: {
-        'apikey': SUPABASE_SERVICE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
         'Prefer': 'return=minimal',
       },
