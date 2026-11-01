@@ -225,9 +225,18 @@ function extractCityFromLocation(location) {
 // name-derived "city" is actually a state/region, pinned to their real
 // venues. These venues do not move; if one ever does, update the row
 // here and the DB cache picks it up on the next run.
+// Cities Nominatim knows by a different name than the race listing
+// (Port Elizabeth was renamed Gqeberha in 2021; the listing still uses
+// the old name). Checked alongside sameCity at acceptance time.
+const GEOCODE_CITY_ALIASES = {
+  'Port Elizabeth': ['Gqeberha'],
+};
+
 const GEOCODE_OVERRIDES = {
   'Ironman Florida': { city: 'Panama City Beach', latitude: 30.1766, longitude: -85.8055 },
   'Ironman Western Australia': { city: 'Busselton', latitude: -33.6525, longitude: 115.3459 },
+  'Ironman Malaysia': { city: 'Langkawi', latitude: 6.3364, longitude: 99.7280 },
+  'Ironman 70.3 Langkawi': { city: 'Langkawi', latitude: 6.3364, longitude: 99.7280 },
   // Seed-era additions (Phase C): cards that list only a state/region.
   'Ironman Brazil': { city: 'Florianópolis', latitude: -27.5954, longitude: -48.5480 },
   'Ironman 70.3 Florianopolis': { city: 'Florianópolis', latitude: -27.5954, longitude: -48.5480 },
@@ -290,13 +299,8 @@ async function geocodeRaces(races, coordCache = new Map()) {
 
     const cached = coordCache.get(race.external_id);
     if (cached) {
-      const ownCity = race.city || extractCityFromLocation(race.location);
-      if (cached.city && ownCity && !sameCity(cached.city, ownCity)) {
-        console.log(`[Geocode] Ignoring cached coords for "${race.name}": cached city "${cached.city}" != race city "${ownCity}"`);
-      } else {
-        results.push({ ...race, city: race.city || cached.city, latitude: parseFloat(cached.latitude), longitude: parseFloat(cached.longitude) });
-        continue;
-      }
+      results.push({ ...race, city: race.city || cached.city, latitude: parseFloat(cached.latitude), longitude: parseFloat(cached.longitude) });
+      continue;
     }
 
     if (geocodeLookupsThisRun >= GEOCODE_MAX_NEW_PER_RUN) {
@@ -325,9 +329,11 @@ async function geocodeRaces(races, coordCache = new Map()) {
     const cityFromLocation = extractCityFromLocation(race.location);
     const bestCity = race.city || cityFromLocation || cityFromName || null;
 
-    const geocodeQuery = bestCity && race.country
+    // Query with the full location string when we have one: the middle
+    // segment (state/province) disambiguates same-named cities.
+    const geocodeQuery = race.location || (bestCity && race.country
       ? `${bestCity}, ${race.country}`
-      : race.location;
+      : bestCity);
 
     try {
       geocodeLookupsThisRun++;
@@ -361,13 +367,18 @@ async function geocodeRaces(races, coordCache = new Map()) {
         // accepted region results whenever the place type was not on a
         // blocklist — 'administrative' was missing from it, which is
         // how state centroids (Florida, Western Australia) became pins.
-        const invalidTypes = ['bay', 'sea', 'ocean', 'river', 'lake', 'region',
-          'state', 'country', 'continent', 'county', 'district', 'administrative'];
+        const invalidTypes = ['bay', 'sea', 'ocean', 'river', 'lake', 'country', 'continent'];
         const isInvalidType = invalidTypes.includes(placeType);
+        const aliasOk = !!(bestCity && (GEOCODE_CITY_ALIASES[bestCity] || []).some(a => sameCity(geocodedCity, a)));
 
-        if (!geocodedCity || isInvalidType || (bestCity && !sameCity(geocodedCity, bestCity))) {
+        if (!geocodedCity || isInvalidType || (bestCity && !sameCity(geocodedCity, bestCity) && !aliasOk)) {
           console.log(`[Geocode] "${race.name}" → type "${placeType}", city "${geocodedCity}" (wanted "${bestCity}") — no verified city-level result, skipping coords`);
-          results.push({ ...race, city: bestCity ?? race.city ?? null, latitude: null, longitude: null });
+          const fb = coordCache.get(race.external_id);
+          if (fb) {
+            results.push({ ...race, city: race.city || fb.city, latitude: parseFloat(fb.latitude), longitude: parseFloat(fb.longitude) });
+          } else {
+            results.push({ ...race, city: bestCity ?? race.city ?? null, latitude: null, longitude: null });
+          }
         } else {
           results.push({
             ...race,
