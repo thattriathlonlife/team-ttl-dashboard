@@ -406,6 +406,11 @@ export default function Home({ session, profile }) {
   const homeCacheKey = `home:${isTeamTier(profile) ? 'team' : 'fan'}`
   const cachedHome = pageCacheGet(homeCacheKey)
   const [weekRaces, setWeekRaces] = useState(() => cachedHome?.weekRaces || [])
+  // Hero frames follow each cover photo's own shape (Zack, 2026-11-01:
+  // a fixed 16/9.5 frame center-crops portrait covers — heads and feet
+  // amputated). Ratios are learned on image load, clamped so a hero
+  // is never a sliver nor a full-screen wall.
+  const [heroRatios, setHeroRatios] = useState({})
   const [nextRace, setNextRace] = useState(() => cachedHome?.nextRace || null)
   const [myProfile, setMyProfile] = useState(() => cachedHome?.myProfile || null)
   const [feed, setFeed] = useState([])
@@ -807,7 +812,15 @@ export default function Home({ session, profile }) {
           padding: 0, marginBottom: '1rem', display: 'block', background: '#161616',
         }}
       >
-        <img src={d.image} alt="" style={{ width: '100%', aspectRatio: '16/9.5', objectFit: 'cover', display: 'block' }} />
+        <img
+          src={d.image}
+          alt=""
+          onLoad={(e) => {
+            const { naturalWidth: w, naturalHeight: h } = e.currentTarget
+            if (w && h) setHeroRatios(prev => (prev[d.image] ? prev : { ...prev, [d.image]: Math.min(1.9, Math.max(0.85, w / h)) }))
+          }}
+          style={{ width: '100%', aspectRatio: heroRatios[d.image] ? String(heroRatios[d.image]) : '16/9.5', objectFit: 'cover', display: 'block' }}
+        />
         <div style={{
           position: 'absolute', inset: 0,
           background: 'linear-gradient(180deg, rgba(0,0,0,0) 34%, rgba(5,8,10,0.88) 82%)',

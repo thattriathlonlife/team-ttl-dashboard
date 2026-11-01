@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 // In-app article reader (Zack, 2026-11-01): stories are read INSIDE the
 // app, never by booting the user to the TTL website. The feeds API
@@ -44,6 +45,47 @@ function sanitize(html) {
 }
 
 export default function StoryReader({ story, onClose }) {
+  // The reader renders through a portal to <body>: inside the app's
+  // scrolling <main> its fixed overlay was trapped under the app chrome
+  // and its own header (with the close button) never reached the screen
+  // (Zack, 2026-11-01: "no way to get out of it"). The portal makes the
+  // overlay truly viewport-fixed, above header and nav.
+  const overlayRef = useRef(null)
+  const dragRef = useRef(null)
+  // Swipe back to the feed: a rightward, mostly-horizontal drag pulls
+  // the article with the finger; past ~90px it dismisses, short of that
+  // it snaps back. Transform only — the scroll position never fights it
+  // because engagement requires horizontal dominance.
+  const swipe = {
+    onTouchStart: (e) => {
+      const t = e.touches[0]
+      dragRef.current = { x: t.clientX, y: t.clientY, dx: 0, active: false }
+    },
+    onTouchMove: (e) => {
+      const d = dragRef.current
+      const el = overlayRef.current
+      if (!d || !el) return
+      const t = e.touches[0]
+      const dx = t.clientX - d.x
+      const dy = t.clientY - d.y
+      if (!d.active && dx > 14 && dx > Math.abs(dy) * 1.6) d.active = true
+      if (d.active) {
+        d.dx = dx
+        el.style.transition = 'none'
+        el.style.transform = `translateX(${dx}px)`
+      }
+    },
+    onTouchEnd: () => {
+      const d = dragRef.current
+      const el = overlayRef.current
+      dragRef.current = null
+      if (!el) return
+      if (d?.active && d.dx > 90) { onClose(); return }
+      el.style.transition = 'transform 0.22s ease'
+      el.style.transform = ''
+    },
+  }
+
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
@@ -62,10 +104,11 @@ export default function StoryReader({ story, onClose }) {
     ? new Date(story.published).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : ''
 
-  return (
-    <div style={S.overlay} role="dialog" aria-modal="true" aria-label={story.title}>
+  return createPortal(
+    <div ref={overlayRef} style={S.overlay} role="dialog" aria-modal="true" aria-label={story.title} {...swipe}>
       <style>{ARTICLE_CSS}</style>
       <div style={S.header}>
+        <button onClick={onClose} aria-label="Back to feed" style={S.backBtn}>‹ <span>Back</span></button>
         <span style={S.kicker}>STORY{dateLabel ? ` · ${dateLabel.toUpperCase()}` : ''}</span>
         <button onClick={onClose} aria-label="Close article" style={S.closeBtn}>✕</button>
       </div>
@@ -81,7 +124,8 @@ export default function StoryReader({ story, onClose }) {
             : <p style={S.fallback}>{story.summary || 'The full text of this story is not available in the app yet.'}</p>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -95,7 +139,12 @@ const S = {
     padding: 'calc(0.7rem + env(safe-area-inset-top, 0px)) 1.1rem 0.7rem',
     borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
   },
-  kicker: { fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', color: 'var(--accent)' },
+  kicker: { fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', color: 'var(--accent)', flex: 1, textAlign: 'center' },
+  backBtn: {
+    display: 'flex', alignItems: 'center', gap: '2px', background: 'none', border: 'none',
+    color: '#fff', fontFamily: "'Barlow Condensed', sans-serif", fontSize: '19px', fontWeight: 700,
+    letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer', padding: '4px 8px 4px 0', flexShrink: 0,
+  },
   closeBtn: {
     background: 'rgba(255,255,255,0.08)', border: 'none', color: '#fff',
     width: 34, height: 34, borderRadius: '50%', fontSize: 15, cursor: 'pointer', flexShrink: 0,
