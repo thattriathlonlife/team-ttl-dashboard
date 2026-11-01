@@ -35,7 +35,12 @@ const S = {
   viewBtnActive: { background: 'var(--brand)', color: '#000', fontWeight: 600 },
 }
 
-const ORG_OPTIONS = [{ value: 'all', label: 'All' }, { value: 'pto_scrape', label: 'IRONMAN' }, { value: 'triathlon_api', label: 'World Tri' }, { value: 'manual', label: 'Manual' }]
+const ORG_OPTIONS = [{ value: 'all', label: 'All' }, { value: 'ironman', label: 'IRONMAN' }, { value: 'triathlon_api', label: 'World Tri' }, { value: 'manual', label: 'Manual' }]
+// The IRONMAN org group spans both branded sources: the curated seed
+// (ironman_calendar, Phase C) and the retired PTO scrape's rows, which
+// still carry history. Matching the chip to 'pto_scrape' alone hid all
+// 159 seed races — the map read 'no location data' on the default view.
+const ORG_SOURCES = { ironman: ['ironman_calendar', 'pto_scrape'] }
 const TYPE_OPTIONS = [{ value: 'all', label: 'All Types' }, { value: 'IRONMAN', label: 'Full' }, { value: '70.3', label: '70.3' }, { value: 'Olympic', label: 'Olympic' }, { value: 'Sprint', label: 'Sprint' }, { value: 'Other', label: 'Other' }]
 
 export default function Dashboard({ session }) {
@@ -47,7 +52,7 @@ export default function Dashboard({ session }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddRace, setShowAddRace] = useState(false)
-  const [orgFilter, setOrgFilter] = useState('pto_scrape')
+  const [orgFilter, setOrgFilter] = useState('ironman')
   const [typeFilter, setTypeFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState('all') // 'all' | 'mine'
@@ -103,7 +108,7 @@ export default function Dashboard({ session }) {
   }
 
   const filteredRaces = races.filter(r => {
-    const orgMatch = orgFilter === 'all' || r.source === orgFilter
+    const orgMatch = orgFilter === 'all' || (ORG_SOURCES[orgFilter] ? ORG_SOURCES[orgFilter].includes(r.source) : r.source === orgFilter)
     const typeMatch = typeFilter === 'all' || r.type === typeFilter
     const q = searchQuery.toLowerCase().trim()
     const searchMatch = !q || r.name?.toLowerCase().includes(q) || r.location?.toLowerCase().includes(q) || r.city?.toLowerCase().includes(q) || r.country?.toLowerCase().includes(q) || r.type?.toLowerCase().includes(q)
