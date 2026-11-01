@@ -69,6 +69,11 @@ function postScore(p) {
 function buildFeed(content, posts) {
   const ranked = [...posts].sort((a, b) => b.score - a.score)
   const out = []
+  // Popular discussions lead the river (Zack, 2026-10-31): when the top
+  // discussion has real engagement, it opens the feed instead of waiting
+  // behind two content cards.
+  const top = ranked[0]
+  if (top && (top.data.reactionCount + top.data.replyCount) >= 3) out.push(ranked.shift())
   let ci = 0
   let pi = 0
   while (ci < content.length || pi < ranked.length) {
@@ -76,6 +81,62 @@ function buildFeed(content, posts) {
     if (pi < ranked.length) out.push(ranked[pi++])
   }
   return out
+}
+
+// ─── Location-aware serving (Zack, 2026-10-31) ──────────────────────────
+// "Say I'm traveling in Arizona, the relevant chats could show in my
+// feed, unique for me." Two signals, both computed on-device from the
+// member's own position (nothing is stored server-side):
+//  1. Race proximity — a discussion/logistics post whose race is within
+//     ~320 km gets a strong boost and a "Near you" chip.
+//  2. Region match — a regions-channel post whose channel name matches
+//     the member's state, city, or regional nickname gets a smaller one.
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371
+  const dLa = (lat2 - lat1) * Math.PI / 180
+  const dLo = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLo / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+
+const REGION_WORDS = {
+  Arizona: ['arizona', 'phoenix', 'southwest', 'desert'],
+  Oregon: ['oregon', 'portland', 'pnw', 'pacific northwest'],
+  Washington: ['washington', 'seattle', 'pnw', 'pacific northwest'],
+  California: ['california', 'socal', 'norcal', 'bay area', 'san diego', 'los angeles'],
+  Nevada: ['nevada', 'las vegas', 'southwest'],
+  Utah: ['utah', 'southwest'],
+  Colorado: ['colorado', 'denver', 'mountain'],
+  Texas: ['texas', 'austin', 'houston', 'dallas'],
+  Florida: ['florida', 'southeast'],
+  Georgia: ['georgia', 'atlanta', 'southeast'],
+  'North Carolina': ['carolina', 'southeast'],
+  'South Carolina': ['carolina', 'southeast'],
+  'New York': ['new york', 'northeast', 'new england'],
+  Massachusetts: ['massachusetts', 'boston', 'new england', 'northeast'],
+  Illinois: ['illinois', 'chicago', 'midwest'],
+  Minnesota: ['minnesota', 'midwest'],
+  Wisconsin: ['wisconsin', 'midwest'],
+  Hawaii: ['hawaii'],
+  Idaho: ['idaho', 'pnw', 'pacific northwest'],
+  Montana: ['montana', 'mountain'],
+}
+
+function geoBoost(post, geo) {
+  if (!geo) return null
+  const ch = post.data.channel
+  const race = ch?.race
+  if (race && race.latitude != null && race.longitude != null) {
+    const km = haversineKm(geo.lat, geo.lon, race.latitude, race.longitude)
+    if (km <= 320) return { boost: 9, label: `Near ${race.city || race.location || 'you'}` }
+  }
+  if (ch?.category === 'regions' && geo.state) {
+    const name = (ch.name || '').toLowerCase()
+    const words = [geo.state, geo.city, ...(REGION_WORDS[geo.state] || [])]
+      .filter(Boolean).map(w => String(w).toLowerCase())
+    if (words.some(w => name.includes(w))) return { boost: 6, label: 'Near you' }
+  }
+  return null
 }
 
 function RaceRow({ race }) {
@@ -180,7 +241,7 @@ async function loadFeedPosts(team, userId) {
   const raceIds = [...new Set(allowed.map(id => byId[id].race_id).filter(Boolean))]
   if (raceIds.length) {
     const { data: raceRows } = await supabase.from('races')
-      .select('id, name, race_date, location').in('id', raceIds)
+      .select('id, name, race_date, location, city, latitude, longitude').in('id', raceIds)
     const raceById = Object.fromEntries((raceRows || []).map(r => [r.id, r]))
     for (const id of allowed) {
       if (byId[id].race_id) byId[id].race = raceById[byId[id].race_id] || null
@@ -245,6 +306,12 @@ export default function Home({ session, profile }) {
   const [myProfile, setMyProfile] = useState(null)
   const [feed, setFeed] = useState([])
   const [hero, setHero] = useState(null)
+  // Location-aware serving: raw feed inputs are kept so the river can be
+  // re-ranked when the member's position resolves (or is enabled).
+  const [feedSource, setFeedSource] = useState(null)
+  const [geo, setGeo] = useState(null)
+  const [geoPrompt, setGeoPrompt] = useState(false)
+  const [nearCount, setNearCount] = useState(0)
   const [filter, setFilter] = useState('all')
   const [archiveMeta, setArchiveMeta] = useState(null)
   const filterBarRef = useRef(null)
@@ -378,8 +445,59 @@ export default function Home({ session, profile }) {
     // headlines the river and is pulled out of the interleave.
     const heroItem = content.find(c => (c.kind === 'story' || c.kind === 'video') && c.data.image) || null
     setHero(heroItem)
-    setFeed(buildFeed(content, posts).filter(i => !heroItem || i.key !== heroItem.key))
+    setFeedSource({ content, posts })
     setLoading(false)
+  }
+
+  // Re-rank the river whenever the inputs or the member's position change:
+  // geo-boosted posts rise by score, exactly like engagement does.
+  useEffect(() => {
+    if (!feedSource) return
+    let near = 0
+    const boosted = feedSource.posts.map(p => {
+      const hit = geoBoost(p, geo)
+      if (!hit) return p
+      near++
+      return { ...p, score: p.score + hit.boost, data: { ...p.data, nearLabel: hit.label } }
+    })
+    setNearCount(near)
+    setFeed(buildFeed(feedSource.content, boosted).filter(i => !hero || i.key !== hero.key))
+  }, [feedSource, geo, hero])
+
+  // Location: if permission is already granted, resolve silently; if it
+  // has never been asked, offer the opt-in row (never a surprise prompt);
+  // if denied, stay quiet. Position stays on-device — the reverse
+  // geocode only labels it.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!('geolocation' in navigator)) return
+      try {
+        const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null)
+        if (cancelled) return
+        if (perm?.state === 'granted') requestGeo()
+        else if (!perm || perm.state === 'prompt') setGeoPrompt(true)
+      } catch { if (!cancelled) setGeoPrompt(true) }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function requestGeo() {
+    if (!('geolocation' in navigator)) return
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords
+      let city = null
+      let state = null
+      try {
+        const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`)
+        const j = await r.json()
+        city = j.city || j.locality || null
+        state = j.principalSubdivision || null
+      } catch { /* coordinates alone still power race proximity */ }
+      setGeo({ lat: latitude, lon: longitude, city, state })
+      setGeoPrompt(false)
+    }, () => setGeoPrompt(false), { timeout: 8000, maximumAge: 3600e3 })
   }
 
   // Live reaction from the feed (DESIGN-SPEC §5): a real write to
@@ -425,6 +543,8 @@ export default function Home({ session, profile }) {
               {channelDisplayName(ch)}
             </span>
           )}
+          {m.nearLabel && <span style={F.chip('var(--accent)')}>📍 Near you</span>}
+          {(m.reactionCount + m.replyCount) >= 5 && <span style={F.chip('var(--highlight)')}>🔥 Popular</span>}
         </div>
         {m.content && (
           <div style={{ ...F.summary, WebkitLineClamp: 5, marginTop: 0, fontSize: '14.5px', color: '#ddd' }}>
@@ -662,15 +782,23 @@ export default function Home({ session, profile }) {
         )
       })()}
 
-      {/* The river */}
-      <div style={{
-        fontFamily: 'Barlow Condensed, sans-serif',
-        fontSize: '12px', letterSpacing: '3px',
-        textTransform: 'uppercase', color: 'var(--brand)',
-        margin: '0.85rem 0 0.4rem',
-      }}>
-        Your feed
-      </div>
+      {/* The "Your feed" heading is gone (Zack, 2026-10-31: the page IS
+          the Feed now — the label was redundant). This slot carries only
+          live context: a location line when geo serving found something
+          near the member, or the one-time location opt-in. */}
+      {geo && nearCount > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0.85rem 0 0.2rem', fontSize: '13px', color: '#bbb' }}>
+          <span>📍</span>
+          <span>Near <b style={{ color: '#fff' }}>{geo.city ? `${geo.city}${geo.state ? `, ${geo.state}` : ''}` : 'you'}</b> — local races &amp; chats floated to the top of your feed</span>
+        </div>
+      )}
+      {!geo && geoPrompt && (
+        <button onClick={requestGeo} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', margin: '0.85rem 0 0.2rem', padding: '10px 14px', background: 'rgba(var(--accent-rgb),0.07)', border: '1px solid rgba(var(--accent-rgb),0.25)', borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
+          <span style={{ fontSize: '15px' }}>📍</span>
+          <span style={{ flex: 1, fontSize: '13px', color: '#ccc' }}>Traveling? Float races &amp; chats near you to the top</span>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)' }}>Enable location</span>
+        </button>
+      )}
 
       {/* Filter chips — one lens across every source. A sticky overlay:
           fixed height with an equal negative bottom margin, so it takes
@@ -715,7 +843,13 @@ export default function Home({ session, profile }) {
       {filter === 'all' && hero && renderHero(hero)}
 
       {(() => {
-        const visibleFeed = filter === 'all' ? feed : feed.filter(i => i.kind === filter)
+        const visibleFeed = filter === 'all'
+          ? feed
+          : filter === 'post'
+            // The Posts lens is the popular-discussions view: pure
+            // engagement order, no interleave.
+            ? feed.filter(i => i.kind === 'post').sort((a, b) => b.score - a.score)
+            : feed.filter(i => i.kind === filter)
         if (visibleFeed.length === 0) {
           return (
             <div style={{

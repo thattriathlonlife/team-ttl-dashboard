@@ -17,11 +17,14 @@ const iconBtnStyle = { background: 'none', border: 'none', color: '#ccc', cursor
 const badgeStyle = { position: 'absolute', top: '1px', right: '0px', background: 'var(--accent)', color: '#fff', fontSize: '9px', fontWeight: 700, borderRadius: '8px', padding: '1px 4px', minWidth: '14px', textAlign: 'center', fontFamily: 'Barlow Condensed, sans-serif' }
 
 // Icons as simple SVG components
+// The home page is the Feed (renamed by Zack, 2026-10-31) — a stacked
+// river glyph replaces the house.
 const HomeIcon = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
-    <path d="M3 12L12 3l9 9"/>
-    <path d="M9 21V12h6v9"/>
-    <path d="M3 12v9h18V12"/>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round">
+    <path d="M4 6h16"/>
+    <path d="M4 12h10"/>
+    <path d="M4 18h13"/>
+    <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>
   </svg>
 )
 const RaceIcon = ({ active }) => (
@@ -56,14 +59,14 @@ const ProfileIcon = ({ active, avatarUrl, color, initials }) => {
 // Home feed + its filters cover discovery, and /content survives as the
 // archive page one tap deep). Profile is not a tab — behind the avatar.
 const TABS = [
-  { path: '/', label: 'Home' },
+  { path: '/', label: 'Feed' },
   { path: '/races', label: 'Races' },
   { path: '/messages', label: 'Chat' },
   { path: '/team', label: 'Team' },
 ]
 
 const DESKTOP_NAV = [
-  { path: '/', label: 'Home' },
+  { path: '/', label: 'Feed' },
   { path: '/races', label: 'Races' },
   { path: '/messages', label: 'Chat' },
   { path: '/team', label: 'Team' },
