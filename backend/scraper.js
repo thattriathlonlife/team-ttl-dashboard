@@ -244,7 +244,11 @@ async function scrapeIronmanRaces() {
       }
 
       const slug = $(el).attr('href')?.split('/race/')[1]?.split('/')[0] || '';
-      const external_id = `pto_${slug || name.toLowerCase().replace(/\s+/g, '-')}_${race_date}`;
+      // Stable edition identity (Phase B, 2026-11-01): slug + YEAR.
+      // The old slug + full-date form made every reschedule a new row
+      // and stranded that edition's race entries on the stale copy.
+      // migratePtoIdentities() renames the existing rows to match.
+      const external_id = `pto_${slug || name.toLowerCase().replace(/\s+/g, '-')}_${race_date.slice(0, 4)}`;
 
       races.push({
         name,
@@ -458,6 +462,139 @@ async function geocodeRaces(races, coordCache = new Map()) {
 }
 
 // ---------------------------------------------------------------
+// IDENTITY + RECONCILIATION (Phase B, 2026-11-01)
+// ---------------------------------------------------------------
+
+// Rename stored PTO rows from the old date-embedded external_id
+// (pto_<slug>_<date>) to the stable edition identity (pto_<slug>_<year>)
+// the scraper now generates, so a reschedule updates the same row —
+// and its race entries — instead of forking a new one. Runs every time
+// and is a no-op once migrated. If any rename fails, the incoming PTO
+// races fall back to their OLD ids for this run so the upsert updates
+// the existing rows rather than duplicating them.
+async function migratePtoIdentities(incomingPto) {
+  const { data: existing, error } = await supabaseRequest(
+    '/races?select=id,external_id,race_date&source=eq.pto_scrape&limit=1000'
+  );
+  if (error || !Array.isArray(existing)) {
+    console.error('[Identity] Could not read existing PTO rows — skipping migration this run');
+    return;
+  }
+  const stableOf = (ext) => {
+    const m = /^(.+)_(\d{4})-\d{2}-\d{2}$/.exec(ext || '');
+    return m ? `${m[1]}_${m[2]}` : null;
+  };
+  const takenIds = new Set(existing.map(r => r.external_id));
+  const groups = new Map();
+  for (const row of existing) {
+    const st = stableOf(row.external_id);
+    if (!st) continue;
+    if (!groups.has(st)) groups.set(st, []);
+    groups.get(st).push(row);
+  }
+
+  let renamed = 0;
+  let failed = false;
+  const dateByStable = new Map();
+  for (const [stable, rows] of groups) {
+    if (rows.length > 1) {
+      console.log(`::warning::[Identity] ${rows.length} rows share edition ${stable} — left untouched for manual review`);
+      continue;
+    }
+    const row = rows[0];
+    dateByStable.set(stable, row.race_date);
+    if (takenIds.has(stable)) {
+      console.log(`::warning::[Identity] Stable id ${stable} already exists alongside ${row.external_id} — manual review needed, not renaming`);
+      failed = true;
+      continue;
+    }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/races?id=eq.${row.id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ external_id: stable }),
+    });
+    if (res.ok) { renamed++; takenIds.add(stable); }
+    else { console.error(`[Identity] Rename failed for ${row.external_id}: HTTP ${res.status}`); failed = true; }
+  }
+  if (renamed) console.log(`[Identity] Migrated ${renamed} PTO row(s) to stable slug+year identities`);
+
+  if (failed) {
+    // Safety: do not let new-style ids create duplicates next to
+    // un-renamed rows. Revert this run's incoming ids to the old form.
+    console.log('::warning::[Identity] Migration incomplete — incoming PTO races keep old-style ids this run');
+    for (const race of incomingPto) {
+      race.external_id = `${race.external_id.slice(0, -5)}_${race.race_date}`;
+    }
+    return;
+  }
+
+  // Distinct same-year edition guard: an incoming race whose stable id
+  // already belongs to a row racing >45 days away is a different
+  // edition — suffix it with its month instead of overwriting the row.
+  for (const race of incomingPto) {
+    const known = dateByStable.get(race.external_id);
+    if (known && Math.abs(new Date(race.race_date) - new Date(known)) > 45 * 864e5) {
+      const alt = `${race.external_id}_${race.race_date.slice(5, 7)}`;
+      console.log(`::warning::[Identity] "${race.name}" looks like a distinct same-year edition — using ${alt}`);
+      race.external_id = alt;
+    }
+  }
+}
+
+// Cross-source dedupe guard (audit F4/F9): if a race about to be
+// upserted matches an existing DB row — or an earlier race in this same
+// batch — on normalized name + date under a DIFFERENT external_id,
+// adopt the existing identity so the upsert updates that row instead
+// of forking a twin that splits the entries.
+function applyDedupeGuard(races, existingRows) {
+  const norm = (x) => (x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const byKey = new Map();
+  for (const r of existingRows || []) {
+    const k = `${norm(r.name)}|${r.race_date}`;
+    if (!byKey.has(k)) byKey.set(k, r.external_id);
+  }
+  let adopted = 0;
+  for (const race of races) {
+    const k = `${norm(race.name)}|${race.race_date}`;
+    const hit = byKey.get(k);
+    if (hit && hit !== race.external_id) {
+      console.log(`[Dedupe] "${race.name}" (${race.race_date}) adopts existing identity ${hit} instead of ${race.external_id}`);
+      race.external_id = hit;
+      adopted++;
+    } else if (!hit) {
+      byKey.set(k, race.external_id);
+    }
+  }
+  if (adopted) console.log(`[Dedupe] ${adopted} adoption(s) — no duplicate rows created`);
+  return races;
+}
+
+// Reconciliation visibility (Phase B1): which upcoming DB rows did this
+// run NOT see? Without last_seen columns (migration 0005, pending) this
+// is report-only — but it turns "is anything stale?" from unknowable
+// into a per-run log line with names.
+async function reportUnseen(fetched) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const { data: existing, error } = await supabaseRequest(
+    `/races?select=name,race_date,external_id,source&race_date=gte.${todayStr}&order=race_date&limit=1000`
+  );
+  if (error || !Array.isArray(existing)) return null;
+  const seen = new Set(fetched.map(r => r.external_id));
+  const unseen = existing.filter(r => !seen.has(r.external_id));
+  console.log(`[Reconcile] Upcoming DB rows: ${existing.length} — seen this run: ${existing.length - unseen.length}, NOT seen: ${unseen.length}`);
+  for (const r of unseen.slice(0, 25)) {
+    console.log(`[Reconcile]   not seen: ${r.race_date} "${r.name}" (${r.source})`);
+  }
+  if (unseen.length > 25) console.log(`[Reconcile]   …and ${unseen.length - 25} more`);
+  return unseen.length;
+}
+
+// ---------------------------------------------------------------
 // UPSERT RACES — insert new, update existing (by external_id)
 // ---------------------------------------------------------------
 async function upsertRaces(races) {
@@ -660,10 +797,19 @@ async function main() {
     const triEvents = await geocodeRaces(triEventsRaw, coordCache);
     const geocodedIronman = await geocodeRaces(ironmanRaces, coordCache);
 
-    // 4. Merge and upsert
+    // 4. Phase B identity work, then merge and upsert: rename stored
+    // PTO rows to stable edition ids (so this run's upserts land on
+    // them), then let any race adopt an existing row's identity when
+    // name + date match across sources — no forked duplicates.
+    await migratePtoIdentities(geocodedIronman);
+    const { data: existingSnapshot } = await supabaseRequest('/races?select=external_id,name,race_date&limit=2000');
     const all = [...triEvents, ...geocodedIronman];
+    applyDedupeGuard(all, Array.isArray(existingSnapshot) ? existingSnapshot : []);
     console.log(`[Main] Total combined races: ${all.length}`);
     await upsertRaces(all);
+
+    // Reconciliation visibility: upcoming rows this run did not see.
+    const unseenCount = await reportUnseen(all);
 
     // Run summary — the health record F2 asked for. One block in the
     // log and, under GitHub Actions, in the step summary.
@@ -676,6 +822,7 @@ async function main() {
       `- by type: ${Object.entries(byType).map(([k, v]) => `${k}=${v}`).join(', ')}`,
       `- branded upcoming in fetch: ${brandedUpcoming}`,
       `- geocoded: ${all.filter(r => r.latitude).length}/${all.length} (live lookups this run: ${geocodeLookupsThisRun})`,
+      `- upcoming DB rows not seen this run: ${unseenCount ?? 'n/a'}`,
     ].join('\n');
     console.log(summary);
     if (process.env.GITHUB_STEP_SUMMARY) {
