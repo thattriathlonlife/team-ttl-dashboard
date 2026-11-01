@@ -69,6 +69,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const [sideFilter, setSideFilter] = useState('all') // sidebar category chips
   const [dmChannels, setDmChannels] = useState([])
   const [showNewDm, setShowNewDm] = useState(false)
+  const [showAddMenu, setShowAddMenu] = useState(false)
   const [lockedChannel, setLockedChannel] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
@@ -296,7 +297,8 @@ export default function Messaging({ session, profile, onReadChannel }) {
         <div style={{ width: isMobile ? '100%' : '280px', background: '#111', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'relative' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff' }}>Messages</div>
-            {isAdmin && <button onClick={() => setShowNewChannel(true)} style={{ background: 'rgba(var(--brand-rgb),0.1)', border: '1px solid rgba(var(--brand-rgb),0.3)', borderRadius: '6px', color: 'var(--brand)', fontSize: '18px', cursor: 'pointer', padding: '2px 10px', lineHeight: 1 }}>+</button>}
+            {/* Channel creation moved to the floating "+ New chat" pill
+                (Zack, 2026-10-31) — the header stays clean. */}
           </div>
 
           <div style={{ flex: 1, overflow: 'auto' }}>
@@ -433,22 +435,57 @@ export default function Messaging({ session, profile, onReadChannel }) {
             )}
           </div>
 
-          {/* Compose FAB — new direct message (team view) */}
-          {teamView && (
-            <button
-              onClick={() => setShowNewDm(true)}
-              aria-label="New message"
-              style={{
-                position: 'absolute', right: '16px', bottom: '18px', zIndex: 30,
-                width: '52px', height: '52px', borderRadius: '50%',
-                background: 'var(--brand)', color: '#04282a', border: 'none',
-                fontSize: '21px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 10px 26px rgba(var(--brand-rgb),0.4)',
-              }}
-            >
-              ✎
-            </button>
+          {/* Floating "+ New chat" pill — WhatsApp's "+ Add group" pattern
+              (Zack, 2026-10-31: the add-chat action belongs on a floating
+              button). The old compose FAB sat at bottom:18 inside the
+              sidebar, where the app's floating nav covers it on mobile —
+              this pill rides ABOVE the nav (bottom: 94 on mobile). With
+              both actions available it opens a two-row menu; with one, it
+              fires it directly. */}
+          {(isAdmin || teamView) && (!isMobile || (!selectedChannel && !showMentions)) && (
+            <>
+              {showAddMenu && (
+                <>
+                  <div onClick={() => setShowAddMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />
+                  <div style={{
+                    position: 'absolute', right: '16px', bottom: isMobile ? '152px' : '76px', zIndex: 61,
+                    background: '#1d1d1d', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '14px',
+                    boxShadow: '0 18px 44px rgba(0,0,0,0.55)', overflow: 'hidden', minWidth: '212px',
+                  }}>
+                    {isAdmin && (
+                      <button onClick={() => { setShowAddMenu(false); setShowNewChannel(true) }} style={{ display: 'flex', alignItems: 'center', gap: '11px', width: '100%', padding: '13px 16px', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', textAlign: 'left' }}>
+                        <span style={{ fontSize: '16px' }}>＋</span>
+                        <span style={{ fontFamily: 'Barlow, sans-serif', fontSize: '14.5px', fontWeight: 600, color: '#fff' }}>New channel</span>
+                      </button>
+                    )}
+                    {teamView && (
+                      <button onClick={() => { setShowAddMenu(false); setShowNewDm(true) }} style={{ display: 'flex', alignItems: 'center', gap: '11px', width: '100%', padding: '13px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                        <span style={{ fontSize: '15px' }}>✉️</span>
+                        <span style={{ fontFamily: 'Barlow, sans-serif', fontSize: '14.5px', fontWeight: 600, color: '#fff' }}>New message</span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+              <button
+                onClick={() => {
+                  if (isAdmin && teamView) setShowAddMenu(m => !m)
+                  else if (isAdmin) setShowNewChannel(true)
+                  else setShowNewDm(true)
+                }}
+                aria-label="Start a new chat"
+                style={{
+                  position: 'absolute', right: '16px', bottom: isMobile ? '94px' : '18px', zIndex: 60,
+                  background: 'var(--brand)', color: '#03292b', border: 'none', borderRadius: '999px',
+                  padding: '13px 22px', cursor: 'pointer',
+                  fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 800, letterSpacing: '1.2px',
+                  display: 'flex', alignItems: 'center', gap: '7px',
+                  boxShadow: '0 12px 30px rgba(var(--brand-rgb),0.42)',
+                }}
+              >
+                <span style={{ fontSize: '17px', lineHeight: 1 }}>+</span> NEW CHAT
+              </button>
+            </>
           )}
         </div>
       )}
