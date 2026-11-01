@@ -246,6 +246,8 @@ export default function Home({ session, profile }) {
   const [feed, setFeed] = useState([])
   const [hero, setHero] = useState(null)
   const [filter, setFilter] = useState('all')
+  const [chipsHidden, setChipsHidden] = useState(false)
+  const lastScrollByTarget = useRef(new Map())
   const [visibleCount, setVisibleCount] = useState(FEED_BATCH)
   const [loading, setLoading] = useState(true)
   const sentinelRef = useRef(null)
@@ -256,6 +258,28 @@ export default function Home({ session, profile }) {
   // Reload when the tier flips (profile arrives after mount, or the demo
   // switch is flipped) so team channels join/leave the post mix correctly.
   useEffect(() => { loadAll() }, [team])
+
+  // Filter bar behaviour: hide on scroll down, reappear on scroll up
+  // (always visible near the top). Scroll events are captured at the
+  // document because the scroller is Layout's <main> on mobile and the
+  // window on desktop; per-target positions keep nested scrollers
+  // (the chips row itself) from interfering.
+  useEffect(() => {
+    function onScroll(e) {
+      const t = e.target
+      const y = t === document
+        ? (document.scrollingElement?.scrollTop ?? window.scrollY)
+        : t?.scrollTop
+      if (typeof y !== 'number') return
+      const last = lastScrollByTarget.current.get(t) ?? 0
+      if (y < 60) setChipsHidden(false)
+      else if (y > last + 6) setChipsHidden(true)
+      else if (y < last - 6) setChipsHidden(false)
+      lastScrollByTarget.current.set(t, y)
+    }
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    return () => document.removeEventListener('scroll', onScroll, { capture: true })
+  }, [])
 
   useEffect(() => {
     const el = sentinelRef.current
@@ -553,7 +577,7 @@ export default function Home({ session, profile }) {
   )
 
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1.1rem 1.25rem 2rem' }}>
+    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '0.6rem 1.25rem 2rem' }}>
       {/* Pinned: this week's racing */}
       {weekRaces.length > 0 && (
         <div style={{
@@ -618,13 +642,26 @@ export default function Home({ session, profile }) {
         fontFamily: 'Barlow Condensed, sans-serif',
         fontSize: '12px', letterSpacing: '3px',
         textTransform: 'uppercase', color: 'var(--brand)',
-        margin: '1.75rem 0 0.75rem',
+        margin: '0.85rem 0 0.4rem',
       }}>
         Your feed
       </div>
 
-      {/* Filter chips — one lens across every source */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '0.75rem', scrollbarWidth: 'none' }}>
+      {/* Filter chips — one lens across every source. Sticky under the
+          header; slides away while scrolling down, returns on scroll up.
+          The negative top margin when hidden collapses its slot so the
+          feed doesn't keep a dead band. */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        margin: chipsHidden ? '-58px -1.25rem 0.6rem' : '0 -1.25rem 0.6rem',
+        padding: '0.45rem 1.25rem',
+        background: 'rgba(13,13,13,0.94)',
+        backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+        transform: chipsHidden ? 'translateY(-130%)' : 'translateY(0)',
+        opacity: chipsHidden ? 0 : 1,
+        transition: 'transform 0.28s ease, opacity 0.22s ease, margin 0.28s ease',
+      }}>
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
         {FEED_FILTERS.map(f => {
           const active = filter === f.id
           return (
@@ -644,6 +681,7 @@ export default function Home({ session, profile }) {
             </button>
           )
         })}
+      </div>
       </div>
 
       {filter === 'all' && hero && renderHero(hero)}
