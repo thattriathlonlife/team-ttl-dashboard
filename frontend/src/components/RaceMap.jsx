@@ -100,7 +100,7 @@ function recolor(map) {
   }
 }
 
-function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, onToggle, onFail }) {
+function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, onToggle, onFail, mapMode = 'community' }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -330,6 +330,23 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
             </div>
             <button onClick={() => setSelected(null)} aria-label="Close race card" style={{ background: 'none', border: 'none', color: '#777', fontSize: '17px', cursor: 'pointer', alignSelf: 'flex-start', padding: '2px 4px' }}>✕</button>
           </div>
+          {mapMode === 'team' && (
+            <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '9px' }}>
+              {selEntries.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {selEntries.slice(0, 6).map((entry, idx) => (
+                    <span key={entry.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#1c1f22', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '999px', padding: '3px 10px 3px 4px', fontSize: '12px', color: '#ddd' }}>
+                      <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: entry.profiles?.avatar_color || MEMBER_COLORS[idx % MEMBER_COLORS.length], display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: 700, color: '#10131a', fontFamily: 'Barlow Condensed, sans-serif' }}>{(entry.profiles?.full_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2)}</span>
+                      {entry.profiles?.full_name || 'TTL Member'}
+                    </span>
+                  ))}
+                  {selEntries.length > 6 && <span style={{ fontSize: '12px', color: '#888', alignSelf: 'center' }}>+{selEntries.length - 6} more</span>}
+                </div>
+              ) : (
+                <div style={{ fontSize: '12.5px', color: '#888' }}>No teammates entered yet — be the first on this start line.</div>
+              )}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '7px', marginTop: '11px', flexWrap: 'wrap' }}>
             <button
               onClick={() => onToggle?.(selected.id)}

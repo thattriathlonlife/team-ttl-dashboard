@@ -4,6 +4,7 @@ import RaceList from '../components/RaceList'
 import CalendarView from '../components/CalendarView'
 import AddRaceModal from '../components/AddRaceModal'
 import RaceMap from '../components/RaceMap'
+import { isTeamTier, setDemoTier } from '../lib/tier'
 
 const S = {
   page: { maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' },
@@ -53,6 +54,10 @@ export default function Dashboard({ session }) {
   const [loading, setLoading] = useState(true)
   const [showAddRace, setShowAddRace] = useState(false)
   const [orgFilter, setOrgFilter] = useState('ironman')
+  // Map view mode (Zack, 2026-11-01): Community shows counts for
+  // everyone; Team names the roster on the map. Remembered per device.
+  const [mapMode, setMapModeState] = useState(() => { try { return localStorage.getItem('ttl-map-mode') || 'community' } catch { return 'community' } })
+  const setMapMode = (m) => { setMapModeState(m); try { localStorage.setItem('ttl-map-mode', m) } catch { /* private mode */ } }
   const [typeFilter, setTypeFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState('all') // 'all' | 'mine'
@@ -134,6 +139,8 @@ export default function Dashboard({ session }) {
   const hasEntryTimestamps = scopedEntries.some(e => e.created_at)
   const nextRaceCrew = nextRace ? allEntries.filter(e => e.race_id === nextRace.id).length : 0
 
+  const teamView = isTeamTier(profile)
+
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#555', textTransform: 'uppercase' }}>Loading...</div>
 
   return (
@@ -141,7 +148,24 @@ export default function Dashboard({ session }) {
       {/* Map — the Races page is the map's home; it reflects the same
           filters as the list. */}
       <div style={{ marginBottom: '1.1rem' }}>
-        <RaceMap races={filteredRaces} allEntries={allEntries} myEntries={myEntries} profile={profile} session={session} onToggle={toggleEntry} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.55rem' }}>
+          <div style={S.viewToggle} role="group" aria-label="Map view">
+            <button style={{ ...S.viewBtn, ...(mapMode === 'community' ? S.viewBtnActive : {}) }} onClick={() => setMapMode('community')}>Community</button>
+            <button style={{ ...S.viewBtn, ...(mapMode === 'team' ? S.viewBtnActive : {}) }} onClick={() => setMapMode('team')}>Team{teamView ? '' : ' 🔒'}</button>
+          </div>
+          <span style={{ fontSize: '12px', color: '#666' }}>{mapMode === 'team' ? (teamView ? "Who's racing, by name" : 'Named rosters are a team view') : 'Where the team races — counts for everyone'}</span>
+        </div>
+        {mapMode === 'team' && !teamView ? (
+          <div style={{ height: '300px', background: '#05090e', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px' }}>
+            <div style={{ fontSize: '26px', marginBottom: '8px' }}>🔒</div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#fff', marginBottom: '6px' }}>The team map is for Team TTL members</div>
+            <p style={{ fontSize: '13.5px', color: '#999', lineHeight: 1.55, maxWidth: '420px', margin: '0 0 16px' }}>The community map shows how many TTLers are on each start line. The team map names them — who's racing where, on every pin.</p>
+            <a href="https://thattriathlonlife.com" target="_blank" rel="noopener" style={{ background: 'var(--brand)', color: '#06282a', borderRadius: '6px', padding: '10px 20px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', textDecoration: 'none', marginBottom: '10px' }}>Apply for Team TTL</a>
+            <button onClick={() => setDemoTier('team')} style={{ background: 'none', border: 'none', color: '#666', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>Demo: preview the member view</button>
+          </div>
+        ) : (
+          <RaceMap races={filteredRaces} allEntries={allEntries} myEntries={myEntries} profile={profile} session={session} onToggle={toggleEntry} mapMode={mapMode} />
+        )}
       </div>
 
       {/* Hero: your next race countdown (Concept A) */}
