@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { raceChannelKind, isTeamOnlyChannel, channelDisplayName } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
 import { useAudio } from '../lib/audio'
+import VideoPlayer from '../components/VideoPlayer'
 
 const FEED_FILTERS = [
   { id: 'all', label: 'All' },
@@ -314,6 +315,7 @@ export default function Home({ session, profile }) {
   const [nearCount, setNearCount] = useState(0)
   const [filter, setFilter] = useState('all')
   const [archiveMeta, setArchiveMeta] = useState(null)
+  const [playingVideo, setPlayingVideo] = useState(null)
   const filterBarRef = useRef(null)
   const barHiddenRef = useRef(false)
   const lastScrollByTarget = useRef(new Map())
@@ -674,7 +676,7 @@ export default function Home({ session, profile }) {
     const isVideo = item.kind === 'video'
     return (
       <button
-        onClick={() => window.open(d.link, '_blank', 'noopener')}
+        onClick={() => setPlayingVideo(d)}
         style={{
           position: 'relative', width: '100%', textAlign: 'left', cursor: 'pointer',
           borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)',
@@ -903,6 +905,7 @@ export default function Home({ session, profile }) {
           </>
         )
       })()}
+      <VideoPlayer video={playingVideo} onClose={() => setPlayingVideo(null)} />
     </div>
   )
 }

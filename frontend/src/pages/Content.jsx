@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+  const [playingVideo, setPlayingVideo] = useState(null)
+import VideoPlayer from '../components/VideoPlayer'
 import { useAudio, fmtClock } from '../lib/audio'
 
 // The Archive — TTL's complete public catalogue, one tap deep from the
@@ -125,7 +127,7 @@ export default function Content() {
           {data.videos.map((v, vi) => vi === 0 ? (
             // Hero treatment for the newest video: full-bleed thumbnail,
             // scrim headline (mockups, 2026-10-31).
-            <button key={v.id} onClick={() => window.open(v.link, '_blank', 'noopener')} style={{ display: 'block', width: '100%', padding: 0, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden', position: 'relative', cursor: 'pointer', background: '#161616', marginBottom: 10, textAlign: 'left' }}>
+            <button key={v.id} onClick={() => setPlayingVideo(v)} style={{ display: 'block', width: '100%', padding: 0, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden', position: 'relative', cursor: 'pointer', background: '#161616', marginBottom: 10, textAlign: 'left' }}>
               {v.image && <img style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} src={v.image} alt="" loading="lazy" />}
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 42%, rgba(4,6,8,0.9))' }} />
               <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -68%)', width: 52, height: 52, borderRadius: '50%', background: 'rgba(0,0,0,0.62)', color: '#fff', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>▶</div>
@@ -136,7 +138,7 @@ export default function Content() {
               </div>
             </button>
           ) : (
-            <button key={v.id} style={{ ...S.card, flexDirection: 'column', gap: 10 }} onClick={() => window.open(v.link, '_blank', 'noopener')}>
+            <button key={v.id} style={{ ...S.card, flexDirection: 'column', gap: 10 }} onClick={() => setPlayingVideo(v)}>
               {v.image && (
                 <div style={{ position: 'relative', width: '100%' }}>
                   <img style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 8, display: 'block', background: '#1f1f1f' }} src={v.image} alt="" loading="lazy" />
@@ -163,6 +165,7 @@ export default function Content() {
           </div>
         </button>
       ))}
+      <VideoPlayer video={playingVideo} onClose={() => setPlayingVideo(null)} />
     </div>
   )
 }
