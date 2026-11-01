@@ -8,14 +8,14 @@ const S = {
   },
   modal: {
     background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
-    borderTop: '3px solid #00B5B9',
+    borderTop: '3px solid var(--brand)',
     borderRadius: '10px', padding: '2rem',
     width: '100%', maxWidth: '480px',
   },
   title: {
     fontFamily: 'Barlow Condensed, sans-serif',
     fontSize: '22px', fontWeight: 700, letterSpacing: '2px',
-    textTransform: 'uppercase', color: '#00B5B9', marginBottom: '1.5rem',
+    textTransform: 'uppercase', color: 'var(--brand)', marginBottom: '1.5rem',
   },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
   group: { marginBottom: '12px' },
@@ -36,7 +36,7 @@ const S = {
   btnSubmit: {
     fontFamily: 'Barlow Condensed, sans-serif',
     fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase',
-    padding: '10px 24px', background: '#00B5B9',
+    padding: '10px 24px', background: 'var(--brand)',
     border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer',
   },
 }

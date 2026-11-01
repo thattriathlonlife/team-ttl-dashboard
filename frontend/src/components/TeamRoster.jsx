@@ -1,4 +1,4 @@
-const MEMBER_COLORS = ['#00B5B9','#E87362','#E8B84B','#E87362','#a78bfa','#34d399','#f472b6','#60a5fa']
+const MEMBER_COLORS = ['var(--brand)','var(--accent)','var(--highlight)','var(--accent)','#a78bfa','#34d399','#f472b6','#60a5fa']
 
 const S = {
   grid: {
@@ -34,9 +34,9 @@ const S = {
     fontSize: '10px', letterSpacing: '0.5px',
     padding: '2px 8px', borderRadius: '3px',
   },
-  tagFull: { background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9', border: '1px solid rgba(0, 181, 185,0.2)' },
-  tag703: { background: 'rgba(232, 115, 98,0.12)', color: '#E87362', border: '1px solid rgba(232, 115, 98,0.2)' },
-  tagOther: { background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.2)' },
+  tagFull: { background: 'rgba(var(--brand-rgb),0.12)', color: 'var(--brand)', border: '1px solid rgba(var(--brand-rgb),0.2)' },
+  tag703: { background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.2)' },
+  tagOther: { background: 'rgba(var(--highlight-rgb),0.1)', color: 'var(--highlight)', border: '1px solid rgba(var(--highlight-rgb),0.2)' },
   role: {
     display: 'inline-block',
     fontFamily: 'Barlow Condensed, sans-serif',

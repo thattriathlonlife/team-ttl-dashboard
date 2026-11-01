@@ -10,11 +10,17 @@
   --muted: #888888;
   --muted2: #555555;
 
-  /* TTL Brand Colors — seasonal tokens; keep in sync with src/lib/theme.js
-     (the single source of truth) and re-apply with scripts/recolor.mjs */
-  --brand: #00B5B9;
-  --accent: #E87362;
+  /* Dual themes (DESIGN-SPEC §3): default = TTL masterbrand, shown to
+     Fan/Community users. [data-theme="team"] = the season's Team TTL kit
+     palette, shown to team-entitled members. Values mirror
+     src/lib/theme.js (BRAND_THEME / TEAM_THEME). The -rgb triplets let
+     components write rgba(var(--brand-rgb), 0.12) inline. */
+  --brand: #2BB3A3;
+  --brand-rgb: 43, 179, 163;
+  --accent: #E9C46A;
+  --accent-rgb: 233, 196, 106;
   --highlight: #E8B84B;
+  --highlight-rgb: 232, 184, 75;
   --ink: #1F212D;
   --cyan: var(--brand);
   --pink: var(--accent);
@@ -24,6 +30,16 @@
 
   --font-display: 'Barlow Condensed', sans-serif;
   --font-body: 'Barlow', sans-serif;
+}
+
+/* Team theme — the 2027 Team TTL kit, for team-entitled members. */
+[data-theme="team"] {
+  --brand: #00B5B9;
+  --brand-rgb: 0, 181, 185;
+  --accent: #E87362;
+  --accent-rgb: 232, 115, 98;
+  --highlight: #E8B84B;
+  --highlight-rgb: 232, 184, 75;
 }
 
 html, body, #root {

@@ -52,7 +52,7 @@ export default function RaceMap({ races }) {
             fontSize: '13px', color: '#ccc',
             fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px',
           }}>
-            <span style={{ color: '#00B5B9', fontSize: '16px' }}>📍</span>
+            <span style={{ color: 'var(--brand)', fontSize: '16px' }}>📍</span>
             <span style={{ fontWeight: 600, color: '#fff' }}>{race.city || race.location}</span>
             <span style={{ color: '#999' }}>— {race.name}</span>
           </div>

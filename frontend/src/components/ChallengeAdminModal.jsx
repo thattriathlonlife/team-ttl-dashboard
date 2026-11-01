@@ -141,13 +141,13 @@ export default function ChallengeAdminModal({ challenge, userId, onSave, onClose
       <div style={{
         background: '#1a1a1a',
         border: '1px solid rgba(255,255,255,0.12)',
-        borderTop: '3px solid #E8B84B',
+        borderTop: '3px solid var(--highlight)',
         borderRadius: '10px', padding: '2rem',
         width: '100%', maxWidth: '480px',
         maxHeight: '90vh', overflowY: 'auto',
       }}>
         {/* Title */}
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '22px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#E8B84B', marginBottom: '4px' }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '22px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--highlight)', marginBottom: '4px' }}>
           {challenge ? 'Edit Challenge' : 'New Challenge'}
         </div>
         <div style={{ fontSize: '13px', color: '#555', marginBottom: '1.5rem' }}>
@@ -174,13 +174,13 @@ export default function ChallengeAdminModal({ challenge, userId, onSave, onClose
                 key={opt.value}
                 onClick={() => set('type', opt.value)}
                 style={{
-                  background: form.type === opt.value ? 'rgba(232,184,75,0.1)' : '#111',
-                  border: `1px solid ${form.type === opt.value ? 'rgba(232,184,75,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  background: form.type === opt.value ? 'rgba(var(--highlight-rgb),0.1)' : '#111',
+                  border: `1px solid ${form.type === opt.value ? 'rgba(var(--highlight-rgb),0.4)' : 'rgba(255,255,255,0.1)'}`,
                   borderRadius: 6, padding: '10px 14px', cursor: 'pointer',
                   textAlign: 'left',
                 }}
               >
-                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600, color: form.type === opt.value ? '#E8B84B' : '#ccc', marginBottom: 2 }}>
+                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600, color: form.type === opt.value ? 'var(--highlight)' : '#ccc', marginBottom: 2 }}>
                   {opt.label}
                 </div>
                 <div style={{ fontSize: 12, color: '#555' }}>{opt.hint}</div>
@@ -233,7 +233,7 @@ export default function ChallengeAdminModal({ challenge, userId, onSave, onClose
 
         {/* Error */}
         {error && (
-          <div style={{ background: 'rgba(232, 115, 98,0.1)', border: '1px solid rgba(232, 115, 98,0.2)', borderRadius: 6, padding: '10px 12px', color: '#E87362', fontSize: 13, marginBottom: 12 }}>
+          <div style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: 6, padding: '10px 12px', color: 'var(--accent)', fontSize: 13, marginBottom: 12 }}>
             {error}
           </div>
         )}
@@ -249,8 +249,8 @@ export default function ChallengeAdminModal({ challenge, userId, onSave, onClose
                 style={{
                   fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase',
                   padding: '9px 16px', background: 'none',
-                  border: '1px solid rgba(232, 115, 98,0.25)',
-                  borderRadius: 5, color: '#E87362', cursor: 'pointer',
+                  border: '1px solid rgba(var(--accent-rgb),0.25)',
+                  borderRadius: 5, color: 'var(--accent)', cursor: 'pointer',
                 }}
               >
                 {deactivating ? 'Deactivating...' : 'End challenge'}
@@ -275,7 +275,7 @@ export default function ChallengeAdminModal({ challenge, userId, onSave, onClose
               disabled={saving}
               style={{
                 fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase',
-                padding: '10px 24px', background: '#E8B84B',
+                padding: '10px 24px', background: 'var(--highlight)',
                 border: 'none', borderRadius: 5, color: '#000', cursor: 'pointer',
               }}
             >

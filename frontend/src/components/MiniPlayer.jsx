@@ -14,13 +14,13 @@ export default function MiniPlayer({ floating = false }) {
         ? { position: 'fixed', right: '16px', bottom: '16px', width: 'min(380px, calc(100vw - 32px))', zIndex: 300 }
         : { margin: '0 12px 8px' }),
       background: 'rgba(24,24,24,0.96)', backdropFilter: 'blur(12px)',
-      border: '1px solid rgba(0, 181, 185,0.35)', borderRadius: '14px',
+      border: '1px solid rgba(var(--brand-rgb),0.35)', borderRadius: '14px',
       padding: '10px 12px', boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {current.image
           ? <img src={current.image} alt="" style={{ width: 38, height: 38, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
-          : <div style={{ width: 38, height: 38, borderRadius: '8px', background: 'rgba(0, 181, 185,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', flexShrink: 0 }}>🎧</div>}
+          : <div style={{ width: 38, height: 38, borderRadius: '8px', background: 'rgba(var(--brand-rgb),0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', flexShrink: 0 }}>🎧</div>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {current.title}
@@ -31,7 +31,7 @@ export default function MiniPlayer({ floating = false }) {
         </div>
         <button onClick={toggle} aria-label={playing ? 'Pause' : 'Play'} style={{
           width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-          background: '#00B5B9', border: 'none', color: '#06282a',
+          background: 'var(--brand)', border: 'none', color: '#06282a',
           fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {playing ? '❚❚' : '▶'}
@@ -53,7 +53,7 @@ export default function MiniPlayer({ floating = false }) {
         style={{ height: '12px', display: 'flex', alignItems: 'center', cursor: duration ? 'pointer' : 'default', marginTop: '2px' }}
       >
         <div style={{ height: '3px', flex: 1, background: 'rgba(255,255,255,0.12)', borderRadius: '2px', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${pct}%`, background: '#00B5B9', borderRadius: '2px', transition: 'width 0.25s linear' }} />
+          <div style={{ height: '100%', width: `${pct}%`, background: 'var(--brand)', borderRadius: '2px', transition: 'width 0.25s linear' }} />
         </div>
       </div>
     </div>

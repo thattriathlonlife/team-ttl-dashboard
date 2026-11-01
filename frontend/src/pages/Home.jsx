@@ -91,8 +91,8 @@ function RaceRow({ race }) {
             marginLeft: '8px',
             fontFamily: 'Barlow Condensed, sans-serif',
             fontSize: '11px', letterSpacing: '1px',
-            background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9',
-            border: '1px solid rgba(0, 181, 185,0.25)',
+            background: 'rgba(var(--brand-rgb),0.12)', color: 'var(--brand)',
+            border: '1px solid rgba(var(--brand-rgb),0.25)',
             borderRadius: '3px', padding: '1px 7px',
             verticalAlign: 'middle', whiteSpace: 'nowrap',
           }}>
@@ -104,7 +104,7 @@ function RaceRow({ race }) {
           style={{
             fontFamily: 'Barlow Condensed, sans-serif',
             fontSize: '11px', letterSpacing: '1px',
-            textTransform: 'uppercase', color: '#00B5B9',
+            textTransform: 'uppercase', color: 'var(--brand)',
             background: 'none', border: 'none', cursor: 'pointer',
             whiteSpace: 'nowrap', padding: 0, flexShrink: 0,
           }}
@@ -115,7 +115,7 @@ function RaceRow({ race }) {
       {expanded && (
         <div style={{
           marginTop: '6px', paddingLeft: '12px',
-          borderLeft: '2px solid rgba(0, 181, 185,0.2)',
+          borderLeft: '2px solid rgba(var(--brand-rgb),0.2)',
           fontSize: '13px', color: '#aaa', lineHeight: 1.8,
         }}>
           {names.join(', ')}
@@ -153,7 +153,7 @@ function Avatar({ profile, size = 36 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: profile?.avatar_color || '#00B5B9',
+      background: profile?.avatar_color || 'var(--brand)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: 'Barlow Condensed, sans-serif', fontSize: size * 0.38, fontWeight: 700, color: '#000',
     }}>{initials}</div>
@@ -349,21 +349,13 @@ export default function Home({ session, profile }) {
     }
   }
 
-  const firstName = myProfile?.full_name?.split(' ')[0] || 'Athlete'
   const totalRacers = [...new Set(weekRaces.flatMap(r => r.race_entries.map(e => e.athlete_id)))].length
-  const greeting = () => {
-    const h = new Date().getHours()
-    if (h < 12) return 'Good morning'
-    if (h < 17) return 'Good afternoon'
-    return 'Good evening'
-  }
-
   const pillBtn = (active) => ({
     display: 'inline-flex', alignItems: 'center', gap: '6px',
     fontFamily: 'Barlow, sans-serif', fontSize: '13px', fontWeight: 600,
-    color: active ? '#E87362' : '#aaa',
-    background: active ? 'rgba(232, 115, 98,0.12)' : 'rgba(255,255,255,0.05)',
-    border: `1px solid ${active ? 'rgba(232, 115, 98,0.4)' : 'rgba(255,255,255,0.09)'}`,
+    color: active ? 'var(--accent)' : '#aaa',
+    background: active ? 'rgba(var(--accent-rgb),0.12)' : 'rgba(255,255,255,0.05)',
+    border: `1px solid ${active ? 'rgba(var(--accent-rgb),0.4)' : 'rgba(255,255,255,0.09)'}`,
     borderRadius: '999px', padding: '6px 13px', cursor: 'pointer',
   })
 
@@ -380,7 +372,7 @@ export default function Home({ session, profile }) {
             <div style={{ fontSize: '12px', color: '#777' }}>{timeAgo(m.created_at)}</div>
           </div>
           {ch && (
-            <span style={F.chip(ch.feedKind === 'discussion' ? '#00B5B9' : '#E8B84B')}>
+            <span style={F.chip(ch.feedKind === 'discussion' ? 'var(--brand)' : 'var(--highlight)')}>
               {channelDisplayName(ch)}
             </span>
           )}
@@ -399,7 +391,7 @@ export default function Home({ session, profile }) {
             style={{
               display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left',
               marginTop: '12px', padding: '10px 12px', cursor: 'pointer',
-              background: 'rgba(0, 181, 185,0.07)', border: '1px solid rgba(0, 181, 185,0.25)',
+              background: 'rgba(var(--brand-rgb),0.07)', border: '1px solid rgba(var(--brand-rgb),0.25)',
               borderRadius: '10px',
             }}
           >
@@ -408,7 +400,7 @@ export default function Home({ session, profile }) {
               <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 600, color: '#fff' }}>{race.name}</span>
               <span style={{ display: 'block', fontSize: '12px', color: '#999' }}>{fmtDate(race.race_date)} · {race.location}</span>
             </span>
-            <span style={{ color: '#00B5B9', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' }}>View race →</span>
+            <span style={{ color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' }}>View race →</span>
           </button>
         )}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px' }}>
@@ -422,7 +414,7 @@ export default function Home({ session, profile }) {
           <span style={pillBtn(false)}>
             💬 {m.replyCount} {m.replyCount === 1 ? 'reply' : 'replies'}
           </span>
-          <span style={{ marginLeft: 'auto', color: '#00B5B9', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', textTransform: 'uppercase', fontSize: '11px' }}>
+          <span style={{ marginLeft: 'auto', color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', textTransform: 'uppercase', fontSize: '11px' }}>
             {ch?.feedKind === 'discussion' ? 'Race discussion' : 'Team channel'}
           </span>
         </div>
@@ -438,10 +430,10 @@ export default function Home({ session, profile }) {
         <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
           {ep.image
             ? <img src={ep.image} alt="" loading="lazy" style={{ width: '64px', height: '64px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
-            : <div style={{ width: '64px', height: '64px', borderRadius: '10px', background: 'rgba(0, 181, 185,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎧</div>}
+            : <div style={{ width: '64px', height: '64px', borderRadius: '10px', background: 'rgba(var(--brand-rgb),0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎧</div>}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
-              <span style={F.chip('#00B5B9')}>Podcast</span>
+              <span style={F.chip('var(--brand)')}>Podcast</span>
               <span style={{ fontSize: '12px', color: '#777' }}>{fmtDate(ep.published)}{ep.duration ? ` · ${ep.duration}` : ''}</span>
             </div>
             <div style={F.cardTitle}>{ep.title}</div>
@@ -451,10 +443,10 @@ export default function Home({ session, profile }) {
             onClick={() => audio.playEpisode(ep)} aria-label={isCurrent && audio.playing ? 'Pause' : 'Play'}
             style={{
               width: '46px', height: '46px', borderRadius: '50%', flexShrink: 0, alignSelf: 'center',
-              background: '#00B5B9', border: 'none',
+              background: 'var(--brand)', border: 'none',
               color: '#06282a', fontSize: '16px', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 6px 18px rgba(0, 181, 185,0.35)',
+              boxShadow: '0 6px 18px rgba(var(--brand-rgb),0.35)',
             }}
           >
             {isCurrent && audio.playing ? '❚❚' : '▶'}
@@ -481,7 +473,7 @@ export default function Home({ session, profile }) {
         )}
         <div style={{ padding: '1rem 1.25rem' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
-            <span style={F.chip('#E87362')}>YouTube</span>
+            <span style={F.chip('var(--accent)')}>YouTube</span>
             <span style={{ fontSize: '12px', color: '#777' }}>{v.age || fmtDate(v.published)}{v.views ? ` · ${v.views}` : ''}</span>
           </div>
           <div style={F.cardTitle}>{v.title}</div>
@@ -497,7 +489,7 @@ export default function Home({ session, profile }) {
         {st.image && <img src={st.image} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '16/8', objectFit: 'cover', display: 'block' }} />}
         <div style={{ padding: '1rem 1.25rem' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
-            <span style={F.chip('#E8B84B')}>Story</span>
+            <span style={F.chip('var(--highlight)')}>Story</span>
             <span style={{ fontSize: '12px', color: '#777' }}>{fmtDate(st.published)}</span>
           </div>
           <div style={F.cardTitle}>{st.title}</div>
@@ -528,7 +520,7 @@ export default function Home({ session, profile }) {
           padding: '1.1rem 1.25rem',
         }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '7px' }}>
-            <span style={F.chip(isVideo ? '#E87362' : '#E8B84B')}>{isVideo ? '▶ YouTube' : 'Top story'}</span>
+            <span style={F.chip(isVideo ? 'var(--accent)' : 'var(--highlight)')}>{isVideo ? '▶ YouTube' : 'Top story'}</span>
             <span style={{ fontSize: '12px', color: '#cfd4da' }}>{isVideo ? (d.age || '') : fmtDate(d.published)}</span>
           </div>
           <div style={{
@@ -561,46 +553,23 @@ export default function Home({ session, profile }) {
   )
 
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '2rem 1.25rem' }}>
-      {/* Greeting */}
-      <div style={{ marginBottom: '1.75rem' }}>
-        <div style={{
-          fontFamily: 'Barlow Condensed, sans-serif',
-          fontSize: '12px', letterSpacing: '3px',
-          textTransform: 'uppercase', color: '#999', marginBottom: '6px',
-        }}>
-          {greeting()},
-        </div>
-        <h1 style={{
-          fontFamily: 'Barlow Condensed, sans-serif',
-          fontSize: '38px', fontWeight: 900,
-          letterSpacing: '2px', lineHeight: 1, color: '#fff',
-        }}>
-          {firstName.toUpperCase()}
-        </h1>
-        <div style={{
-          width: '60px', height: '3px', marginTop: '12px',
-          background: 'linear-gradient(90deg, #00B5B9, #E87362)',
-          borderRadius: '2px',
-        }} />
-      </div>
-
+    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1.1rem 1.25rem 2rem' }}>
       {/* Pinned: this week's racing */}
       {weekRaces.length > 0 && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(0, 181, 185,0.06) 0%, rgba(232, 115, 98,0.06) 100%)',
-          border: '1px solid rgba(0, 181, 185,0.2)',
+          background: 'linear-gradient(135deg, rgba(var(--brand-rgb),0.06) 0%, rgba(var(--accent-rgb),0.06) 100%)',
+          border: '1px solid rgba(var(--brand-rgb),0.2)',
           borderRadius: '12px', padding: '1.4rem 1.5rem',
           marginBottom: '1rem', position: 'relative', overflow: 'hidden',
         }}>
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
-            background: 'linear-gradient(90deg, #00B5B9, #E87362, #E8B84B, #E87362)',
+            background: 'linear-gradient(90deg, var(--brand), var(--accent), var(--highlight), var(--accent))',
           }} />
           <div style={{
             fontFamily: 'Barlow Condensed, sans-serif',
             fontSize: '12px', letterSpacing: '3px',
-            textTransform: 'uppercase', color: '#00B5B9', marginBottom: '8px',
+            textTransform: 'uppercase', color: 'var(--brand)', marginBottom: '8px',
           }}>
             This week
           </div>
@@ -628,12 +597,12 @@ export default function Home({ session, profile }) {
         return (
           <button onClick={() => navigate('/races')} style={{
             display: 'flex', alignItems: 'center', gap: '16px', width: '100%', textAlign: 'left',
-            background: '#161616', border: '1px solid rgba(232, 115, 98,0.3)', borderRadius: '10px',
+            background: '#161616', border: '1px solid rgba(var(--accent-rgb),0.3)', borderRadius: '10px',
             padding: '1.1rem 1.4rem', marginBottom: '1rem', cursor: 'pointer',
           }}>
             <div style={{ fontSize: '26px', flexShrink: 0 }}>🏁</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#E87362', marginBottom: '3px' }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '3px' }}>
                 Your next race{days >= 0 ? ` — ${days === 0 ? 'today!' : `in ${days} day${days === 1 ? '' : 's'}`}` : ''}
               </div>
               <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '18px', fontWeight: 700, letterSpacing: '1px', color: '#fff' }}>{nextRace.name}</div>
@@ -648,7 +617,7 @@ export default function Home({ session, profile }) {
       <div style={{
         fontFamily: 'Barlow Condensed, sans-serif',
         fontSize: '12px', letterSpacing: '3px',
-        textTransform: 'uppercase', color: '#00B5B9',
+        textTransform: 'uppercase', color: 'var(--brand)',
         margin: '1.75rem 0 0.75rem',
       }}>
         Your feed
@@ -666,9 +635,9 @@ export default function Home({ session, profile }) {
                 fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600,
                 letterSpacing: '1.5px', textTransform: 'uppercase', whiteSpace: 'nowrap',
                 padding: '8px 16px', borderRadius: '999px', cursor: 'pointer',
-                border: `1px solid ${active ? 'rgba(0, 181, 185,0.55)' : 'rgba(255,255,255,0.12)'}`,
-                background: active ? 'rgba(0, 181, 185,0.14)' : '#161616',
-                color: active ? '#00B5B9' : '#888', transition: 'all 0.15s',
+                border: `1px solid ${active ? 'rgba(var(--brand-rgb),0.55)' : 'rgba(255,255,255,0.12)'}`,
+                background: active ? 'rgba(var(--brand-rgb),0.14)' : '#161616',
+                color: active ? 'var(--brand)' : '#888', transition: 'all 0.15s',
               }}
             >
               {f.label}

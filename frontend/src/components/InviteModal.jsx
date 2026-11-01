@@ -9,14 +9,14 @@ const S = {
   },
   modal: {
     background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
-    borderTop: '3px solid #E87362',
+    borderTop: '3px solid var(--accent)',
     borderRadius: '10px', padding: '2rem',
     width: '100%', maxWidth: '420px',
   },
   title: {
     fontFamily: 'Barlow Condensed, sans-serif',
     fontSize: '22px', fontWeight: 700, letterSpacing: '2px',
-    textTransform: 'uppercase', color: '#E87362', marginBottom: '4px',
+    textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '4px',
   },
   sub: { fontSize: '13px', color: '#999', marginBottom: '1.5rem' },
   group: { marginBottom: '12px' },
@@ -37,19 +37,19 @@ const S = {
   btnSubmit: {
     fontFamily: 'Barlow Condensed, sans-serif',
     fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase',
-    padding: '10px 24px', background: '#E87362',
+    padding: '10px 24px', background: 'var(--accent)',
     border: 'none', borderRadius: '5px', color: '#fff', cursor: 'pointer',
   },
   success: {
-    background: 'rgba(0, 181, 185,0.1)', border: '1px solid rgba(0, 181, 185,0.25)',
+    background: 'rgba(var(--brand-rgb),0.1)', border: '1px solid rgba(var(--brand-rgb),0.25)',
     borderRadius: '6px', padding: '12px',
-    color: '#00B5B9', fontSize: '14px', fontFamily: 'Barlow Condensed',
+    color: 'var(--brand)', fontSize: '14px', fontFamily: 'Barlow Condensed',
     letterSpacing: '0.5px',
   },
   error: {
-    background: 'rgba(232, 115, 98,0.1)', border: '1px solid rgba(232, 115, 98,0.2)',
+    background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.2)',
     borderRadius: '6px', padding: '10px',
-    color: '#E87362', fontSize: '13px',
+    color: 'var(--accent)', fontSize: '13px',
   },
 }
 

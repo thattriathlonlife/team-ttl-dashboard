@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { isTeamTier, setDemoTier } from '../lib/tier'
 import { raceChannelAudience, raceChannelKind, raceChannelType } from '../lib/channels'
 
-const MEMBER_COLORS = ['#00B5B9','#E87362','#E8B84B','#E87362','#a78bfa','#34d399','#f472b6','#60a5fa']
+const MEMBER_COLORS = ['var(--brand)','var(--accent)','var(--highlight)','var(--accent)','#a78bfa','#34d399','#f472b6','#60a5fa']
 
 const ICONS = {
   swim: {
@@ -32,7 +32,7 @@ function CourseIcon({ category, value, distance }) {
   const labels = { swim: 'Swim', bike: 'Bike', run: 'Run' }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-      <div style={{ width: '52px', height: '52px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00B5B9', background: 'rgba(0, 181, 185,0.06)' }}>{icon}</div>
+      <div style={{ width: '52px', height: '52px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand)', background: 'rgba(var(--brand-rgb),0.06)' }}>{icon}</div>
       <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#999' }}>{labels[category]}</div>
       <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, color: '#fff', textAlign: 'center' }}>{value || '—'}</div>
       {distance && <div style={{ fontSize: '11px', color: '#999' }}>{distance}</div>}
@@ -41,9 +41,9 @@ function CourseIcon({ category, value, distance }) {
 }
 
 function getBadgeStyle(type) {
-  if (type === 'IRONMAN') return { background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9', border: '1px solid rgba(0, 181, 185,0.25)' }
-  if (type === '70.3') return { background: 'rgba(232, 115, 98,0.12)', color: '#E87362', border: '1px solid rgba(232, 115, 98,0.25)' }
-  return { background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.2)' }
+  if (type === 'IRONMAN') return { background: 'rgba(var(--brand-rgb),0.12)', color: 'var(--brand)', border: '1px solid rgba(var(--brand-rgb),0.25)' }
+  if (type === '70.3') return { background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.25)' }
+  return { background: 'rgba(var(--highlight-rgb),0.1)', color: 'var(--highlight)', border: '1px solid rgba(var(--highlight-rgb),0.2)' }
 }
 
 function formatDate(dateStr) {
@@ -69,14 +69,14 @@ const S = {
   avatar: { width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, color: '#000', flexShrink: 0 },
   athleteName: { fontSize: '14px', color: '#fff', fontWeight: 500 },
   descText: { fontSize: '14px', color: '#bbb', lineHeight: 1.7 },
-  regBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', padding: '14px', background: '#00B5B9', border: 'none', borderRadius: '8px', color: '#000', cursor: 'pointer', textAlign: 'center', textDecoration: 'none' },
+  regBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', padding: '14px', background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#000', cursor: 'pointer', textAlign: 'center', textDecoration: 'none' },
   discussBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#ccc', cursor: 'pointer', marginTop: '10px', textAlign: 'center' },
   enterBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#ccc', cursor: 'pointer', marginTop: '10px' },
-  enterBtnJoined: { borderColor: '#00B5B9', color: '#00B5B9' },
-  logisticsBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'rgba(0, 181, 185,0.07)', border: '1px solid rgba(0, 181, 185,0.35)', borderRadius: '8px', color: '#00B5B9', cursor: 'pointer', marginTop: '10px' },
-  lockNote: { marginTop: '10px', padding: '12px', background: 'rgba(232, 115, 98,0.08)', border: '1px solid rgba(232, 115, 98,0.25)', borderRadius: '8px', color: '#bbb', fontSize: '13px', lineHeight: 1.55 },
-  threadError: { marginTop: '10px', padding: '12px', background: 'rgba(232, 115, 98,0.12)', border: '1px solid rgba(232, 115, 98,0.45)', borderRadius: '8px', color: '#f0b0a6', fontSize: '13px', lineHeight: 1.55 },
-  lockLink: { color: '#E87362', fontWeight: 700, textDecoration: 'none' },
+  enterBtnJoined: { borderColor: 'var(--brand)', color: 'var(--brand)' },
+  logisticsBtn: { display: 'block', width: '100%', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '12px', background: 'rgba(var(--brand-rgb),0.07)', border: '1px solid rgba(var(--brand-rgb),0.35)', borderRadius: '8px', color: 'var(--brand)', cursor: 'pointer', marginTop: '10px' },
+  lockNote: { marginTop: '10px', padding: '12px', background: 'rgba(var(--accent-rgb),0.08)', border: '1px solid rgba(var(--accent-rgb),0.25)', borderRadius: '8px', color: '#bbb', fontSize: '13px', lineHeight: 1.55 },
+  threadError: { marginTop: '10px', padding: '12px', background: 'rgba(var(--accent-rgb),0.12)', border: '1px solid rgba(var(--accent-rgb),0.45)', borderRadius: '8px', color: '#f0b0a6', fontSize: '13px', lineHeight: 1.55 },
+  lockLink: { color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' },
   demoSwitch: { background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '12px', padding: 0, textDecoration: 'underline' },
   loading: { fontSize: '13px', color: '#555', padding: '4px 0' },
   emptyText: { fontSize: '13px', color: '#555', fontStyle: 'italic' },

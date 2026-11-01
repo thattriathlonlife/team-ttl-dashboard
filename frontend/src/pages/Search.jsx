@@ -12,11 +12,11 @@ import { isTeamTier } from '../lib/tier'
 const S = {
   wrap: { maxWidth: '680px', margin: '0 auto', padding: '1.5rem 1.25rem 3rem' },
   input: {
-    width: '100%', background: '#161616', border: '1px solid rgba(0, 181, 185,0.35)',
+    width: '100%', background: '#161616', border: '1px solid rgba(var(--brand-rgb),0.35)',
     borderRadius: '999px', padding: '14px 20px', fontSize: '16px', color: '#fff',
     outline: 'none', fontFamily: 'Barlow, sans-serif',
   },
-  h: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '3px', textTransform: 'uppercase', color: '#00B5B9', margin: '1.75rem 0 0.6rem' },
+  h: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--brand)', margin: '1.75rem 0 0.6rem' },
   row: {
     display: 'flex', alignItems: 'center', gap: '12px', width: '100%', textAlign: 'left',
     background: '#161616', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px',

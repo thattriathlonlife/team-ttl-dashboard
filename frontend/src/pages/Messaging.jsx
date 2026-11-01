@@ -10,7 +10,7 @@ function dmOtherProfile(channel, userId) {
   return channel.dm_members?.find(m => m.id !== userId) || null
 }
 
-const MEMBER_COLORS = ['#00B5B9','#E87362','#E8B84B','#E87362','#a78bfa','#34d399','#f472b6','#60a5fa']
+const MEMBER_COLORS = ['var(--brand)','var(--accent)','var(--highlight)','var(--accent)','#a78bfa','#34d399','#f472b6','#60a5fa']
 const QUICK_EMOJIS = ['👍','💪','🔥','🤘','🏁','❤️','🎉','😮']
 const ALL_EMOJIS = ['😀','😂','🥹','😍','🤩','😎','🥳','🤔','😮','💪','🔥','❤️','👍','🎉','🏆','🤘','🏁','🏊','🚴','🏃','⚡','💯','🙌','👏']
 
@@ -44,8 +44,8 @@ function MessageContent({ content, currentUserId, profiles }) {
           const isMe = mentioned?.id === currentUserId
           return (
             <span key={i} style={{
-              background: isMe ? 'rgba(232, 115, 98,0.2)' : 'rgba(0, 181, 185,0.15)',
-              color: isMe ? '#E87362' : '#00B5B9',
+              background: isMe ? 'rgba(var(--accent-rgb),0.2)' : 'rgba(var(--brand-rgb),0.15)',
+              color: isMe ? 'var(--accent)' : 'var(--brand)',
               borderRadius: '3px', padding: '0 3px',
               fontWeight: 600,
             }}>{part}</span>
@@ -264,18 +264,18 @@ export default function Messaging({ session, profile, onReadChannel }) {
         <div style={{ width: isMobile ? '100%' : '280px', background: '#111', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff' }}>Messages</div>
-            {isAdmin && <button onClick={() => setShowNewChannel(true)} style={{ background: 'rgba(0, 181, 185,0.1)', border: '1px solid rgba(0, 181, 185,0.3)', borderRadius: '6px', color: '#00B5B9', fontSize: '18px', cursor: 'pointer', padding: '2px 10px', lineHeight: 1 }}>+</button>}
+            {isAdmin && <button onClick={() => setShowNewChannel(true)} style={{ background: 'rgba(var(--brand-rgb),0.1)', border: '1px solid rgba(var(--brand-rgb),0.3)', borderRadius: '6px', color: 'var(--brand)', fontSize: '18px', cursor: 'pointer', padding: '2px 10px', lineHeight: 1 }}>+</button>}
           </div>
 
           <div style={{ flex: 1, overflow: 'auto' }}>
             {/* Mentions row */}
-            <button onClick={openMentions} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '14px 20px', background: showMentions ? 'rgba(232, 115, 98,0.08)' : 'none', border: 'none', borderLeft: showMentions ? '3px solid #E87362' : '3px solid transparent', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: showMentions ? 'rgba(232, 115, 98,0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0, color: showMentions ? '#E87362' : '#666' }}>@</div>
+            <button onClick={openMentions} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '14px 20px', background: showMentions ? 'rgba(var(--accent-rgb),0.08)' : 'none', border: 'none', borderLeft: showMentions ? '3px solid var(--accent)' : '3px solid transparent', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: showMentions ? 'rgba(var(--accent-rgb),0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0, color: showMentions ? 'var(--accent)' : '#666' }}>@</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 600, color: showMentions ? '#fff' : mentionCount > 0 ? '#fff' : '#888' }}>Mentions</div>
                 <div style={{ fontSize: '12px', color: '#555', marginTop: '1px' }}>Messages where you're tagged</div>
               </div>
-              {mentionCount > 0 && <div style={{ background: '#E87362', color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, borderRadius: '10px', padding: '2px 8px', flexShrink: 0 }}>{mentionCount}</div>}
+              {mentionCount > 0 && <div style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, borderRadius: '10px', padding: '2px 8px', flexShrink: 0 }}>{mentionCount}</div>}
             </button>
 
             <ChannelGroup label="General" channels={generalChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} locked={!teamView} />
@@ -386,22 +386,22 @@ function channelInitial(ch) {
 }
 
 const CATEGORY_COLORS = {
-  general:  '#00B5B9',
-  training: '#E8B84B',
+  general:  'var(--brand)',
+  training: 'var(--highlight)',
   interest: '#a78bfa',
   regions:  '#60a5fa',
-  race:     '#E87362',
+  race:     'var(--accent)',
 }
 
 function ChannelIcon({ ch, isSelected, size = 36 }) {
   if (ch.is_readonly) {
     return (
-      <div style={{ width: size, height: size, borderRadius: '8px', background: isSelected ? 'rgba(232, 115, 98,0.25)' : 'rgba(232, 115, 98,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: size * 0.5 }}>
+      <div style={{ width: size, height: size, borderRadius: '8px', background: isSelected ? 'rgba(var(--accent-rgb),0.25)' : 'rgba(var(--accent-rgb),0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: size * 0.5 }}>
         📢
       </div>
     )
   }
-  const color = CATEGORY_COLORS[ch.category] || '#00B5B9'
+  const color = CATEGORY_COLORS[ch.category] || 'var(--brand)'
   const letter = channelInitial(ch)
   return (
     <div style={{
@@ -428,7 +428,7 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
       <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', padding: '12px 20px 5px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#444', flex: 1 }}>{label}</span>
         {!open && groupUnread > 0 && (
-          <span style={{ background: '#00B5B9', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', fontWeight: 700, borderRadius: '8px', padding: '1px 6px' }}>{groupUnread}</span>
+          <span style={{ background: 'var(--brand)', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', fontWeight: 700, borderRadius: '8px', padding: '1px 6px' }}>{groupUnread}</span>
         )}
         <span style={{ fontSize: '10px', color: '#333', marginLeft: '4px' }}>{open ? '▾' : '▸'}</span>
       </button>
@@ -451,9 +451,9 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
             style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               width: '100%', padding: '8px 16px 8px 20px',
-              background: isSelected ? 'rgba(0, 181, 185,0.07)' : 'none',
+              background: isSelected ? 'rgba(var(--brand-rgb),0.07)' : 'none',
               border: 'none',
-              borderLeft: isSelected ? '2px solid #00B5B9' : '2px solid transparent',
+              borderLeft: isSelected ? '2px solid var(--brand)' : '2px solid transparent',
               cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s',
             }}
           >
@@ -472,7 +472,7 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
 
             {locked && <div style={{ fontSize: '13px', color: '#555', flexShrink: 0 }}>🔒</div>}
             {unreadCount > 0 && (
-              <div style={{ background: '#00B5B9', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '8px', padding: '1px 7px', flexShrink: 0 }}>
+              <div style={{ background: 'var(--brand)', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '8px', padding: '1px 7px', flexShrink: 0 }}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </div>
             )}
@@ -546,7 +546,7 @@ function MentionsView({ session, profile, isMobile, channels, teamView, onBack, 
             const msg = m.message
             const chName = ch ? channelDisplayName(ch) : ''
             return (
-              <div key={m.id} onClick={() => onOpenChannel(channels.find(full => full.id === ch?.id) || ch)} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid #E87362', borderRadius: '8px', padding: '12px', marginBottom: '8px', cursor: 'pointer' }}>
+              <div key={m.id} onClick={() => onOpenChannel(channels.find(full => full.id === ch?.id) || ch)} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid var(--accent)', borderRadius: '8px', padding: '12px', marginBottom: '8px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <Avatar profile={msg?.profiles} size={24} />
                   <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600, color: '#fff' }}>{msg?.profiles?.full_name || 'Athlete'}</span>
@@ -847,7 +847,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
               {(accessLabel || channel.description) && (
                 <div style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {accessLabel && <span style={{ color: accessLabel === 'Public discussion' ? '#00B5B9' : '#E87362', fontWeight: 600 }}>{accessLabel}</span>}
+                  {accessLabel && <span style={{ color: accessLabel === 'Public discussion' ? 'var(--brand)' : 'var(--accent)', fontWeight: 600 }}>{accessLabel}</span>}
                   {accessLabel && channel.description && <span> · </span>}
                   {channel.description}
                 </div>
@@ -882,8 +882,8 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               {/* Reply quote */}
               {msg.reply_msg && (
                 <div style={{ paddingLeft: '42px', marginBottom: '2px' }}>
-                  <div style={{ borderLeft: '2px solid #00B5B9', paddingLeft: '8px', fontSize: '12px', color: '#555', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ color: '#00B5B9', fontWeight: 600, fontFamily: 'Barlow Condensed, sans-serif' }}>{msg.reply_msg.profiles?.full_name || 'Athlete'}</span>
+                  <div style={{ borderLeft: '2px solid var(--brand)', paddingLeft: '8px', fontSize: '12px', color: '#555', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--brand)', fontWeight: 600, fontFamily: 'Barlow Condensed, sans-serif' }}>{msg.reply_msg.profiles?.full_name || 'Athlete'}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>{msg.reply_msg.content}</span>
                   </div>
                 </div>
@@ -907,7 +907,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                   <div style={{ marginTop: '4px' }}>
                     <textarea
                       autoFocus
-                      style={{ width: '100%', background: '#1a1a1a', border: '1px solid rgba(0, 181, 185,0.4)', borderRadius: '6px', color: '#fff', padding: '8px 10px', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', resize: 'none', lineHeight: 1.5, minHeight: '40px', maxHeight: '120px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: '#1a1a1a', border: '1px solid rgba(var(--brand-rgb),0.4)', borderRadius: '6px', color: '#fff', padding: '8px 10px', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', resize: 'none', lineHeight: 1.5, minHeight: '40px', maxHeight: '120px', boxSizing: 'border-box' }}
                       value={editText}
                       onChange={e => setEditText(e.target.value)}
                       onKeyDown={e => {
@@ -916,7 +916,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                       }}
                     />
                     <div style={{ display: 'flex', gap: '6px', marginTop: '5px' }}>
-                      <button onClick={saveEdit} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', padding: '4px 12px', background: '#00B5B9', border: 'none', borderRadius: '4px', color: '#000', cursor: 'pointer' }}>Save</button>
+                      <button onClick={saveEdit} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', padding: '4px 12px', background: 'var(--brand)', border: 'none', borderRadius: '4px', color: '#000', cursor: 'pointer' }}>Save</button>
                       <button onClick={() => { setEditingMsg(null); setEditText('') }} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', padding: '4px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: '#999', cursor: 'pointer' }}>Cancel</button>
                       <span style={{ fontSize: '11px', color: '#555', alignSelf: 'center' }}>Enter to save · Esc to cancel</span>
                     </div>
@@ -939,7 +939,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                     {Object.entries(grouped).map(([emoji, userIds]) => (
                       <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '3px', background: userIds.includes(userId) ? 'rgba(0, 181, 185,0.1)' : '#1a1a1a', border: `1px solid ${userIds.includes(userId) ? 'rgba(0, 181, 185,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '12px', padding: '2px 8px', fontSize: '13px', cursor: 'pointer', color: '#bbb' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: '3px', background: userIds.includes(userId) ? 'rgba(var(--brand-rgb),0.1)' : '#1a1a1a', border: `1px solid ${userIds.includes(userId) ? 'rgba(var(--brand-rgb),0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '12px', padding: '2px 8px', fontSize: '13px', cursor: 'pointer', color: '#bbb' }}>
                         {emoji} <span style={{ fontSize: '11px', fontFamily: 'Barlow Condensed, sans-serif' }}>{userIds.length}</span>
                       </button>
                     ))}
@@ -991,7 +991,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         {replyTo && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px 6px 0 0', padding: '6px 12px', marginBottom: '-4px' }}>
             <span style={{ fontSize: '12px', color: '#555' }}>↩ Replying to</span>
-            <span style={{ fontSize: '12px', color: '#00B5B9', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600 }}>{replyTo.profiles?.full_name || 'Athlete'}</span>
+            <span style={{ fontSize: '12px', color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600 }}>{replyTo.profiles?.full_name || 'Athlete'}</span>
             <span style={{ fontSize: '12px', color: '#555', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyTo.content}</span>
             <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#555', fontSize: '16px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
           </div>
@@ -1002,7 +1002,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', marginBottom: '6px', overflow: 'hidden', maxHeight: '160px', overflowY: 'auto' }}>
             {mentionQuery.filtered.slice(0, 6).map((p, i) => (
               <button key={p.id} onClick={() => insertMention(p)}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', background: i === mentionIndex ? 'rgba(0, 181, 185,0.1)' : 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', background: i === mentionIndex ? 'rgba(var(--brand-rgb),0.1)' : 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
                 <Avatar profile={p} size={24} idx={i} />
                 <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', color: '#fff' }}>{p.full_name}</span>
               </button>
@@ -1034,7 +1034,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           </div>
           {(text.trim() || uploading) && (
             <button onClick={() => sendMessage()} disabled={sending || uploading}
-              style={{ background: '#00B5B9', border: 'none', borderRadius: '8px', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', padding: '6px 12px', cursor: 'pointer', flexShrink: 0 }}>
+              style={{ background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', padding: '6px 12px', cursor: 'pointer', flexShrink: 0 }}>
               {uploading ? '...' : sending ? '...' : 'Send'}
             </button>
           )}
@@ -1056,7 +1056,7 @@ function DMGroup({ dmChannels, selected, unread, lastMessages, userId, onSelect,
       <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', padding: '12px 20px 5px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#444', flex: 1 }}>Direct Messages</span>
         {!open && dmUnread > 0 && (
-          <span style={{ background: '#00B5B9', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', fontWeight: 700, borderRadius: '8px', padding: '1px 6px' }}>{dmUnread}</span>
+          <span style={{ background: 'var(--brand)', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', fontWeight: 700, borderRadius: '8px', padding: '1px 6px' }}>{dmUnread}</span>
         )}
         <span style={{ fontSize: '10px', color: '#333', marginLeft: '4px' }}>{open ? '▾' : '▸'}</span>
       </button>
@@ -1077,9 +1077,9 @@ function DMGroup({ dmChannels, selected, unread, lastMessages, userId, onSelect,
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px',
                   width: '100%', padding: '8px 16px 8px 20px',
-                  background: isSelected ? 'rgba(0, 181, 185,0.07)' : 'none',
+                  background: isSelected ? 'rgba(var(--brand-rgb),0.07)' : 'none',
                   border: 'none',
-                  borderLeft: isSelected ? '2px solid #00B5B9' : '2px solid transparent',
+                  borderLeft: isSelected ? '2px solid var(--brand)' : '2px solid transparent',
                   cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s',
                 }}
               >
@@ -1095,7 +1095,7 @@ function DMGroup({ dmChannels, selected, unread, lastMessages, userId, onSelect,
                   )}
                 </div>
                 {unreadCount > 0 && (
-                  <div style={{ background: '#00B5B9', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '8px', padding: '1px 7px', flexShrink: 0 }}>
+                  <div style={{ background: 'var(--brand)', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '8px', padding: '1px 7px', flexShrink: 0 }}>
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </div>
                 )}
@@ -1226,15 +1226,15 @@ function NewChannelModal({ session, onClose, onCreated }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid #00B5B9', borderRadius: '10px', padding: '2rem', width: '100%', maxWidth: '420px' }}>
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#00B5B9', marginBottom: '1.5rem' }}>New Channel</div>
+      <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid var(--brand)', borderRadius: '10px', padding: '2rem', width: '100%', maxWidth: '420px' }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--brand)', marginBottom: '1.5rem' }}>New Channel</div>
 
         <div style={{ marginBottom: '12px' }}>
           <label style={labelStyle}>Category</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {categoryOptions.map(opt => (
               <button key={opt.value} onClick={() => setCategory(opt.value)}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '6px', border: '1px solid', borderColor: category === opt.value ? '#00B5B9' : 'rgba(255,255,255,0.12)', background: category === opt.value ? 'rgba(0, 181, 185,0.12)' : 'transparent', color: category === opt.value ? '#00B5B9' : '#888', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.5px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '6px', border: '1px solid', borderColor: category === opt.value ? 'var(--brand)' : 'rgba(255,255,255,0.12)', background: category === opt.value ? 'rgba(var(--brand-rgb),0.12)' : 'transparent', color: category === opt.value ? 'var(--brand)' : '#888', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.5px' }}>
                 <span>{opt.icon}</span>{opt.label}
               </button>
             ))}
@@ -1249,10 +1249,10 @@ function NewChannelModal({ session, onClose, onCreated }) {
           <label style={labelStyle}>Description (optional)</label>
           <input style={inputStyle} placeholder="What's this channel about?" value={description} onChange={e => setDescription(e.target.value)} />
         </div>
-        {error && <div style={{ color: '#E87362', fontSize: '13px', marginBottom: '12px' }}>{error}</div>}
+        {error && <div style={{ color: 'var(--accent)', fontSize: '13px', marginBottom: '12px' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase', padding: '10px 20px', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '5px', color: '#999', cursor: 'pointer' }}>Cancel</button>
-          <button onClick={create} disabled={saving} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: '#00B5B9', border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer' }}>{saving ? 'Creating...' : 'Create'}</button>
+          <button onClick={create} disabled={saving} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: 'var(--brand)', border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer' }}>{saving ? 'Creating...' : 'Create'}</button>
         </div>
       </div>
     </div>

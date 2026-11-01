@@ -14,7 +14,7 @@ const BellIcon = () => (
   </svg>
 )
 const iconBtnStyle = { background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', padding: '6px', display: 'flex', position: 'relative' }
-const badgeStyle = { position: 'absolute', top: '1px', right: '0px', background: '#E87362', color: '#fff', fontSize: '9px', fontWeight: 700, borderRadius: '8px', padding: '1px 4px', minWidth: '14px', textAlign: 'center', fontFamily: 'Barlow Condensed, sans-serif' }
+const badgeStyle = { position: 'absolute', top: '1px', right: '0px', background: 'var(--accent)', color: '#fff', fontSize: '9px', fontWeight: 700, borderRadius: '8px', padding: '1px 4px', minWidth: '14px', textAlign: 'center', fontFamily: 'Barlow Condensed, sans-serif' }
 
 // Icons as simple SVG components
 const HomeIcon = ({ active }) => (
@@ -49,9 +49,9 @@ const TeamIcon = ({ active }) => (
   </svg>
 )
 const ProfileIcon = ({ active, avatarUrl, color, initials }) => {
-  if (avatarUrl) return <img src={avatarUrl} alt="profile" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', border: active ? '2px solid #00B5B9' : '1.5px solid rgba(255,255,255,0.2)' }} />
+  if (avatarUrl) return <img src={avatarUrl} alt="profile" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', border: active ? '2px solid var(--brand)' : '1.5px solid rgba(255,255,255,0.2)' }} />
   return (
-    <div style={{ width: 24, height: 24, borderRadius: '50%', background: active ? '#00B5B9' : (color || '#444'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#000', border: active ? '2px solid #00B5B9' : 'none', fontFamily: 'Barlow Condensed, sans-serif' }}>
+    <div style={{ width: 24, height: 24, borderRadius: '50%', background: active ? 'var(--brand)' : (color || '#444'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#000', border: active ? '2px solid var(--brand)' : 'none', fontFamily: 'Barlow Condensed, sans-serif' }}>
       {initials}
     </div>
   )
@@ -89,7 +89,7 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
 
   const email = session?.user?.email || ''
   const initials = (profile?.full_name || email).split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  const avatarColor = profile?.avatar_color || '#00B5B9'
+  const avatarColor = profile?.avatar_color || 'var(--brand)'
   const avatarUrl = profile?.avatar_url || null
 
   const signOut = async () => { await supabase.auth.signOut() }
@@ -98,13 +98,17 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         {/* Top stripe */}
-        <div style={{ height: '3px', background: 'linear-gradient(90deg, #00B5B9, #E87362, #E8B84B, #E87362)', flexShrink: 0 }} />
+        <div style={{ height: '3px', background: 'linear-gradient(90deg, var(--brand), var(--accent), var(--highlight), var(--accent))', flexShrink: 0 }} />
 
         {/* Slim top bar — wordmark + avatar. Profile is not a tab in the
             5-tab model; it lives behind the avatar. */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#161616', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-          <button onClick={() => navigate('/')} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 900, letterSpacing: '3px', color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-            <span style={{ color: '#00B5B9' }}>TEAM</span> TTL
+          <button onClick={() => navigate('/')} aria-label="That Triathlon Life — home" style={{ display: 'flex', alignItems: 'center', gap: '9px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <img src="/icons/icon-192.png" alt="" style={{ width: '30px', height: '30px', borderRadius: '8px' }} />
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.15 }}>
+              <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12.5px', fontWeight: 800, letterSpacing: '2.2px', color: '#fff' }}>THAT TRIATHLON</span>
+              <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12.5px', fontWeight: 800, letterSpacing: '2.2px', color: 'var(--brand)' }}>LIFE</span>
+            </span>
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <button onClick={() => navigate('/search')} aria-label="Search" style={iconBtnStyle}>
@@ -149,9 +153,9 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
                   flex: 1, display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center',
                   padding: '7px 2px 6px',
-                  background: active ? 'rgba(0, 181, 185,0.16)' : 'none',
+                  background: active ? 'rgba(var(--brand-rgb),0.16)' : 'none',
                   border: 'none', borderRadius: '999px',
-                  color: active ? '#00B5B9' : '#666',
+                  color: active ? 'var(--brand)' : '#666',
                   cursor: 'pointer', position: 'relative',
                   transition: 'all 0.15s',
                 }}
@@ -165,7 +169,7 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
                   {tab.label}
                 </span>
                 {isMessages && unreadCount > 0 && (
-                  <div style={{ position: 'absolute', top: '6px', left: '50%', marginLeft: '6px', background: '#E87362', color: '#fff', fontSize: '9px', fontWeight: 700, borderRadius: '8px', padding: '1px 4px', minWidth: '14px', textAlign: 'center', fontFamily: 'Barlow Condensed, sans-serif' }}>
+                  <div style={{ position: 'absolute', top: '6px', left: '50%', marginLeft: '6px', background: 'var(--accent)', color: '#fff', fontSize: '9px', fontWeight: 700, borderRadius: '8px', padding: '1px 4px', minWidth: '14px', textAlign: 'center', fontFamily: 'Barlow Condensed, sans-serif' }}>
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </div>
                 )}
@@ -181,20 +185,24 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
   // Desktop — keep top nav
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <div style={{ height: '3px', background: 'linear-gradient(90deg, #00B5B9, #E87362, #E8B84B, #E87362)' }} />
+      <div style={{ height: '3px', background: 'linear-gradient(90deg, var(--brand), var(--accent), var(--highlight), var(--accent))' }} />
       <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 1.5rem', height: '56px', background: '#161616', borderBottom: '1px solid rgba(255,255,255,0.08)', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-          <button style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '26px', fontWeight: 900, letterSpacing: '3px', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px', marginRight: '16px', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} onClick={() => navigate('/')}>
-            <span style={{ color: '#00B5B9' }}>TEAM</span> TTL
+          <button style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '20px', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} onClick={() => navigate('/')} aria-label="That Triathlon Life — home">
+            <img src="/icons/icon-192.png" alt="" style={{ width: '34px', height: '34px', borderRadius: '9px' }} />
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.15 }}>
+              <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, letterSpacing: '2.4px', color: '#fff' }}>THAT TRIATHLON</span>
+              <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, letterSpacing: '2.4px', color: 'var(--brand)' }}>LIFE</span>
+            </span>
           </button>
           {DESKTOP_NAV.map(link => (
             <button key={link.path}
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '2px', textTransform: 'uppercase', padding: '0 12px', height: '56px', display: 'flex', alignItems: 'center', color: location.pathname === link.path ? '#fff' : '#888', cursor: 'pointer', background: 'none', border: 'none', borderBottom: location.pathname === link.path ? '2px solid #00B5B9' : '2px solid transparent', transition: 'all 0.15s', position: 'relative', flexShrink: 0 }}
+              style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '2px', textTransform: 'uppercase', padding: '0 12px', height: '56px', display: 'flex', alignItems: 'center', color: location.pathname === link.path ? '#fff' : '#888', cursor: 'pointer', background: 'none', border: 'none', borderBottom: location.pathname === link.path ? '2px solid var(--brand)' : '2px solid transparent', transition: 'all 0.15s', position: 'relative', flexShrink: 0 }}
               onClick={() => navigate(link.path)}
             >
               {link.label}
               {link.path === '/messages' && unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: '10px', right: '4px', background: '#E87362', color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '8px', padding: '1px 5px', fontFamily: 'Barlow Condensed, sans-serif' }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+                <span style={{ position: 'absolute', top: '10px', right: '4px', background: 'var(--accent)', color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '8px', padding: '1px 5px', fontFamily: 'Barlow Condensed, sans-serif' }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
               )}
             </button>
           ))}
@@ -223,7 +231,7 @@ export default function Layout({ children, session, profile, onNavigateProfile, 
                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
                   onClick={() => { setDesktopDropdown(false); onNavigateProfile() }}>Profile Settings</button>
                 <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
-                <button style={{ padding: '8px 12px', borderRadius: '4px', fontSize: '13px', color: '#E87362', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', background: 'none', border: 'none', width: '100%', textAlign: 'left' }}
+                <button style={{ padding: '8px 12px', borderRadius: '4px', fontSize: '13px', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', background: 'none', border: 'none', width: '100%', textAlign: 'left' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#2a2a2a'}
                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
                   onClick={signOut}>Sign out</button>

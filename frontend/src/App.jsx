@@ -19,6 +19,18 @@ function AppRoutes({ session, profile, setProfile }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const navigate = useNavigate()
 
+  // Dual theme (DESIGN-SPEC §3): one unified brand app — Fan/Community
+  // users see the TTL masterbrand theme; team-entitled members see the
+  // season's Team TTL kit palette. Switching data-theme swaps every
+  // --brand/--accent/--highlight variable app-wide. The demo tier switch
+  // reloads the page, so this also fires correctly after a flip.
+  const teamTheme = isTeamTier(profile)
+  useEffect(() => {
+    document.documentElement.dataset.theme = teamTheme ? 'team' : 'brand'
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', teamTheme ? '#00B5B9' : '#2BB3A3')
+  }, [teamTheme])
+
   useEffect(() => { 
     loadUnreadCount()
     // Refresh every 30 seconds

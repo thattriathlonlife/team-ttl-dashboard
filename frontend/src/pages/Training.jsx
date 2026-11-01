@@ -7,20 +7,20 @@ import ChallengeAdminModal from '../components/ChallengeAdminModal'
 const STRAVA_ORANGE = '#FC4C02'
 
 const TYPE_CONFIG = {
-  'Swim':           { emoji: '🏊', color: '#00B5B9', bg: 'rgba(0, 181, 185,0.12)' },
-  'Bike':           { emoji: '🚴', color: '#E87362', bg: 'rgba(232, 115, 98,0.12)' },
-  'Ride':           { emoji: '🚴', color: '#E87362', bg: 'rgba(232, 115, 98,0.12)' },
-  'VirtualRide':    { emoji: '🚴', color: '#E87362', bg: 'rgba(232, 115, 98,0.12)' },
-  'Run':            { emoji: '🏃', color: '#E87362', bg: 'rgba(232, 115, 98,0.12)' },
-  'VirtualRun':     { emoji: '🏃', color: '#E87362', bg: 'rgba(232, 115, 98,0.12)' },
+  'Swim':           { emoji: '🏊', color: 'var(--brand)', bg: 'rgba(var(--brand-rgb),0.12)' },
+  'Bike':           { emoji: '🚴', color: 'var(--accent)', bg: 'rgba(var(--accent-rgb),0.12)' },
+  'Ride':           { emoji: '🚴', color: 'var(--accent)', bg: 'rgba(var(--accent-rgb),0.12)' },
+  'VirtualRide':    { emoji: '🚴', color: 'var(--accent)', bg: 'rgba(var(--accent-rgb),0.12)' },
+  'Run':            { emoji: '🏃', color: 'var(--accent)', bg: 'rgba(var(--accent-rgb),0.12)' },
+  'VirtualRun':     { emoji: '🏃', color: 'var(--accent)', bg: 'rgba(var(--accent-rgb),0.12)' },
   'Walk':           { emoji: '🚶', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
   'Hike':           { emoji: '🥾', color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
-  'WeightTraining': { emoji: '💪', color: '#E8B84B', bg: 'rgba(232,184,75,0.12)' },
-  'Workout':        { emoji: '⚡', color: '#E8B84B', bg: 'rgba(232,184,75,0.12)' },
+  'WeightTraining': { emoji: '💪', color: 'var(--highlight)', bg: 'rgba(var(--highlight-rgb),0.12)' },
+  'Workout':        { emoji: '⚡', color: 'var(--highlight)', bg: 'rgba(var(--highlight-rgb),0.12)' },
   'Yoga':           { emoji: '🧘', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
   'Kayaking':       { emoji: '🛶', color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
   'Soccer':         { emoji: '⚽', color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
-  'Tennis':         { emoji: '🎾', color: '#E8B84B', bg: 'rgba(232,184,75,0.12)' },
+  'Tennis':         { emoji: '🎾', color: 'var(--highlight)', bg: 'rgba(var(--highlight-rgb),0.12)' },
 }
 
 function getType(sport_type) {
@@ -75,7 +75,7 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.err) return (
       <div style={{ padding: '2rem', maxWidth: 600, margin: '0 auto' }}>
-        <div style={{ background: 'rgba(232, 115, 98,0.1)', border: '1px solid rgba(232, 115, 98,0.2)', borderRadius: 8, padding: '1.5rem', color: '#E87362' }}>
+        <div style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: 8, padding: '1.5rem', color: 'var(--accent)' }}>
           <b>Training page error</b><br />{this.state.err.message}
         </div>
       </div>
@@ -88,7 +88,7 @@ class ErrorBoundary extends Component {
 function Av({ name, color, url, size = 26 }) {
   const init = (name || 'A').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   if (url) return <img src={url} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-  return <div style={{ width: size, height: size, borderRadius: '50%', background: color || '#00B5B9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: Math.max(9, size * 0.36), fontWeight: 700, color: '#000', flexShrink: 0 }}>{init}</div>
+  return <div style={{ width: size, height: size, borderRadius: '50%', background: color || 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: Math.max(9, size * 0.36), fontWeight: 700, color: '#000', flexShrink: 0 }}>{init}</div>
 }
 
 // ── Weekly summary ────────────────────────────────────────────────
@@ -112,15 +112,15 @@ function WeeklySummary({ activities, challenges }) {
 
   const cols = [
     { e: '🏅', l: 'Sessions',   v: week.length,                                        s: 'this week',                                        c: '#fff'    },
-    { e: '🏊', l: 'Swim',       v: swKm > 0 ? `${swKm.toFixed(1)} km` : sw.length,    s: `${sw.length} session${sw.length !== 1 ? 's' : ''}`, c: '#00B5B9' },
-    { e: '🚴', l: 'Bike',       v: bkKm > 0 ? `${bkKm.toFixed(0)} km` : bk.length,    s: `${bk.length} session${bk.length !== 1 ? 's' : ''}`, c: '#E87362' },
-    { e: '🏃', l: 'Run',        v: rnKm > 0 ? `${rnKm.toFixed(1)} km` : rn.length,    s: `${rn.length} session${rn.length !== 1 ? 's' : ''}`, c: '#E87362' },
+    { e: '🏊', l: 'Swim',       v: swKm > 0 ? `${swKm.toFixed(1)} km` : sw.length,    s: `${sw.length} session${sw.length !== 1 ? 's' : ''}`, c: 'var(--brand)' },
+    { e: '🚴', l: 'Bike',       v: bkKm > 0 ? `${bkKm.toFixed(0)} km` : bk.length,    s: `${bk.length} session${bk.length !== 1 ? 's' : ''}`, c: 'var(--accent)' },
+    { e: '🏃', l: 'Run',        v: rnKm > 0 ? `${rnKm.toFixed(1)} km` : rn.length,    s: `${rn.length} session${rn.length !== 1 ? 's' : ''}`, c: 'var(--accent)' },
     // Only show the challenges column when there are challenges this week
     weekChallenges.length > 0 && {
       e: '🏆', l: 'Challenges',
       v: completedCount,
       s: completedCount === weekChallenges.length ? 'all complete' : `of ${weekChallenges.length}`,
-      c: completedCount > 0 ? '#E8B84B' : '#555',
+      c: completedCount > 0 ? 'var(--highlight)' : '#555',
     },
   ].filter(Boolean)
   return (
@@ -163,14 +163,14 @@ function Leaderboard({ activities, profiles }) {
       {ranked.length === 0
         ? <div style={{ padding: '12px 14px', fontSize: 12, color: '#444', fontStyle: 'italic' }}>No training logged yet this week</div>
         : ranked.map((a, i) => (
-          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderBottom: i < ranked.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', background: i === 0 ? 'rgba(232,184,75,0.04)' : 'none' }}>
+          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderBottom: i < ranked.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', background: i === 0 ? 'rgba(var(--highlight-rgb),0.04)' : 'none' }}>
             <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>{MEDALS[i] || `${i + 1}`}</span>
             <Av name={a.name} color={a.color} url={a.url} size={24} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
               <div style={{ fontSize: 10, color: '#555' }}>{a.sessions} session{a.sessions !== 1 ? 's' : ''}</div>
             </div>
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, color: i === 0 ? '#E8B84B' : '#666', flexShrink: 0 }}>{a.score}</div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, color: i === 0 ? 'var(--highlight)' : '#666', flexShrink: 0 }}>{a.score}</div>
           </div>
         ))
       }
@@ -217,7 +217,7 @@ function Streaks({ profiles }) {
             </div>
             {a.pending
               ? <div style={{ fontSize: 11, color: '#444', fontFamily: 'Barlow Condensed, sans-serif' }}>–</div>
-              : <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: '#E87362', flexShrink: 0 }}>{'🔥'.repeat(Math.min(a.streak, 3))} {a.streak}</div>
+              : <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>{'🔥'.repeat(Math.min(a.streak, 3))} {a.streak}</div>
             }
           </div>
         ))
@@ -244,10 +244,10 @@ function PeakWeek({ activities, athleteId }) {
   const peak   = scored.reduce((b, w) => w.score > b.score ? w : b, scored[0])
   if (peak.ts !== thisW) return null
   return (
-    <div style={{ background: 'rgba(232,184,75,0.08)', border: '1px solid rgba(232,184,75,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div style={{ background: 'rgba(var(--highlight-rgb),0.08)', border: '1px solid rgba(var(--highlight-rgb),0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
       <span style={{ fontSize: 20, flexShrink: 0 }}>🏆</span>
       <div>
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: '#E8B84B' }}>Biggest week in the last 14 days!</div>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: 'var(--highlight)' }}>Biggest week in the last 14 days!</div>
         <div style={{ fontSize: 11, color: '#aaa' }}>{peak.sessions} sessions · {(peak.dur / 3600).toFixed(1)}h · {(peak.dist / 1000).toFixed(0)} km</div>
       </div>
     </div>
@@ -279,15 +279,15 @@ function MonthlySummary({ activities, challenges }) {
   ).length
 
   const stats = [
-    swKm > 0 && { emoji: '🏊', label: 'Swim',  value: `${swKm.toFixed(1)} km`, color: '#00B5B9' },
-    bkKm > 0 && { emoji: '🚴', label: 'Bike',  value: `${bkKm.toFixed(0)} km`,  color: '#E87362' },
-    rnKm > 0 && { emoji: '🏃', label: 'Run',   value: `${rnKm.toFixed(1)} km`, color: '#E87362' },
-               { emoji: '⏱',  label: 'Total', value: `${hrs.toFixed(0)}h`,     color: '#E8B84B' },
+    swKm > 0 && { emoji: '🏊', label: 'Swim',  value: `${swKm.toFixed(1)} km`, color: 'var(--brand)' },
+    bkKm > 0 && { emoji: '🚴', label: 'Bike',  value: `${bkKm.toFixed(0)} km`,  color: 'var(--accent)' },
+    rnKm > 0 && { emoji: '🏃', label: 'Run',   value: `${rnKm.toFixed(1)} km`, color: 'var(--accent)' },
+               { emoji: '⏱',  label: 'Total', value: `${hrs.toFixed(0)}h`,     color: 'var(--highlight)' },
   ].filter(Boolean)
   return (
-    <div style={{ background: 'rgba(232, 115, 98,0.06)', border: '1px solid rgba(232, 115, 98,0.18)', borderRadius: 10, padding: '0.875rem 1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+    <div style={{ background: 'rgba(var(--accent-rgb),0.06)', border: '1px solid rgba(var(--accent-rgb),0.18)', borderRadius: 10, padding: '0.875rem 1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
       <div style={{ flexShrink: 0 }}>
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: '#E87362', marginBottom: 2 }}>🗓 {MONTHS[lm]} Recap</div>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 2 }}>🗓 {MONTHS[lm]} Recap</div>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, color: '#fff' }}>
           {acts.length} sessions · {aths} athlete{aths !== 1 ? 's' : ''}
           {completedChallenges > 0 && ` · ${completedChallenges} challenge${completedChallenges !== 1 ? 's' : ''} completed`}
@@ -344,9 +344,9 @@ function ActivityBadgeStrip({ activity }) {
             title={meta.label}
             style={{
               fontSize: 11, padding: '2px 7px', borderRadius: 3,
-              background: 'rgba(232,184,75,0.1)',
-              border: '1px solid rgba(232,184,75,0.25)',
-              color: '#E8B84B',
+              background: 'rgba(var(--highlight-rgb),0.1)',
+              border: '1px solid rgba(var(--highlight-rgb),0.25)',
+              color: 'var(--highlight)',
               fontFamily: 'Barlow Condensed, sans-serif',
               letterSpacing: '0.5px',
             }}
@@ -376,7 +376,7 @@ function ActivityCard({ activity, upcomingRaces }) {
           <Av name={activity.athlete_name} color={activity.athlete_avatar_color} url={activity.athlete_avatar_url} size={20} />
           <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12, color: '#888', flex: 1 }}>{activity.athlete_name}</span>
           {nextRace && daysOut !== null && daysOut <= 30 && (
-            <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: '#00B5B9', background: 'rgba(0, 181, 185,0.1)', border: '1px solid rgba(0, 181, 185,0.2)', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>
+            <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: 'var(--brand)', background: 'rgba(var(--brand-rgb),0.1)', border: '1px solid rgba(var(--brand-rgb),0.2)', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>
               🏁 {daysOut}d · {nextRace.name.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '')}
             </span>
           )}
@@ -397,7 +397,7 @@ function ActivityCard({ activity, upcomingRaces }) {
           {activity.average_cadence      > 0 && <span style={{ fontSize: 12, color: '#666' }}>{formatCadence(activity.average_cadence, activity.sport_type)}</span>}
           {activity.average_heartrate    > 0 && <span style={{ fontSize: 12, color: '#888' }}>♥ {Math.round(activity.average_heartrate)} bpm</span>}
           {activity.suffer_score         > 0 && <span style={{ fontSize: 12, color: '#555' }}>effort {activity.suffer_score}</span>}
-          {activity.pr_count             > 0 && <span style={{ fontSize: 11, color: '#E8B84B', background: 'rgba(232,184,75,0.1)', borderRadius: 3, padding: '1px 5px' }}>🏆 {activity.pr_count} PR{activity.pr_count > 1 ? 's' : ''}</span>}
+          {activity.pr_count             > 0 && <span style={{ fontSize: 11, color: 'var(--highlight)', background: 'rgba(var(--highlight-rgb),0.1)', borderRadius: 3, padding: '1px 5px' }}>🏆 {activity.pr_count} PR{activity.pr_count > 1 ? 's' : ''}</span>}
           {activity.kudos_count          > 0 && <span style={{ fontSize: 12, color: '#555' }}>👍 {activity.kudos_count}</span>}
           {activity.trainer                  && <span style={{ fontSize: 11, color: '#444', background: 'rgba(255,255,255,0.04)', borderRadius: 3, padding: '1px 5px' }}>indoor</span>}
         </div>
@@ -606,7 +606,7 @@ function TrainingPage({ session, profile }) {
       {!isConnected && <ConnectBanner userId={userId} />}
 
       {searchParams.get('connected') === 'true' && (
-        <div style={{ background: 'rgba(0, 181, 185,0.1)', border: '1px solid rgba(0, 181, 185,0.25)', borderRadius: 8, padding: '10px 14px', color: '#00B5B9', fontSize: 13, marginBottom: '1.25rem' }}>
+        <div style={{ background: 'rgba(var(--brand-rgb),0.1)', border: '1px solid rgba(var(--brand-rgb),0.25)', borderRadius: 8, padding: '10px 14px', color: 'var(--brand)', fontSize: 13, marginBottom: '1.25rem' }}>
           ✓ Strava connected! Your activities will appear within the hour. Hit Refresh to sync your recent activities now.
         </div>
       )}
@@ -633,7 +633,7 @@ function TrainingPage({ session, profile }) {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
                   <button
                     onClick={() => setShowChallengeModal(true)}
-                    style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '1px', textTransform: 'uppercase', padding: '5px 12px', background: 'rgba(232,184,75,0.08)', border: '1px solid rgba(232,184,75,0.25)', borderRadius: 4, color: '#E8B84B', cursor: 'pointer' }}
+                    style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '1px', textTransform: 'uppercase', padding: '5px 12px', background: 'rgba(var(--highlight-rgb),0.08)', border: '1px solid rgba(var(--highlight-rgb),0.25)', borderRadius: 4, color: 'var(--highlight)', cursor: 'pointer' }}
                   >
                     + Add challenge
                   </button>

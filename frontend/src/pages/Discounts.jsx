@@ -12,9 +12,9 @@ function CopyButton({ code }) {
     <button onClick={copy} style={{
       fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700,
       letterSpacing: '1px', textTransform: 'uppercase', padding: '6px 14px',
-      background: copied ? 'rgba(0, 181, 185,0.15)' : 'rgba(255,255,255,0.06)',
-      border: `1px solid ${copied ? 'rgba(0, 181, 185,0.4)' : 'rgba(255,255,255,0.12)'}`,
-      borderRadius: '4px', color: copied ? '#00B5B9' : '#ccc', cursor: 'pointer', transition: 'all 0.15s',
+      background: copied ? 'rgba(var(--brand-rgb),0.15)' : 'rgba(255,255,255,0.06)',
+      border: `1px solid ${copied ? 'rgba(var(--brand-rgb),0.4)' : 'rgba(255,255,255,0.12)'}`,
+      borderRadius: '4px', color: copied ? 'var(--brand)' : '#ccc', cursor: 'pointer', transition: 'all 0.15s',
     }}>
       {copied ? '✓ Copied' : code}
     </button>
@@ -35,7 +35,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
       {isAdmin && (
         <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '4px', zIndex: 2 }}>
           <button onClick={() => onEdit(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: '#aaa', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>Edit</button>
-          <button onClick={() => onDelete(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(232, 115, 98,0.2)', borderRadius: '4px', color: '#E87362', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>×</button>
+          <button onClick={() => onDelete(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: '4px', color: 'var(--accent)', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>×</button>
         </div>
       )}
 
@@ -44,7 +44,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
         {discount.logo_url ? (
           <img src={discount.logo_url} alt={discount.brand} style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'contain', background: '#fff', padding: '4px', flexShrink: 0 }} />
         ) : (
-          <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: discount.color || 'rgba(0, 181, 185,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: discount.color || 'rgba(var(--brand-rgb),0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
             {discount.brand.slice(0, 2).toUpperCase()}
           </div>
         )}
@@ -53,7 +53,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
           <div style={{ fontSize: '12px', color: '#999' }}>{discount.category}</div>
         </div>
         {discount.amount && (
-          <div style={{ flexShrink: 0, fontFamily: 'Barlow Condensed, sans-serif', fontSize: '22px', fontWeight: 800, color: '#00B5B9' }}>{discount.amount}</div>
+          <div style={{ flexShrink: 0, fontFamily: 'Barlow Condensed, sans-serif', fontSize: '22px', fontWeight: 800, color: 'var(--brand)' }}>{discount.amount}</div>
         )}
       </div>
 
@@ -66,13 +66,13 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
             : <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase', color: '#555', padding: '6px 0' }}>Code coming soon</div>
           }
           {discount.single_use && (
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', padding: '3px 8px', background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.25)', borderRadius: '3px' }}>Single use</div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', padding: '3px 8px', background: 'rgba(var(--highlight-rgb),0.1)', color: 'var(--highlight)', border: '1px solid rgba(var(--highlight-rgb),0.25)', borderRadius: '3px' }}>Single use</div>
           )}
           {discount.note === 'rolling-availability' && (
-            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', padding: '3px 8px', background: 'rgba(0, 181, 185,0.08)', color: '#00B5B9', border: '1px solid rgba(0, 181, 185,0.2)', borderRadius: '3px' }}>Rolling offer</div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', padding: '3px 8px', background: 'rgba(var(--brand-rgb),0.08)', color: 'var(--brand)', border: '1px solid rgba(var(--brand-rgb),0.2)', borderRadius: '3px' }}>Rolling offer</div>
           )}
           {daysLeft !== null && (
-            <div style={{ fontSize: '11px', color: daysLeft <= 7 ? '#E87362' : '#555', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px', marginLeft: 'auto' }}>
+            <div style={{ fontSize: '11px', color: daysLeft <= 7 ? 'var(--accent)' : '#555', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px', marginLeft: 'auto' }}>
               {isExpired ? 'Expired' : daysLeft === 0 ? 'Expires today' : `${daysLeft}d left`}
             </div>
           )}
@@ -82,7 +82,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
   )
 }
 
-const EMPTY_FORM = { brand: '', code: '', amount: '', description: '', category: '', color: '#00B5B9', expiry: '', single_use: false, note: '', active: true, sort_order: 0 }
+const EMPTY_FORM = { brand: '', code: '', amount: '', description: '', category: '', color: 'var(--brand)', expiry: '', single_use: false, note: '', active: true, sort_order: 0 }
 
 function DiscountModal({ discount, onSave, onClose }) {
   const [form, setForm] = useState(discount ? {
@@ -91,7 +91,7 @@ function DiscountModal({ discount, onSave, onClose }) {
     note: discount.note || '',
     code: discount.code || '',
     amount: discount.amount || '',
-    color: discount.color || '#00B5B9',
+    color: discount.color || 'var(--brand)',
     logo_url: discount.logo_url || '',
   } : { ...EMPTY_FORM, logo_url: '' })
   const [saving, setSaving] = useState(false)
@@ -146,8 +146,8 @@ function DiscountModal({ discount, onSave, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid #00B5B9', borderRadius: '10px', padding: '2rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflow: 'auto' }}>
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#00B5B9', marginBottom: '1.5rem' }}>
+      <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid var(--brand)', borderRadius: '10px', padding: '2rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflow: 'auto' }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--brand)', marginBottom: '1.5rem' }}>
           {discount?.id ? 'Edit Discount' : 'Add Discount'}
         </div>
 
@@ -187,7 +187,7 @@ function DiscountModal({ discount, onSave, onClose }) {
               <div style={{ fontSize: '11px', color: '#555' }}>PNG or SVG recommended, max 1MB</div>
             </div>
             {form.logo_url && (
-              <button onClick={() => set('logo_url', '')} style={{ background: 'none', border: 'none', color: '#E87362', fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
+              <button onClick={() => set('logo_url', '')} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
             )}
           </div>
         </div>
@@ -206,7 +206,7 @@ function DiscountModal({ discount, onSave, onClose }) {
             <label style={labelStyle}>Brand Colour</label>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <input style={{ ...inputStyle, flex: 1 }} value={form.color} onChange={e => set('color', e.target.value)} placeholder="#e63946" />
-              <input type="color" value={form.color || '#00B5B9'} onChange={e => set('color', e.target.value)} style={{ width: '36px', height: '36px', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: 0 }} />
+              <input type="color" value={form.color || 'var(--brand)'} onChange={e => set('color', e.target.value)} style={{ width: '36px', height: '36px', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: 0 }} />
             </div>
           </div>
           <div style={groupStyle}>
@@ -231,11 +231,11 @@ function DiscountModal({ discount, onSave, onClose }) {
           </label>
         </div>
 
-        {error && <div style={{ color: '#E87362', fontSize: '13px', marginBottom: '12px' }}>{error}</div>}
+        {error && <div style={{ color: 'var(--accent)', fontSize: '13px', marginBottom: '12px' }}>{error}</div>}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase', padding: '10px 20px', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '5px', color: '#999', cursor: 'pointer' }}>Cancel</button>
-          <button onClick={save} disabled={saving} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: '#00B5B9', border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer' }}>
+          <button onClick={save} disabled={saving} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: 'var(--brand)', border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer' }}>
             {saving ? 'Saving...' : discount?.id ? 'Save Changes' : 'Add Discount'}
           </button>
         </div>
@@ -282,7 +282,7 @@ export default function Discounts({ profile }) {
           <div style={{ fontSize: '14px', color: '#999' }}>Exclusive member benefits from our partners. Tap a code to copy it.</div>
         </div>
         {isAdmin && (
-          <button onClick={handleAdd} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 20px', background: '#00B5B9', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer', flexShrink: 0 }}>
+          <button onClick={handleAdd} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 20px', background: 'var(--brand)', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer', flexShrink: 0 }}>
             + Add Discount
           </button>
         )}

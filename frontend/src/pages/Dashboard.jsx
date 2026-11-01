@@ -9,7 +9,7 @@ const S = {
   page: { maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' },
   tabBar: { display: 'flex', gap: '0', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' },
   tab: { padding: '12px 20px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', letterSpacing: '2px', textTransform: 'uppercase', color: '#888', background: 'none', border: 'none', borderBottom: '2px solid transparent', cursor: 'pointer', transition: 'all 0.15s', marginBottom: '-1px' },
-  tabActive: { color: '#00B5B9', borderBottomColor: '#00B5B9' },
+  tabActive: { color: 'var(--brand)', borderBottomColor: 'var(--brand)' },
   statsRow: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '1.5rem' },
   statCard: { background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '1rem 1.25rem' },
   statLabel: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#999', marginBottom: '6px' },
@@ -21,7 +21,7 @@ const S = {
   btnGhost: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '8px 16px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#ccc', cursor: 'pointer', transition: 'all 0.15s' },
   filters: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' },
   filterBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase', padding: '5px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', color: '#555', cursor: 'pointer', transition: 'all 0.15s' },
-  filterBtnActive: { border: '1px solid rgba(0, 181, 185,0.5)', color: '#00B5B9', background: 'rgba(0, 181, 185,0.08)' },
+  filterBtnActive: { border: '1px solid rgba(var(--brand-rgb),0.5)', color: 'var(--brand)', background: 'rgba(var(--brand-rgb),0.08)' },
   filterDivider: { width: '1px', background: 'rgba(255,255,255,0.08)', height: '20px', margin: '0 4px' },
   filterLabel: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#333', marginRight: '2px' },
   searchWrap: { position: 'relative', marginBottom: '10px' },
@@ -32,7 +32,7 @@ const S = {
   // My Races toggle
   viewToggle: { display: 'flex', background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '2px', marginBottom: '1rem', width: 'fit-content' },
   viewBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase', padding: '6px 16px', background: 'none', border: 'none', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.15s', color: '#555' },
-  viewBtnActive: { background: '#00B5B9', color: '#000', fontWeight: 600 },
+  viewBtnActive: { background: 'var(--brand)', color: '#000', fontWeight: 600 },
 }
 
 const ORG_OPTIONS = [{ value: 'all', label: 'All' }, { value: 'pto_scrape', label: 'IRONMAN' }, { value: 'triathlon_api', label: 'World Tri' }, { value: 'manual', label: 'Manual' }]
@@ -122,22 +122,22 @@ export default function Dashboard({ session }) {
       <div style={S.statsRow}>
         <div style={S.statCard}>
           <div style={S.statLabel}>Total Races</div>
-          <div style={{ ...S.statValue, color: '#00B5B9' }}>{filteredRaces.length}</div>
+          <div style={{ ...S.statValue, color: 'var(--brand)' }}>{filteredRaces.length}</div>
           <div style={S.statSub}>matching filters</div>
         </div>
         <div style={S.statCard}>
           <div style={S.statLabel}>My Races</div>
-          <div style={{ ...S.statValue, color: '#E87362' }}>{myRaceCount}</div>
+          <div style={{ ...S.statValue, color: 'var(--accent)' }}>{myRaceCount}</div>
           <div style={S.statSub}>entered so far</div>
         </div>
         <div style={S.statCard}>
           <div style={S.statLabel}>Team Members</div>
-          <div style={{ ...S.statValue, color: '#E8B84B' }}>{profiles.length}</div>
+          <div style={{ ...S.statValue, color: 'var(--highlight)' }}>{profiles.length}</div>
           <div style={S.statSub}>active athletes</div>
         </div>
         <div style={S.statCard}>
           <div style={S.statLabel}>Next Race</div>
-          <div style={{ ...S.statValue, color: '#E87362', fontSize: daysToNext !== null ? '28px' : '18px' }}>
+          <div style={{ ...S.statValue, color: 'var(--accent)', fontSize: daysToNext !== null ? '28px' : '18px' }}>
             {daysToNext !== null ? `${daysToNext}d` : '—'}
           </div>
           <div style={S.statSub}>{nextRace ? nextRace.name.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '') : 'No races entered'}</div>

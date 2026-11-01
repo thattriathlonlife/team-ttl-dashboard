@@ -2,7 +2,7 @@ import { useState } from 'react'
 import RaceDetail from './RaceDetail'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-const MEMBER_COLORS = ['#00B5B9','#E87362','#E8B84B','#E87362','#a78bfa','#34d399','#f472b6','#60a5fa']
+const MEMBER_COLORS = ['var(--brand)','var(--accent)','var(--highlight)','var(--accent)','#a78bfa','#34d399','#f472b6','#60a5fa']
 
 const S = {
   list: { display: 'flex', flexDirection: 'column', gap: '8px' },
@@ -14,7 +14,7 @@ const S = {
     transition: 'border-color 0.15s, background 0.15s',
     cursor: 'pointer',
   },
-  rowMine: { borderLeft: '3px solid #00B5B9' },
+  rowMine: { borderLeft: '3px solid var(--brand)' },
   dateBlock: { textAlign: 'center' },
   dateMonth: {
     fontFamily: 'Barlow Condensed, sans-serif',
@@ -35,9 +35,9 @@ const S = {
     fontSize: '11px', fontWeight: 700, letterSpacing: '1px',
     padding: '3px 10px', borderRadius: '3px', textTransform: 'uppercase',
   },
-  badgeFull: { background: 'rgba(0, 181, 185,0.12)', color: '#00B5B9', border: '1px solid rgba(0, 181, 185,0.25)' },
-  badge703: { background: 'rgba(232, 115, 98,0.12)', color: '#E87362', border: '1px solid rgba(232, 115, 98,0.25)' },
-  badgeOther: { background: 'rgba(232,184,75,0.1)', color: '#E8B84B', border: '1px solid rgba(232,184,75,0.2)' },
+  badgeFull: { background: 'rgba(var(--brand-rgb),0.12)', color: 'var(--brand)', border: '1px solid rgba(var(--brand-rgb),0.25)' },
+  badge703: { background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.25)' },
+  badgeOther: { background: 'rgba(var(--highlight-rgb),0.1)', color: 'var(--highlight)', border: '1px solid rgba(var(--highlight-rgb),0.2)' },
   right: { display: 'flex', alignItems: 'center', gap: '10px' },
   avatars: { display: 'flex' },
   avatar: {
@@ -55,7 +55,7 @@ const S = {
     borderRadius: '4px', color: '#ccc',
     cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
   },
-  btnJoined: { borderColor: '#00B5B9', color: '#00B5B9' },
+  btnJoined: { borderColor: 'var(--brand)', color: 'var(--brand)' },
   empty: {
     textAlign: 'center', padding: '3rem',
     fontFamily: 'Barlow Condensed, sans-serif',
