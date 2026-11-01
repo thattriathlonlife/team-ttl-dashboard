@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-  const [playingVideo, setPlayingVideo] = useState(null)
 import VideoPlayer from '../components/VideoPlayer'
 import { useAudio, fmtClock } from '../lib/audio'
 
@@ -33,6 +32,7 @@ function fmtDate(d) {
 
 export default function Content() {
   const [data, setData] = useState(null)
+  const [playingVideo, setPlayingVideo] = useState(null)
   const [error, setError] = useState(null)
   const audio = useAudio() // global player — playback survives navigation
 
