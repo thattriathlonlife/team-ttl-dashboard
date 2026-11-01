@@ -697,65 +697,6 @@ async function main() {
       try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n'); } catch { /* log copy stands */ }
     }
 
-    // ---------------------------------------------------------------
-    // TEMPORARY test-data seed (2026-11-01, Zack-requested): entries
-    // for the 4 existing profiles across marquee upcoming races so the
-    // team map rosters, KPI strip, hero and feed buzz have real shapes
-    // to render. Idempotent (skips pairs that already exist) and
-    // self-verifying (throws unless the planned pairs are all present
-    // afterwards). REMOVE THIS BLOCK once it has run — the pairs are
-    // recorded in ~/workspace/team-ttl/test-data-seed-spec.json.
-    {
-      const { data: profs, error: profErr } = await supabaseRequest('/profiles?select=id,full_name,email&limit=50');
-      if (profErr || !Array.isArray(profs) || profs.length === 0) throw new Error('[TestSeed] profiles read failed');
-      const members = [...profs].sort((a, b) => {
-        const az = (a.email || '').toLowerCase().includes('zgod89') ? 0 : 1;
-        const bz = (b.email || '').toLowerCase().includes('zgod89') ? 0 : 1;
-        return az - bz || String(a.full_name || '').localeCompare(String(b.full_name || ''));
-      });
-      console.log(`[TestSeed] members: ${members.map(m => m.full_name || m.email).join(', ')}`);
-      const TARGETS = [
-        { name: 'Ironman Florida', date: '2026-11-07', idx: [0, 1, 2] },
-        { name: 'Ironman Cozumel', date: '2026-11-22', idx: [0, 3] },
-        { name: 'Ironman 70.3 La Quinta', date: '2026-12-06', idx: [0, 1, 3] },
-        { name: 'Ironman Western Australia', date: '2026-12-06', idx: [1, 2] },
-        { name: 'Ironman 70.3 Florida', date: '2026-12-13', idx: [0, 2] },
-        { name: 'Ironman 70.3 Pucon', date: '2027-01-10', idx: [1, 3] },
-        { name: 'Ironman 70.3 Oceanside', date: '2027-04-03', idx: [0, 1, 2] },
-        { name: 'Ironman Texas', date: '2027-04-24', idx: [0, 1, 2, 3] },
-        { name: 'Ironman 70.3 Northern California', date: '2027-05-23', idx: [0, 1, 3] },
-        { name: 'Ironman 70.3 World Championship', date: '2027-08-28', idx: [0, 2] },
-        { name: 'Ironman 70.3 Washington Tri-Cities', date: '2027-09-19', idx: [0, 2] },
-        { name: 'Ironman World Championship', date: '2027-10-09', idx: [0, 1] },
-      ];
-      const planned = [];
-      for (const t of TARGETS) {
-        const q = `/races?select=id,name,source&name=eq.${encodeURIComponent(t.name)}&race_date=eq.${t.date}`;
-        const { data: rows, error: rErr } = await supabaseRequest(q);
-        if (rErr || !rows || rows.length === 0) throw new Error(`[TestSeed] target race not found: ${t.name} ${t.date}`);
-        const race = rows.find(r => r.source === 'ironman_calendar') || rows[0];
-        for (const i of t.idx) {
-          if (members[i]) planned.push({ race_id: race.id, athlete_id: members[i].id, race: t.name, member: members[i].full_name || members[i].email });
-        }
-      }
-      const raceIds = [...new Set(planned.map(x => x.race_id))];
-      const { data: existing, error: eErr } = await supabaseRequest(`/race_entries?select=race_id,athlete_id&race_id=in.(${raceIds.join(',')})&limit=500`);
-      if (eErr) throw new Error('[TestSeed] existing entries read failed');
-      const have = new Set((existing || []).map(e => `${e.race_id}|${e.athlete_id}`));
-      const toInsert = planned.filter(x => !have.has(`${x.race_id}|${x.athlete_id}`)).map(x => ({ race_id: x.race_id, athlete_id: x.athlete_id }));
-      console.log(`[TestSeed] planned ${planned.length} pairs, already present ${planned.length - toInsert.length}, inserting ${toInsert.length}`);
-      if (toInsert.length > 0) {
-        const { error: iErr } = await supabaseRequest('/race_entries', 'POST', toInsert);
-        if (iErr) throw new Error(`[TestSeed] insert failed: ${iErr.message}`);
-      }
-      const { data: after, error: aErr } = await supabaseRequest(`/race_entries?select=race_id,athlete_id&race_id=in.(${raceIds.join(',')})&limit=500`);
-      if (aErr) throw new Error('[TestSeed] verify read failed');
-      const afterSet = new Set((after || []).map(e => `${e.race_id}|${e.athlete_id}`));
-      const missing = planned.filter(x => !afterSet.has(`${x.race_id}|${x.athlete_id}`));
-      if (missing.length > 0) throw new Error(`[TestSeed] VERIFY FAILED — ${missing.length} planned pairs missing after insert`);
-      console.log(`[TestSeed] verified: all ${planned.length} pairs present across ${raceIds.length} races`);
-    }
-
     // 5. Check for weekend notifications (currently disabled — see NOTIFICATIONS_ENABLED flag)
     await checkAndNotify();
 
