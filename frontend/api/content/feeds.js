@@ -35,6 +35,23 @@ function tag(block, name) {
   return m ? decodeEntities(m[1]) : null
 }
 
+// Raw variant for article bodies: unwrap CDATA (or unescape) WITHOUT
+// stripping markup — the app renders story HTML in its own reader so
+// reading never leaves the app (Zack, 2026-11-01).
+function rawTag(block, name) {
+  const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`))
+  if (!m) return null
+  const s = m[1].trim()
+  const cd = s.match(/^<!\[CDATA\[([\s\S]*)\]\]>$/)
+  if (cd) return cd[1]
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+}
+
 function firstImage(block) {
   const media = block.match(/<media:content[^>]+url="([^"]+)"/)
   if (media) return media[1]
@@ -46,12 +63,15 @@ function parseAtom(xml, limit) {
   const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].slice(0, limit)
   return entries.map(([, block]) => {
     const link = block.match(/<link[^>]+rel="alternate"[^>]+href="([^"]+)"/) || block.match(/<link[^>]+href="([^"]+)"/)
+    const author = block.match(/<author>[\s\S]*?<name>([\s\S]*?)<\/name>/)
     return {
       title: tag(block, 'title'),
       link: link ? link[1] : null,
       published: tag(block, 'published') || tag(block, 'updated'),
       summary: (tag(block, 'summary') || '').slice(0, 220),
       image: firstImage(block),
+      author: author ? decodeEntities(author[1]) : null,
+      body: rawTag(block, 'content'),
     }
   })
 }

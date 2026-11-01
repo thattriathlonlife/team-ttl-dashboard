@@ -66,16 +66,6 @@ export default function VideoPlayer({ video, onClose }) {
           <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: '15px', fontWeight: 600, color: '#fff', lineHeight: 1.35 }}>
             {video.title}
           </div>
-          {video.link && (
-            <a
-              href={video.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 600, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--brand)', textDecoration: 'none', whiteSpace: 'nowrap', paddingTop: '2px' }}
-            >
-              Watch on YouTube ↗
-            </a>
-          )}
         </div>
       </div>
     </div>

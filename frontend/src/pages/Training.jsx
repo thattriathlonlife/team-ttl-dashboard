@@ -398,7 +398,7 @@ function ActivityCard({ activity, upcomingRaces }) {
   const nextRace = myRaces[0]
   const daysOut  = nextRace ? Math.ceil((new Date(nextRace.race_date) - new Date()) / 86400000) : null
   return (
-    <a href={stravaUrl(activity.id)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block', marginBottom: 8 }}>
+    <div style={{ marginBottom: 8 }}>
       <div
         style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 12, transition: 'border-color 0.15s' }}
         onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(252,76,2,0.3)'}
@@ -417,7 +417,7 @@ function ActivityCard({ activity, upcomingRaces }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <div style={{ width: 32, height: 32, borderRadius: 6, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{cfg.emoji}</div>
           <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{activity.name}</div>
-          <span style={{ fontSize: 10, color: STRAVA_ORANGE, flexShrink: 0 }}>View →</span>
+          <a href={stravaUrl(activity.id)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: STRAVA_ORANGE, flexShrink: 0, textDecoration: 'none' }}>View on Strava ↗</a>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {activity.distance             > 0 && <span style={{ fontSize: 12, color: cfg.color, fontWeight: 600, fontFamily: 'Barlow Condensed, sans-serif' }}>{formatDist(activity.distance)}</span>}
@@ -435,7 +435,7 @@ function ActivityCard({ activity, upcomingRaces }) {
         </div>
         <ActivityBadgeStrip activity={activity} />
       </div>
-    </a>
+    </div>
   )
 }
 

@@ -881,6 +881,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   const [mentionIndex, setMentionIndex] = useState(0)
   const [hoveredMsg, setHoveredMsg] = useState(null)
   const [modNotice, setModNotice] = useState(null)
+  const [lightbox, setLightbox] = useState(null)
   const [revealedHidden, setRevealedHidden] = useState(() => new Set())
   const [editingMsg, setEditingMsg] = useState(null) // { id, content }
   const [hasEarlier, setHasEarlier] = useState(false)
@@ -1283,7 +1284,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                   </div>
                 )}
                 {msg.image_url && (
-                  <img src={msg.image_url} alt="shared" style={{ maxWidth: '280px', maxHeight: '300px', borderRadius: '8px', marginTop: '4px', display: 'block', cursor: 'pointer', objectFit: 'cover', opacity: msg.optimistic ? 0.5 : 1, transition: 'opacity 0.2s' }} onClick={() => window.open(msg.image_url, '_blank')} />
+                  <img src={msg.image_url} alt="shared" style={{ maxWidth: '280px', maxHeight: '300px', borderRadius: '8px', marginTop: '4px', display: 'block', cursor: 'pointer', objectFit: 'cover', opacity: msg.optimistic ? 0.5 : 1, transition: 'opacity 0.2s' }} onClick={() => setLightbox(msg.image_url)} />
                 )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '3px' }}>
                       <span style={{ fontSize: '10.5px', color: 'rgba(255,255,255,0.52)' }}>{msg.optimistic ? 'Sending…' : waClock(msg.created_at)}</span>
@@ -1355,6 +1356,15 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         )}
 
         {/* Auto-moderation notice */}
+        {lightbox && (
+          <div
+            onClick={() => setLightbox(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 210, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          >
+            <img src={lightbox} alt="shared" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '10px', objectFit: 'contain' }} />
+            <button onClick={() => setLightbox(null)} aria-label="Close image" style={{ position: 'absolute', top: 'calc(12px + env(safe-area-inset-top, 0px))', right: '14px', width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', fontSize: '16px', cursor: 'pointer' }}>✕</button>
+          </div>
+        )}
         {modNotice && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(var(--highlight-rgb),0.1)', border: '1px solid rgba(var(--highlight-rgb),0.35)', borderRadius: '10px', padding: '8px 12px', marginBottom: '6px' }}>
             <span style={{ fontSize: '13px' }}>🛡️</span>

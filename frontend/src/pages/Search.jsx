@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import VideoPlayer from '../components/VideoPlayer'
+import StoryReader from '../components/StoryReader'
 import { channelDisplayName, channelAccessLabel, raceChannelKind, isTeamOnlyChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
 
@@ -45,6 +46,7 @@ const RECENT_KEY = 'ttl-recent-searches'
 export default function Search({ profile }) {
   const [query, setQuery] = useState('')
   const [playingVideo, setPlayingVideo] = useState(null)
+  const [readingStory, setReadingStory] = useState(null)
   const [index, setIndex] = useState(null)
   const [recents, setRecents] = useState(() => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') } catch { return [] }
@@ -218,7 +220,7 @@ export default function Search({ profile }) {
         <>
           <div style={S.h}>Stories</div>
           {results.stories.map((s, i) => (
-            <button key={i} style={S.row} onClick={() => window.open(s.link, '_blank', 'noopener')}>
+            <button key={i} style={S.row} onClick={() => setReadingStory(s)}>
               <span style={S.icon}>📰</span>
               <span style={S.title}>{s.title}</span>
             </button>
@@ -226,6 +228,7 @@ export default function Search({ profile }) {
         </>
       )}
       <VideoPlayer video={playingVideo} onClose={() => setPlayingVideo(null)} />
+      <StoryReader story={readingStory} onClose={() => setReadingStory(null)} />
     </div>
   )
 }

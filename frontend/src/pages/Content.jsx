@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import VideoPlayer from '../components/VideoPlayer'
+import StoryReader from '../components/StoryReader'
 import { useAudio, fmtClock } from '../lib/audio'
 
 // The Archive — TTL's complete public catalogue, one tap deep from the
@@ -33,6 +34,7 @@ function fmtDate(d) {
 export default function Content() {
   const [data, setData] = useState(null)
   const [playingVideo, setPlayingVideo] = useState(null)
+  const [readingStory, setReadingStory] = useState(null)
   const [error, setError] = useState(null)
   const audio = useAudio() // global player — playback survives navigation
 
@@ -156,7 +158,7 @@ export default function Content() {
 
       <div id="stories" style={{ ...S.h, scrollMarginTop: '12px' }}>TTL Stories · {data.storiesTotal ?? data.stories.length}</div>
       {data.stories.map((st, i) => (
-        <button key={i} style={S.card} onClick={() => window.open(st.link, '_blank', 'noopener')}>
+        <button key={i} style={S.card} onClick={() => setReadingStory(st)}>
           {st.image && <img style={S.img} src={st.image} alt="" loading="lazy" />}
           <div>
             <div style={S.title}>{st.title}</div>
@@ -166,6 +168,7 @@ export default function Content() {
         </button>
       ))}
       <VideoPlayer video={playingVideo} onClose={() => setPlayingVideo(null)} />
+      <StoryReader story={readingStory} onClose={() => setReadingStory(null)} />
     </div>
   )
 }

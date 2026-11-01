@@ -5,6 +5,7 @@ import { raceChannelKind, isTeamOnlyChannel, channelDisplayName } from '../lib/c
 import { isTeamTier } from '../lib/tier'
 import { useAudio } from '../lib/audio'
 import VideoPlayer from '../components/VideoPlayer'
+import StoryReader from '../components/StoryReader'
 
 const FEED_FILTERS = [
   { id: 'all', label: 'All' },
@@ -412,6 +413,7 @@ export default function Home({ session, profile }) {
   const [filter, setFilter] = useState('all')
   const [archiveMeta, setArchiveMeta] = useState(null)
   const [playingVideo, setPlayingVideo] = useState(null)
+  const [readingStory, setReadingStory] = useState(null)
   const filterBarRef = useRef(null)
   const barHiddenRef = useRef(false)
   const lastScrollByTarget = useRef(new Map())
@@ -755,7 +757,7 @@ export default function Home({ session, profile }) {
   function renderStory(item) {
     const st = item.data
     return (
-      <button key={item.key} onClick={() => window.open(st.link, '_blank', 'noopener')} style={{ ...F.card, cursor: 'pointer', padding: 0, overflow: 'hidden' }}>
+      <button key={item.key} onClick={() => setReadingStory(st)} style={{ ...F.card, cursor: 'pointer', padding: 0, overflow: 'hidden' }}>
         {st.image && <img src={st.image} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '16/8', objectFit: 'cover', display: 'block' }} />}
         <div style={{ padding: '1rem 1.25rem' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
@@ -775,7 +777,7 @@ export default function Home({ session, profile }) {
     const isVideo = item.kind === 'video'
     return (
       <button
-        onClick={() => { if (isVideo) setPlayingVideo(d); else window.open(d.link, '_blank', 'noopener') }}
+        onClick={() => { if (isVideo) setPlayingVideo(d); else setReadingStory(d) }}
         style={{
           position: 'relative', width: '100%', textAlign: 'left', cursor: 'pointer',
           borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)',
@@ -1034,6 +1036,7 @@ export default function Home({ session, profile }) {
         )
       })()}
       <VideoPlayer video={playingVideo} onClose={() => setPlayingVideo(null)} />
+      <StoryReader story={readingStory} onClose={() => setReadingStory(null)} />
     </div>
   )
 }
