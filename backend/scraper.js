@@ -372,6 +372,17 @@ async function geocodeRaces(races, coordCache = new Map()) {
       continue;
     }
 
+    // Live lookups are for races members can still race (Phase A
+    // follow-up, 2026-11-01): the first Phase A run spent every lookup
+    // on past events because the fetch is date-ascending. History keeps
+    // whatever coords it has (source/cache/override above); only
+    // current and upcoming races earn a Nominatim call.
+    const todayCutoff = new Date(Date.now() - 7 * 864e5).toISOString().split('T')[0];
+    if (race.race_date && race.race_date < todayCutoff) {
+      results.push(race);
+      continue;
+    }
+
     const cityFromName = extractCityFromName(race.name);
     const cityFromLocation = extractCityFromLocation(race.location);
     const bestCity = cityFromName || cityFromLocation || null;
