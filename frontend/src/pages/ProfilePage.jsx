@@ -165,6 +165,42 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
     setSaving(false)
   }
 
+  // Location setting (moved here from the Feed, Zack 2026-11-01): the
+  // Feed prompts for nothing. 'ttl-geo-enabled' is the member's switch
+  // ('0' = off); the browser permission is the other half of the state.
+  const [geoSetting, setGeoSetting] = useState('loading')
+  useEffect(() => {
+    ;(async () => {
+      if (!('geolocation' in navigator)) { setGeoSetting('unsupported'); return }
+      let pref = null
+      try { pref = localStorage.getItem('ttl-geo-enabled') } catch { /* private mode */ }
+      if (pref === '0') { setGeoSetting('off'); return }
+      try {
+        const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null)
+        if (perm?.state === 'granted') setGeoSetting('on')
+        else if (perm?.state === 'denied') setGeoSetting('denied')
+        else setGeoSetting('prompt')
+      } catch { setGeoSetting('prompt') }
+    })()
+  }, [])
+  function enableLocation() {
+    try { localStorage.setItem('ttl-geo-enabled', '1') } catch { /* private mode */ }
+    navigator.geolocation.getCurrentPosition(
+      () => setGeoSetting('on'),
+      async () => {
+        try {
+          const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null)
+          setGeoSetting(perm?.state === 'denied' ? 'denied' : 'prompt')
+        } catch { setGeoSetting('prompt') }
+      },
+      { timeout: 8000 },
+    )
+  }
+  function disableLocation() {
+    try { localStorage.setItem('ttl-geo-enabled', '0') } catch { /* private mode */ }
+    setGeoSetting('off')
+  }
+
   async function signOut() { await supabase.auth.signOut() }
 
   function handleExport() {
@@ -297,6 +333,21 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
       </div>
 
       <button style={S.saveBtn} onClick={handleSave} disabled={saving || uploading}>{saving ? 'Saving...' : 'Save Profile'}</button>
+      <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Location</div>
+        <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#888', marginBottom: 10 }}>Float races &amp; chats near you to the top of your Feed when you travel. Your position stays on this device — it's never stored or shared.</div>
+        {geoSetting === 'on' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12.5, color: '#3ecf8e', flex: 1 }}>📍 On — near-you ranking is active in your Feed</span>
+            <button onClick={disableLocation} style={{ background: '#1f1f1f', color: '#ccc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '8px 14px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', cursor: 'pointer' }}>Turn off</button>
+          </div>
+        )}
+        {(geoSetting === 'off' || geoSetting === 'prompt') && (
+          <button onClick={enableLocation} style={{ width: '100%', background: 'var(--brand)', color: '#06282a', border: 'none', borderRadius: 6, padding: '9px 4px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', cursor: 'pointer' }}>Enable location</button>
+        )}
+        {geoSetting === 'denied' && <div style={{ fontSize: 12.5, color: '#999' }}>Location is blocked for this site in your browser settings. Allow it there, then come back and enable it here.</div>}
+        {geoSetting === 'unsupported' && <div style={{ fontSize: 12.5, color: '#999' }}>This browser doesn't support location.</div>}
+      </div>
       <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Demo view (proof of concept)</div>
         <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#888', marginBottom: 10 }}>Preview the app as a fan or as a team member. Real access is set by team entitlement.</div>

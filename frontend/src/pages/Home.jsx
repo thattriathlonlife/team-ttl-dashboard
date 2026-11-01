@@ -414,11 +414,8 @@ export default function Home({ session, profile }) {
   // re-ranked when the member's position resolves (or is enabled).
   const [feedSource, setFeedSource] = useState(() => cachedHome?.feedSource || null)
   const [geo, setGeo] = useState(null)
-  const [geoPrompt, setGeoPrompt] = useState(false)
   // The location opt-in is a one-time slim line, dismissible for good
   // (Zack, 2026-11-01: the old card banner was distracting chrome).
-  const [geoDismissed, setGeoDismissed] = useState(() => { try { return localStorage.getItem('ttl-geo-prompt-dismissed') === '1' } catch { return false } })
-  const dismissGeo = () => { setGeoDismissed(true); try { localStorage.setItem('ttl-geo-prompt-dismissed', '1') } catch { /* private mode */ } }
   const [nearCount, setNearCount] = useState(0)
   const [filter, setFilter] = useState('all')
   const [archiveMeta, setArchiveMeta] = useState(() => cachedHome?.archiveMeta || null)
@@ -597,9 +594,14 @@ export default function Home({ session, profile }) {
       try {
         const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null)
         if (cancelled) return
-        if (perm?.state === 'granted') requestGeo()
-        else if (!perm || perm.state === 'prompt') setGeoPrompt(true)
-      } catch { if (!cancelled) setGeoPrompt(true) }
+        // The opt-in lives in Profile settings (Zack, 2026-11-01 — the
+        // Feed carries no prompt). Granted + not turned off there = on.
+        if (perm?.state === 'granted') {
+          let off = false
+          try { off = localStorage.getItem('ttl-geo-enabled') === '0' } catch { /* private mode */ }
+          if (!off) requestGeo()
+        }
+      } catch { /* no permission API — stay unlocated */ }
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -618,8 +620,7 @@ export default function Home({ session, profile }) {
         state = j.principalSubdivision || null
       } catch { /* coordinates alone still power race proximity */ }
       setGeo({ lat: latitude, lon: longitude, city, state })
-      setGeoPrompt(false)
-    }, () => setGeoPrompt(false), { timeout: 8000, maximumAge: 3600e3 })
+    }, () => { /* denied or timed out — stay unlocated */ }, { timeout: 8000, maximumAge: 3600e3 })
   }
 
   // Live reaction from the feed (DESIGN-SPEC §5): a real write to
@@ -887,14 +888,6 @@ export default function Home({ session, profile }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0.85rem 0 0.2rem', fontSize: '13px', color: '#bbb' }}>
           <span>📍</span>
           <span>Near <b style={{ color: '#fff' }}>{geo.city ? `${geo.city}${geo.state ? `, ${geo.state}` : ''}` : 'you'}</b> — local races &amp; chats floated to the top of your feed</span>
-        </div>
-      )}
-      {!geo && geoPrompt && !geoDismissed && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0.85rem 0 0.2rem', fontSize: '13px', color: '#bbb' }}>
-          <span>📍</span>
-          <span style={{ flex: 1 }}>Traveling? Float races &amp; chats near you to the top</span>
-          <button onClick={requestGeo} style={{ background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)' }}>Enable</button>
-          <button onClick={dismissGeo} aria-label="Dismiss location prompt" style={{ background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer', fontSize: '13px', color: '#777' }}>✕</button>
         </div>
       )}
 
