@@ -73,18 +73,24 @@ function recolor(map) {
   for (const layer of layers) {
     const id = (layer.id || '').toLowerCase()
     try {
-      if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', '#05090e')
+      if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', '#04070b')
       else if (id.includes('water') || id.includes('ocean') || id.includes('sea')) {
-        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#0a2438')
-        if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', '#123a52')
+        // Water pushed DEEPER than the land (fix pass, 2026-10-31: the
+        // first values made continents read as black holes in the sea).
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#071a2c')
+        if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', '#0e2c44')
+      } else if (id.includes('landcover')) {
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#131e28')
+      } else if (id.includes('landuse')) {
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#17222c')
       } else if (id.includes('land') || id.includes('earth')) {
-        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#10161d')
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#1b2733')
       } else if (id.includes('building')) {
-        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#161e26')
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#232f3b')
       } else if (id.includes('boundary') || id.includes('border') || id.includes('admin')) {
-        if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', 'rgba(158,184,198,0.28)')
+        if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', 'rgba(158,184,198,0.3)')
       } else if (layer.type === 'line' && (id.includes('road') || id.includes('street') || id.includes('highway') || id.includes('transport') || id.includes('bridge') || id.includes('tunnel'))) {
-        map.setPaintProperty(layer.id, 'line-color', 'rgba(148,170,182,0.32)')
+        map.setPaintProperty(layer.id, 'line-color', 'rgba(160,185,200,0.4)')
       } else if (layer.type === 'symbol') {
         map.setPaintProperty(layer.id, 'text-color', '#cfe0e2')
         map.setPaintProperty(layer.id, 'text-halo-color', 'rgba(3,8,12,0.9)')
@@ -195,12 +201,22 @@ function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, o
       if (cluster.length === 1) {
         map.easeTo({ center: cluster[0], zoom: 5, pitch: PITCH, duration: 0 })
       } else {
+        // Frame by computed center + zoom (fix pass, 2026-10-31):
+        // fitBounds under globe projection + 48 deg pitch pulled back
+        // to a near-world view and shrank the cluster to dots. Instead,
+        // centre on the cluster and pick the zoom that makes its span
+        // fill ~60% of the panel, floored at 2.55 so labels exist.
         const lngs = cluster.map(p => p[0])
         const lats = cluster.map(p => p[1])
-        map.fitBounds(
-          [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: 44, pitch: PITCH, bearing: -8, maxZoom: 5, duration: 0 }
-        )
+        const spanLng = Math.max(...lngs) - Math.min(...lngs)
+        const spanLat = Math.max(...lats) - Math.min(...lats)
+        const zLng = Math.log2((360 * 0.62) / Math.max(spanLng, 4))
+        const zLat = Math.log2((170 * 0.55) / Math.max(spanLat, 3))
+        const zoom = Math.min(5, Math.max(2.55, Math.min(zLng, zLat)))
+        map.easeTo({
+          center: [(Math.min(...lngs) + Math.max(...lngs)) / 2, (Math.min(...lats) + Math.max(...lats)) / 2],
+          zoom, pitch: PITCH, bearing: -8, duration: 0,
+        })
       }
     }
   }, [racesWithCoords, entriesByRace, myEntries])
