@@ -115,39 +115,73 @@ export default function Dashboard({ session }) {
   const nextRace = races.find(r => myEntries.includes(r.id))
   const daysToNext = nextRace ? Math.ceil((new Date(nextRace.race_date) - new Date()) / 86400000) : null
 
+  // Concept A metrics (approved 2026-10-31): the strip answers horizon,
+  // exposure, participation — computed over ALL upcoming races, never the
+  // filtered subset (a KPI that moves when you type is a result count).
+  const upcomingIds = new Set(races.map(r => r.id))
+  const scopedEntries = allEntries.filter(e => upcomingIds.has(e.race_id))
+  const startLines = scopedEntries.length
+  const ttlersRacing = new Set(scopedEntries.map(e => e.athlete_id)).size
+  const in90 = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]
+  const next90Count = races.filter(r => r.race_date <= in90).length
+  const weekAgo = Date.now() - 7 * 86400000
+  const entriesThisWeek = scopedEntries.filter(e => e.created_at && new Date(e.created_at).getTime() >= weekAgo).length
+  const hasEntryTimestamps = scopedEntries.some(e => e.created_at)
+  const nextRaceCrew = nextRace ? allEntries.filter(e => e.race_id === nextRace.id).length : 0
+
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#555', textTransform: 'uppercase' }}>Loading...</div>
 
   return (
     <div style={S.page}>
-      <div style={S.statsRow}>
-        <div style={S.statCard}>
-          <div style={S.statLabel}>Total Races</div>
-          <div style={{ ...S.statValue, color: 'var(--brand)' }}>{filteredRaces.length}</div>
-          <div style={S.statSub}>matching filters</div>
-        </div>
-        <div style={S.statCard}>
-          <div style={S.statLabel}>My Races</div>
-          <div style={{ ...S.statValue, color: 'var(--accent)' }}>{myRaceCount}</div>
-          <div style={S.statSub}>entered so far</div>
-        </div>
-        <div style={S.statCard}>
-          <div style={S.statLabel}>Team Members</div>
-          <div style={{ ...S.statValue, color: 'var(--highlight)' }}>{profiles.length}</div>
-          <div style={S.statSub}>active athletes</div>
-        </div>
-        <div style={S.statCard}>
-          <div style={S.statLabel}>Next Race</div>
-          <div style={{ ...S.statValue, color: 'var(--accent)', fontSize: daysToNext !== null ? '28px' : '18px' }}>
-            {daysToNext !== null ? `${daysToNext}d` : '—'}
-          </div>
-          <div style={S.statSub}>{nextRace ? nextRace.name.replace(/ironman\s+70\.3\s+/i, '').replace(/ironman\s+/i, '') : 'No races entered'}</div>
-        </div>
+      {/* Map — the Races page is the map's home; it reflects the same
+          filters as the list. */}
+      <div style={{ marginBottom: '1.1rem' }}>
+        <RaceMap races={filteredRaces} allEntries={allEntries} myEntries={myEntries} profile={profile} session={session} onToggle={toggleEntry} />
       </div>
 
-      {/* Map — the Races page is the map's home (moved from Home in the
-          5-tab reshuffle); it reflects the same filters as the list. */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <RaceMap races={filteredRaces} />
+      {/* Hero: your next race countdown (Concept A) */}
+      {nextRace && (
+        <button
+          onClick={() => { setView('list'); setViewMode('mine') }}
+          style={{
+            display: 'flex', gap: '14px', alignItems: 'center', width: '100%', textAlign: 'left',
+            borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', cursor: 'pointer',
+            background: 'linear-gradient(120deg, rgba(var(--brand-rgb),0.13), rgba(var(--accent-rgb),0.07))',
+            border: '1px solid rgba(var(--brand-rgb),0.4)',
+          }}
+        >
+          <div style={{ textAlign: 'center', minWidth: '64px' }}>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '40px', fontWeight: 800, color: '#fff', lineHeight: 0.95 }}>
+              {daysToNext === 0 ? 'GO' : daysToNext}
+            </div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10.5px', letterSpacing: '2px', color: 'var(--brand)', fontWeight: 700, marginTop: '3px' }}>
+              {daysToNext === 0 ? "IT'S RACE DAY" : daysToNext === 1 ? 'DAY TO GO' : 'DAYS TO GO'}
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700 }}>Your next race</div>
+            <div style={{ fontWeight: 700, fontSize: '16.5px', color: '#fff', marginTop: '2px' }}>{nextRace.name}</div>
+            <div style={{ fontSize: '12.5px', color: '#aaa', marginTop: '1px' }}>
+              {nextRace.location}{nextRaceCrew > 0 ? ` · ${nextRaceCrew} teammate${nextRaceCrew !== 1 ? 's' : ''} racing` : ''}
+            </div>
+          </div>
+          <span style={{ color: 'var(--brand)', fontSize: '20px' }}>›</span>
+        </button>
+      )}
+
+      {/* Metric strip: horizon · exposure · participation */}
+      <div style={{ display: 'flex', gap: '9px', marginBottom: '1.25rem' }}>
+        {[
+          { v: races.length, l: 'Upcoming races', s: `${next90Count} in the next 90 days`, sc: '#999' },
+          { v: startLines, l: 'Start lines', s: hasEntryTimestamps && entriesThisWeek > 0 ? `▲ ${entriesThisWeek} this week` : 'across upcoming races', sc: hasEntryTimestamps && entriesThisWeek > 0 ? '#3ecf8e' : '#999' },
+          { v: ttlersRacing, l: 'TTLers racing', s: `of ${profiles.length} members`, sc: '#999' },
+        ].map(m => (
+          <div key={m.l} style={{ flex: 1, background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px 6px 10px', textAlign: 'center', minWidth: 0 }}>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '24px', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{m.v}</div>
+            <div style={{ fontSize: '9.5px', letterSpacing: '1.2px', textTransform: 'uppercase', color: '#6d6d6d', marginTop: '4px' }}>{m.l}</div>
+            <div style={{ fontSize: '10.5px', marginTop: '3px', fontWeight: 600, color: m.sc, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.s}</div>
+          </div>
+        ))}
       </div>
 
       {/* Controls row: List/Calendar segmented toggle + the All / I'm
