@@ -62,13 +62,14 @@ export default function TeamRoster({ profiles, allEntries, races }) {
         const memberEntries = allEntries.filter(e => e.athlete_id === member.id)
         const memberRaces = memberEntries.map(e => races.find(r => r.id === e.race_id)).filter(Boolean)
         const types = [...new Set(memberRaces.map(r => r.type))]
-        const initials = member.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+        const displayName = member.full_name || member.email || 'TTL Member'
+        const initials = displayName.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'T'
         const color = MEMBER_COLORS[idx % MEMBER_COLORS.length]
 
         return (
           <div key={member.id} style={S.card}>
             <div style={{ ...S.avatar, background: color }}>{initials}</div>
-            <div style={S.name}>{member.full_name}</div>
+            <div style={S.name}>{displayName}</div>
             <div style={S.raceCount}>{memberEntries.length} {memberEntries.length === 1 ? 'race' : 'races'} entered</div>
             {member.role === 'admin' && <div style={S.role}>Admin</div>}
             {types.length > 0 && (
