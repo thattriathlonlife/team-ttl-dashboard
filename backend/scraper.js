@@ -9,7 +9,7 @@
 
 import 'dotenv/config';
 import * as cheerio from 'cheerio';
-import { appendFileSync } from 'fs';
+import { appendFileSync, readFileSync } from 'fs';
 
 // --- Config ---
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -170,126 +170,32 @@ async function fetchTriathlonEvents() {
 }
 
 // ---------------------------------------------------------------
-// PTO RACE CALENDAR SCRAPER — stats.protriathletes.org/pro-race-calendar
-// Server-rendered HTML, covers all IRONMAN & 70.3 events worldwide
+// BRANDED CALENDAR — curated seed (Phase C, 2026-11-01)
 // ---------------------------------------------------------------
-async function scrapeIronmanRaces() {
-  console.log('[PTO] Fetching race calendar from stats.protriathletes.org...');
-
-  const response = await fetch('https://stats.protriathletes.org/pro-race-calendar', {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html',
-    }
-  });
-
-  if (!response.ok) {
-    // Fail loudly (audit F2, 2026-11-01): a dead source must turn the
-    // run red, not silently contribute zero races.
-    throw new Error(`[PTO] Failed to fetch calendar: HTTP ${response.status}`);
-  }
-
-  const html = await response.text();
-  console.log(`[PTO] HTML length: ${html.length} chars`);
-
-  const $ = cheerio.load(html);
-  const races = [];
-
-  // The page has race links like: <a href="/race/im-703-peru/2026/results">Ironman 70.3 Peru</a>
-  // followed by plain text blocks with Country:, Location:, Distance:
-  // We find all race links then walk up to grab the surrounding text block
-  $('a[href*="/race/"]').each((_, el) => {
-    try {
-      const name = $(el).text().trim();
-      if (!name || name.length < 3) return;
-
-      // Only process IRONMAN branded races
-      if (!/ironman/i.test(name)) return;
-
-      // Get full text of nearest containing block
-      // Walk up until we find a block with Country: in it
-      let container = $(el).parent();
-      let attempts = 0;
-      while (attempts < 8 && !container.text().includes('Country:')) {
-        container = container.parent();
-        attempts++;
-      }
-      const blockText = container.text();
-
-      // Extract date — "26 April 2026" or "TBA November 2026"
-      const dateMatch = blockText.match(/(\d{1,2}\s+[A-Z][a-z]+\s+20\d{2})/);
-      if (!dateMatch) {
-        console.log(`[PTO] No date for: ${name}`);
-        return;
-      }
-      const race_date = parseDateStr(dateMatch[1]);
-      if (!race_date) return;
-
-      // Extract Country and Location — stop before next field label
-      const countryMatch = blockText.match(/Country:\s*([^:\n\r]+?)(?=\s*(?:Location:|Division:|Distance:|$))/);
-      const locationMatch = blockText.match(/Location:\s*([^:\n\r]+?)(?=\s*(?:Country:|Division:|Distance:|$))/);
-      const distanceMatch = blockText.match(/Distance:\s*([^:\n\r]+?)(?=\s*(?:Country:|Location:|Division:|$))/);
-
-      const country = countryMatch ? countryMatch[1].trim() : '';
-      const locationCity = locationMatch ? locationMatch[1].trim() : '';
-      const distanceStr = distanceMatch ? distanceMatch[1].trim() : '';
-      const location = [locationCity, country].filter(Boolean).join(', ') || 'TBD';
-
-      // Classify type
-      let type;
-      if (name.includes('70.3') || distanceStr.toLowerCase().includes('half')) {
-        type = '70.3';
-      } else {
-        type = 'IRONMAN';
-      }
-
-      const slug = $(el).attr('href')?.split('/race/')[1]?.split('/')[0] || '';
-      // Stable edition identity (Phase B, 2026-11-01): slug + YEAR.
-      // The old slug + full-date form made every reschedule a new row
-      // and stranded that edition's race entries on the stale copy.
-      // migratePtoIdentities() renames the existing rows to match.
-      const external_id = `pto_${slug || name.toLowerCase().replace(/\s+/g, '-')}_${race_date.slice(0, 4)}`;
-
-      races.push({
-        name,
-        type,
-        race_date,
-        location,
-        country: country || null,
-        external_id,
-        source: 'pto_scrape',
-        registration_url: slug
-          ? `https://www.ironman.com/races/${
-              slug
-                .replace(/^ironman-703-/, 'im703-')
-                .replace(/^im-703-/, 'im703-')
-                .replace(/^ironman-/, 'im-')
-            }`
-          : `https://www.ironman.com/races`,
-      });
-
-      console.log(`[PTO] ${name} | ${race_date} | ${location}`);
-    } catch (err) {
-      console.error('[PTO] Error parsing entry:', err.message);
-    }
-  });
-
-  // Deduplicate by external_id
-  const seen = new Set();
-  const unique = races.filter(r => {
-    if (seen.has(r.external_id)) return false;
-    seen.add(r.external_id);
-    return true;
-  });
-
-  console.log(`[PTO] Found ${unique.length} IRONMAN/70.3 races`);
-  return unique;
-}
-
-function parseDateStr(str) {
-  if (!str) return null;
-  const d = new Date(str);
-  return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+// The forward IRONMAN / 70.3 calendar lives in branded-calendar.json,
+// extracted from ironman.com's own listing and refreshed by a monthly
+// browser sweep (the site sits behind Cloudflare; no reliable API or
+// scrape exists — see SCRAPER-AUDIT.md Phase C). The seed is core
+// product data: a missing or corrupt file fails the run loudly rather
+// than silently shipping an app with no branded calendar (the F2 rule).
+function fetchBrandedCalendar() {
+  const raw = readFileSync(new URL('./branded-calendar.json', import.meta.url), 'utf8');
+  const seed = JSON.parse(raw);
+  const races = (seed.races || []).map(r => ({
+    name: r.name,
+    type: r.type,
+    race_date: r.race_date,
+    location: r.location,
+    city: r.city || null,
+    country: r.country || null,
+    latitude: null,
+    longitude: null,
+    external_id: `im_${r.slug}_${String(r.race_date).slice(0, 4)}`,
+    source: 'ironman_calendar',
+    registration_url: r.registration_url || null,
+  }));
+  console.log(`[Calendar] Branded seed loaded: ${races.length} races (extracted ${seed.extracted_at || 'unknown'})`);
+  return races;
 }
 
 // ---------------------------------------------------------------
@@ -322,12 +228,19 @@ function extractCityFromLocation(location) {
 const GEOCODE_OVERRIDES = {
   'Ironman Florida': { city: 'Panama City Beach', latitude: 30.1766, longitude: -85.8055 },
   'Ironman Western Australia': { city: 'Busselton', latitude: -33.6525, longitude: 115.3459 },
+  // Seed-era additions (Phase C): cards that list only a state/region.
+  'Ironman Brazil': { city: 'Florianópolis', latitude: -27.5954, longitude: -48.5480 },
+  'Ironman 70.3 Florianopolis': { city: 'Florianópolis', latitude: -27.5954, longitude: -48.5480 },
+  'Ironman Wales': { city: 'Tenby', latitude: 51.6719, longitude: -4.6986 },
+  'Ironman 70.3 Brasilia': { city: 'Brasília', latitude: -15.7939, longitude: -47.8828 },
+  'Ironman 70.3 São Paulo': { city: 'São Paulo', latitude: -23.5505, longitude: -46.6333 },
+  'Ironman 70.3 Luxembourg': { city: 'Remich', latitude: 49.5450, longitude: 6.3670 },
 };
 
 // Cap on live Nominatim lookups per run. The DB cache absorbs repeat
 // races, so a healthy run geocodes only genuinely new ones; the cap
 // keeps a first run (or a source flood) polite to a free service.
-const GEOCODE_MAX_NEW_PER_RUN = 150;
+const GEOCODE_MAX_NEW_PER_RUN = 300;
 let geocodeLookupsThisRun = 0;
 
 // Coordinates already in the DB, keyed by external_id. The old flow
@@ -464,87 +377,6 @@ async function geocodeRaces(races, coordCache = new Map()) {
 // ---------------------------------------------------------------
 // IDENTITY + RECONCILIATION (Phase B, 2026-11-01)
 // ---------------------------------------------------------------
-
-// Rename stored PTO rows from the old date-embedded external_id
-// (pto_<slug>_<date>) to the stable edition identity (pto_<slug>_<year>)
-// the scraper now generates, so a reschedule updates the same row —
-// and its race entries — instead of forking a new one. Runs every time
-// and is a no-op once migrated. If any rename fails, the incoming PTO
-// races fall back to their OLD ids for this run so the upsert updates
-// the existing rows rather than duplicating them.
-async function migratePtoIdentities(incomingPto) {
-  const { data: existing, error } = await supabaseRequest(
-    '/races?select=id,external_id,race_date&source=eq.pto_scrape&limit=1000'
-  );
-  if (error || !Array.isArray(existing)) {
-    console.error('[Identity] Could not read existing PTO rows — skipping migration this run');
-    return;
-  }
-  const stableOf = (ext) => {
-    const m = /^(.+)_(\d{4})-\d{2}-\d{2}$/.exec(ext || '');
-    return m ? `${m[1]}_${m[2]}` : null;
-  };
-  const takenIds = new Set(existing.map(r => r.external_id));
-  const groups = new Map();
-  for (const row of existing) {
-    const st = stableOf(row.external_id);
-    if (!st) continue;
-    if (!groups.has(st)) groups.set(st, []);
-    groups.get(st).push(row);
-  }
-
-  let renamed = 0;
-  let failed = false;
-  const dateByStable = new Map();
-  for (const [stable, rows] of groups) {
-    if (rows.length > 1) {
-      console.log(`::warning::[Identity] ${rows.length} rows share edition ${stable} — left untouched for manual review`);
-      continue;
-    }
-    const row = rows[0];
-    dateByStable.set(stable, row.race_date);
-    if (takenIds.has(stable)) {
-      console.log(`::warning::[Identity] Stable id ${stable} already exists alongside ${row.external_id} — manual review needed, not renaming`);
-      failed = true;
-      continue;
-    }
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/races?id=eq.${row.id}`, {
-      method: 'PATCH',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ external_id: stable }),
-    });
-    if (res.ok) { renamed++; takenIds.add(stable); }
-    else { console.error(`[Identity] Rename failed for ${row.external_id}: HTTP ${res.status}`); failed = true; }
-  }
-  if (renamed) console.log(`[Identity] Migrated ${renamed} PTO row(s) to stable slug+year identities`);
-
-  if (failed) {
-    // Safety: do not let new-style ids create duplicates next to
-    // un-renamed rows. Revert this run's incoming ids to the old form.
-    console.log('::warning::[Identity] Migration incomplete — incoming PTO races keep old-style ids this run');
-    for (const race of incomingPto) {
-      race.external_id = `${race.external_id.slice(0, -5)}_${race.race_date}`;
-    }
-    return;
-  }
-
-  // Distinct same-year edition guard: an incoming race whose stable id
-  // already belongs to a row racing >45 days away is a different
-  // edition — suffix it with its month instead of overwriting the row.
-  for (const race of incomingPto) {
-    const known = dateByStable.get(race.external_id);
-    if (known && Math.abs(new Date(race.race_date) - new Date(known)) > 45 * 864e5) {
-      const alt = `${race.external_id}_${race.race_date.slice(5, 7)}`;
-      console.log(`::warning::[Identity] "${race.name}" looks like a distinct same-year edition — using ${alt}`);
-      race.external_id = alt;
-    }
-  }
-}
 
 // Cross-source dedupe guard (audit F4/F9): if a race about to be
 // upserted matches an existing DB row — or an earlier race in this same
@@ -772,38 +604,39 @@ async function main() {
     // 1. Fetch from triathlon.org API (Olympic, Sprint, WTS events)
     const triEventsRaw = await fetchTriathlonEvents();
 
-    // 2. Scrape PTO calendar for IRONMAN & 70.3 races
-    const ironmanRaces = await scrapeIronmanRaces();
+    // 2. Branded calendar from the curated seed (Phase C, 2026-11-01).
+    // The PTO scrape is retired: its source became a results archive
+    // with no forward dates. A seed read failure throws (fetchBranded-
+    // Calendar) — the branded calendar never goes silently missing.
+    const brandedRaces = fetchBrandedCalendar();
 
     // Sanity thresholds (audit F2, 2026-11-01): zero from BOTH sources
     // means the run learned nothing — fail loudly instead of letting a
-    // green check hide a dead pipeline. A thin branded haul only warns:
-    // the PTO source is known-degraded (audit F1) and its replacement is
-    // Phase C, but the warning keeps the rot visible on every run.
-    if (triEventsRaw.length === 0 && ironmanRaces.length === 0) {
+    // green check hide a dead pipeline. A thin branded haul warns: the
+    // seed may have gone stale (its monthly sweep is the fix).
+    if (triEventsRaw.length === 0 && brandedRaces.length === 0) {
       throw new Error('[Main] Both sources returned zero races — treating as a failed run');
     }
     const todayStr = new Date().toISOString().split('T')[0];
-    const brandedUpcoming = [...triEventsRaw, ...ironmanRaces]
+    const brandedUpcoming = [...triEventsRaw, ...brandedRaces]
       .filter(r => (r.type === 'IRONMAN' || r.type === '70.3') && r.race_date >= todayStr).length;
     console.log(`[Main] Branded (IRONMAN/70.3) upcoming races in this fetch: ${brandedUpcoming}`);
-    if (brandedUpcoming < 15) {
-      console.log(`::warning::Only ${brandedUpcoming} upcoming IRONMAN/70.3 races in this fetch (a healthy calendar has 40+) — branded coverage is likely broken upstream`);
+    if (brandedUpcoming < 100) {
+      console.log(`::warning::Only ${brandedUpcoming} upcoming IRONMAN/70.3 races in this fetch (the full forward calendar is ~150+) — the branded seed is likely stale; a sweep is due`);
     }
 
     // 3. Geocode both sources against the DB coordinate cache
     // (audit F5 — API races were never geocoded at all before).
     const coordCache = await fetchCoordCache();
     const triEvents = await geocodeRaces(triEventsRaw, coordCache);
-    const geocodedIronman = await geocodeRaces(ironmanRaces, coordCache);
+    const geocodedBranded = await geocodeRaces(brandedRaces, coordCache);
 
-    // 4. Phase B identity work, then merge and upsert: rename stored
-    // PTO rows to stable edition ids (so this run's upserts land on
-    // them), then let any race adopt an existing row's identity when
-    // name + date match across sources — no forked duplicates.
-    await migratePtoIdentities(geocodedIronman);
+    // 4. Merge and upsert, with the cross-source dedupe guard: a race
+    // adopts an existing row's identity when name + date match, so the
+    // seed lands on the rows (and entries) history already built —
+    // including the six ex-PTO rows covering the same editions.
     const { data: existingSnapshot } = await supabaseRequest('/races?select=external_id,name,race_date&limit=2000');
-    const all = [...triEvents, ...geocodedIronman];
+    const all = [...triEvents, ...geocodedBranded];
     applyDedupeGuard(all, Array.isArray(existingSnapshot) ? existingSnapshot : []);
     console.log(`[Main] Total combined races: ${all.length}`);
     await upsertRaces(all);
@@ -818,7 +651,7 @@ async function main() {
     const summary = [
       '## Scraper run summary',
       `- triathlon_api parsed: ${triEvents.length}`,
-      `- pto_scrape parsed: ${geocodedIronman.length}`,
+      `- ironman_calendar parsed: ${geocodedBranded.length}`,
       `- by type: ${Object.entries(byType).map(([k, v]) => `${k}=${v}`).join(', ')}`,
       `- branded upcoming in fetch: ${brandedUpcoming}`,
       `- geocoded: ${all.filter(r => r.latitude).length}/${all.length} (live lookups this run: ${geocodeLookupsThisRun})`,

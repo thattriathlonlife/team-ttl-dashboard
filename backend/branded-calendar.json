@@ -1,0 +1,1598 @@
+{
+ "version": 1,
+ "extracted_at": "2026-11-01",
+ "source": "ironman.com/races listing (browser extraction; see ~/workspace/team-ttl/SCRAPER-AUDIT.md Phase C)",
+ "note": "Curated forward IRONMAN/70.3 calendar. Refreshed by the monthly sweep; race_date is the first day for multi-day championships.",
+ "races": [
+  {
+   "slug": "im703-goa",
+   "name": "Ironman 70.3 Goa",
+   "type": "70.3",
+   "race_date": "2026-11-01",
+   "city": "Goa",
+   "country": "India",
+   "location": "Goa, GA, India",
+   "registration_url": "https://www.ironman.com/races/im703-goa"
+  },
+  {
+   "slug": "im703-kenting",
+   "name": "Ironman 70.3 Kenting",
+   "type": "70.3",
+   "race_date": "2026-11-01",
+   "city": "Kenting",
+   "country": "Chinese Taipei",
+   "location": "Kenting, Chinese Taipei",
+   "registration_url": "https://www.ironman.com/races/im703-kenting"
+  },
+  {
+   "slug": "im703-turkey",
+   "name": "Ironman 70.3 Türkiye",
+   "type": "70.3",
+   "race_date": "2026-11-01",
+   "city": "Belek",
+   "country": "Türkiye",
+   "location": "Belek, 07, Türkiye",
+   "registration_url": "https://www.ironman.com/races/im703-turkey"
+  },
+  {
+   "slug": "im-san-juan",
+   "name": "Ironman San Juan",
+   "type": "IRONMAN",
+   "race_date": "2026-11-01",
+   "city": "San Juan",
+   "country": "Argentina",
+   "location": "San Juan, Argentina",
+   "registration_url": "https://www.ironman.com/races/im-san-juan"
+  },
+  {
+   "slug": "im-florida",
+   "name": "Ironman Florida",
+   "type": "IRONMAN",
+   "race_date": "2026-11-07",
+   "city": "Panama City Beach",
+   "country": "United States",
+   "location": "Panama City Beach, FL, United States",
+   "registration_url": "https://www.ironman.com/races/im-florida"
+  },
+  {
+   "slug": "im703-campeche",
+   "name": "Ironman 70.3 Campeche",
+   "type": "70.3",
+   "race_date": "2026-11-08",
+   "city": "Campeche",
+   "country": "Mexico",
+   "location": "Campeche, CAM, Mexico",
+   "registration_url": "https://www.ironman.com/races/im703-campeche"
+  },
+  {
+   "slug": "im703-melbourne",
+   "name": "Ironman 70.3 Melbourne",
+   "type": "70.3",
+   "race_date": "2026-11-08",
+   "city": "St. Kilda",
+   "country": "Australia",
+   "location": "St. Kilda, VIC, Australia",
+   "registration_url": "https://www.ironman.com/races/im703-melbourne"
+  },
+  {
+   "slug": "im703-phu-quoc",
+   "name": "Ironman 70.3 Phu Quoc",
+   "type": "70.3",
+   "race_date": "2026-11-15",
+   "city": "Phu Quoc",
+   "country": "Vietnam",
+   "location": "Phu Quoc, Vietnam",
+   "registration_url": "https://www.ironman.com/races/im703-phu-quoc"
+  },
+  {
+   "slug": "im703-langkawi",
+   "name": "Ironman 70.3 Langkawi",
+   "type": "70.3",
+   "race_date": "2026-11-21",
+   "city": "Langkawi",
+   "country": "Malaysia",
+   "location": "Langkawi, Malaysia",
+   "registration_url": "https://www.ironman.com/races/im703-langkawi"
+  },
+  {
+   "slug": "im-malaysia",
+   "name": "Ironman Malaysia",
+   "type": "IRONMAN",
+   "race_date": "2026-11-21",
+   "city": "Langkawi",
+   "country": "Malaysia",
+   "location": "Langkawi, Malaysia",
+   "registration_url": "https://www.ironman.com/races/im-malaysia"
+  },
+  {
+   "slug": "im703-mossel-bay",
+   "name": "Ironman 70.3 Mossel Bay",
+   "type": "70.3",
+   "race_date": "2026-11-22",
+   "city": "Mossel Bay",
+   "country": "South Africa",
+   "location": "Mossel Bay, South Africa",
+   "registration_url": "https://www.ironman.com/races/im703-mossel-bay"
+  },
+  {
+   "slug": "im-cozumel",
+   "name": "Ironman Cozumel",
+   "type": "IRONMAN",
+   "race_date": "2026-11-22",
+   "city": "Cozumel",
+   "country": "Mexico",
+   "location": "Cozumel, ROO, Mexico",
+   "registration_url": "https://www.ironman.com/races/im-cozumel"
+  },
+  {
+   "slug": "im703-cartagena",
+   "name": "Ironman 70.3 Cartagena",
+   "type": "70.3",
+   "race_date": "2026-11-29",
+   "city": "Cartagena",
+   "country": "Colombia",
+   "location": "Cartagena, Colombia",
+   "registration_url": "https://www.ironman.com/races/im703-cartagena"
+  },
+  {
+   "slug": "im703-sergipe",
+   "name": "Ironman 70.3 Sergipe",
+   "type": "70.3",
+   "race_date": "2026-11-29",
+   "city": "Aracaju",
+   "country": "Brazil",
+   "location": "Aracaju, SE, Brazil",
+   "registration_url": "https://www.ironman.com/races/im703-sergipe"
+  },
+  {
+   "slug": "im703-valdivia",
+   "name": "Ironman 70.3 Valdivia",
+   "type": "70.3",
+   "race_date": "2026-11-29",
+   "city": "Valdivia",
+   "country": "Chile",
+   "location": "Valdivia, LR, Chile",
+   "registration_url": "https://www.ironman.com/races/im703-valdivia"
+  },
+  {
+   "slug": "im-valdivia",
+   "name": "Ironman Valdivia",
+   "type": "IRONMAN",
+   "race_date": "2026-11-29",
+   "city": "Valdivia",
+   "country": "Chile",
+   "location": "Valdivia, LR, Chile",
+   "registration_url": "https://www.ironman.com/races/im-valdivia"
+  },
+  {
+   "slug": "im-oman",
+   "name": "Ironman Oman",
+   "type": "IRONMAN",
+   "race_date": "2026-12-05",
+   "city": "Muscat",
+   "country": "Oman",
+   "location": "Muscat, Oman",
+   "registration_url": "https://www.ironman.com/races/im-oman"
+  },
+  {
+   "slug": "im703-la-quinta",
+   "name": "Ironman 70.3 La Quinta",
+   "type": "70.3",
+   "race_date": "2026-12-06",
+   "city": "La Quinta",
+   "country": "United States",
+   "location": "La Quinta, CA, United States",
+   "registration_url": "https://www.ironman.com/races/im703-la-quinta"
+  },
+  {
+   "slug": "im703-veracruz",
+   "name": "Ironman 70.3 Veracruz",
+   "type": "70.3",
+   "race_date": "2026-12-06",
+   "city": "Veracruz",
+   "country": "Mexico",
+   "location": "Veracruz, Mexico",
+   "registration_url": "https://www.ironman.com/races/im703-veracruz"
+  },
+  {
+   "slug": "im703-western-australia",
+   "name": "Ironman 70.3 Western Australia",
+   "type": "70.3",
+   "race_date": "2026-12-06",
+   "city": "Busselton",
+   "country": "Australia",
+   "location": "Busselton, WA, Australia",
+   "registration_url": "https://www.ironman.com/races/im703-western-australia"
+  },
+  {
+   "slug": "im-western-australia",
+   "name": "Ironman Western Australia",
+   "type": "IRONMAN",
+   "race_date": "2026-12-06",
+   "city": "Busselton",
+   "country": "Australia",
+   "location": "Busselton, WA, Australia",
+   "registration_url": "https://www.ironman.com/races/im-western-australia"
+  },
+  {
+   "slug": "im703-bahrain",
+   "name": "Ironman 70.3 Bahrain",
+   "type": "70.3",
+   "race_date": "2026-12-11",
+   "city": "Manama",
+   "country": "Bahrain",
+   "location": "Manama, Bahrain",
+   "registration_url": "https://www.ironman.com/races/im703-bahrain"
+  },
+  {
+   "slug": "im703-florida",
+   "name": "Ironman 70.3 Florida",
+   "type": "70.3",
+   "race_date": "2026-12-13",
+   "city": "Haines City",
+   "country": "United States",
+   "location": "Haines City, FL, United States",
+   "registration_url": "https://www.ironman.com/races/im703-florida"
+  },
+  {
+   "slug": "im703-pucon",
+   "name": "Ironman 70.3 Pucon",
+   "type": "70.3",
+   "race_date": "2027-01-10",
+   "city": "Pucon",
+   "country": "Chile",
+   "location": "Pucon, Chile",
+   "registration_url": "https://www.ironman.com/races/im703-pucon"
+  },
+  {
+   "slug": "im703-nelson-mandela-bay",
+   "name": "Ironman 70.3 Nelson Mandela Bay",
+   "type": "70.3",
+   "race_date": "2027-01-31",
+   "city": "Port Elizabeth",
+   "country": "South Africa",
+   "location": "Port Elizabeth, South Africa",
+   "registration_url": "https://www.ironman.com/races/im703-nelson-mandela-bay"
+  },
+  {
+   "slug": "im703-oman",
+   "name": "Ironman 70.3 Muscat",
+   "type": "70.3",
+   "race_date": "2027-02-06",
+   "city": "Muscat",
+   "country": "Oman",
+   "location": "Muscat, Oman",
+   "registration_url": "https://www.ironman.com/races/im703-oman"
+  },
+  {
+   "slug": "im703-san-salvador",
+   "name": "Ironman 70.3 San Salvador",
+   "type": "70.3",
+   "race_date": "2027-02-07",
+   "city": "San Salvador",
+   "country": "El Salvador",
+   "location": "San Salvador, SS, El Salvador",
+   "registration_url": "https://www.ironman.com/races/im703-san-salvador"
+  },
+  {
+   "slug": "im703-amdavad",
+   "name": "Ironman 70.3 Amdavad",
+   "type": "70.3",
+   "race_date": "2027-02-14",
+   "city": "Ahmedabad",
+   "country": "India",
+   "location": "Ahmedabad, India",
+   "registration_url": "https://www.ironman.com/races/im703-amdavad"
+  },
+  {
+   "slug": "im703-panama",
+   "name": "Ironman 70.3 Panama",
+   "type": "70.3",
+   "race_date": "2027-02-28",
+   "city": "Panama City",
+   "country": "Panama",
+   "location": "Panama City, Panama",
+   "registration_url": "https://www.ironman.com/races/im703-panama"
+  },
+  {
+   "slug": "im703-new-zealand",
+   "name": "Ironman 70.3 New Zealand",
+   "type": "70.3",
+   "race_date": "2027-03-06",
+   "city": "Taupo",
+   "country": "New Zealand",
+   "location": "Taupo, New Zealand",
+   "registration_url": "https://www.ironman.com/races/im703-new-zealand"
+  },
+  {
+   "slug": "im-new-zealand",
+   "name": "Ironman New Zealand",
+   "type": "IRONMAN",
+   "race_date": "2027-03-06",
+   "city": "Taupo",
+   "country": "New Zealand",
+   "location": "Taupo, New Zealand",
+   "registration_url": "https://www.ironman.com/races/im-new-zealand"
+  },
+  {
+   "slug": "im703-punta-del-este",
+   "name": "Ironman 70.3 Punta del Este",
+   "type": "70.3",
+   "race_date": "2027-03-07",
+   "city": "Punta del Este",
+   "country": "Uruguay",
+   "location": "Punta del Este, Uruguay",
+   "registration_url": "https://www.ironman.com/races/im703-punta-del-este"
+  },
+  {
+   "slug": "im703-dallas-little-elm",
+   "name": "Ironman 70.3 Dallas-Little Elm",
+   "type": "70.3",
+   "race_date": "2027-03-14",
+   "city": "Dallas",
+   "country": "United States",
+   "location": "Dallas, TX, United States",
+   "registration_url": "https://www.ironman.com/races/im703-dallas-little-elm"
+  },
+  {
+   "slug": "im703-hengqin",
+   "name": "Ironman 70.3 Hengqin",
+   "type": "70.3",
+   "race_date": "2027-03-14",
+   "city": "Hengqin",
+   "country": "China",
+   "location": "Hengqin, China",
+   "registration_url": "https://www.ironman.com/races/im703-hengqin"
+  },
+  {
+   "slug": "im703-laoag",
+   "name": "Ironman 70.3 Laoag",
+   "type": "70.3",
+   "race_date": "2027-03-14",
+   "city": "Laoag",
+   "country": "Philippines",
+   "location": "Laoag, Philippines",
+   "registration_url": "https://www.ironman.com/races/im703-laoag"
+  },
+  {
+   "slug": "im703-puerto-rico",
+   "name": "Ironman 70.3 Puerto Rico",
+   "type": "70.3",
+   "race_date": "2027-03-14",
+   "city": "San Juan",
+   "country": "Puerto Rico",
+   "location": "San Juan, Puerto Rico",
+   "registration_url": "https://www.ironman.com/races/im703-puerto-rico"
+  },
+  {
+   "slug": "im703-doha",
+   "name": "Ironman 70.3 Doha",
+   "type": "70.3",
+   "race_date": "2027-03-20",
+   "city": "Doha",
+   "country": "Qatar",
+   "location": "Doha, Qatar",
+   "registration_url": "https://www.ironman.com/races/im703-doha"
+  },
+  {
+   "slug": "im703-curitiba",
+   "name": "Ironman 70.3 Curitiba",
+   "type": "70.3",
+   "race_date": "2027-03-21",
+   "city": "Curitiba",
+   "country": "Brazil",
+   "location": "Curitiba, PR, Brazil",
+   "registration_url": "https://www.ironman.com/races/im703-curitiba"
+  },
+  {
+   "slug": "im703-geelong",
+   "name": "Ironman 70.3 Geelong",
+   "type": "70.3",
+   "race_date": "2027-03-21",
+   "city": "Geelong",
+   "country": "Australia",
+   "location": "Geelong, VIC, Australia",
+   "registration_url": "https://www.ironman.com/races/im703-geelong"
+  },
+  {
+   "slug": "im703-oceanside",
+   "name": "Ironman 70.3 Oceanside",
+   "type": "70.3",
+   "race_date": "2027-04-03",
+   "city": "Oceanside",
+   "country": "United States",
+   "location": "Oceanside, CA, United States",
+   "registration_url": "https://www.ironman.com/races/im703-oceanside"
+  },
+  {
+   "slug": "im703-vilamoura-algarve",
+   "name": "Ironman 70.3 Vilamoura-Algarve",
+   "type": "70.3",
+   "race_date": "2027-04-03",
+   "city": "Vilamoura",
+   "country": "Portugal",
+   "location": "Vilamoura, Portugal",
+   "registration_url": "https://www.ironman.com/races/im703-vilamoura-algarve"
+  },
+  {
+   "slug": "im703-barranquilla",
+   "name": "Ironman 70.3 Barranquilla",
+   "type": "70.3",
+   "race_date": "2027-04-04",
+   "city": "Barranquilla",
+   "country": "Colombia",
+   "location": "Barranquilla, Colombia",
+   "registration_url": "https://www.ironman.com/races/im703-barranquilla"
+  },
+  {
+   "slug": "im703-puerto-varas",
+   "name": "Ironman 70.3 Puerto Varas",
+   "type": "70.3",
+   "race_date": "2027-04-04",
+   "city": "Puerto Varas",
+   "country": "Chile",
+   "location": "Puerto Varas, LL, Chile",
+   "registration_url": "https://www.ironman.com/races/im703-puerto-varas"
+  },
+  {
+   "slug": "im703-texas",
+   "name": "Ironman 70.3 Texas",
+   "type": "70.3",
+   "race_date": "2027-04-04",
+   "city": "Galveston Island",
+   "country": "United States",
+   "location": "Galveston Island, TX, United States",
+   "registration_url": "https://www.ironman.com/races/im703-texas"
+  },
+  {
+   "slug": "im703-los-cabos",
+   "name": "Ironman 70.3 Los Cabos",
+   "type": "70.3",
+   "race_date": "2027-04-11",
+   "city": "Los Cabos",
+   "country": "Mexico",
+   "location": "Los Cabos, BCS, Mexico",
+   "registration_url": "https://www.ironman.com/races/im703-los-cabos"
+  },
+  {
+   "slug": "im703-san-juan",
+   "name": "Ironman 70.3 San Juan",
+   "type": "70.3",
+   "race_date": "2027-04-11",
+   "city": "San Juan",
+   "country": "Argentina",
+   "location": "San Juan, Argentina",
+   "registration_url": "https://www.ironman.com/races/im703-san-juan"
+  },
+  {
+   "slug": "im-penghu",
+   "name": "Ironman Penghu",
+   "type": "IRONMAN",
+   "race_date": "2027-04-11",
+   "city": "Penghu",
+   "country": "Chinese Taipei",
+   "location": "Penghu, Chinese Taipei",
+   "registration_url": "https://www.ironman.com/races/im-penghu"
+  },
+  {
+   "slug": "im703-brasilia",
+   "name": "Ironman 70.3 Brasilia",
+   "type": "70.3",
+   "race_date": "2027-04-18",
+   "city": null,
+   "country": "Brazil",
+   "location": "DF, Brazil",
+   "registration_url": "https://www.ironman.com/races/im703-brasilia"
+  },
+  {
+   "slug": "im703-valencia",
+   "name": "Ironman 70.3 Valencia",
+   "type": "70.3",
+   "race_date": "2027-04-18",
+   "city": "Valencia",
+   "country": "Spain",
+   "location": "Valencia, Spain",
+   "registration_url": "https://www.ironman.com/races/im703-valencia"
+  },
+  {
+   "slug": "im-mossel-bay",
+   "name": "Ironman South Africa, Mossel Bay",
+   "type": "IRONMAN",
+   "race_date": "2027-04-18",
+   "city": "Mossel Bay",
+   "country": "South Africa",
+   "location": "Mossel Bay, South Africa",
+   "registration_url": "https://www.ironman.com/races/im-mossel-bay"
+  },
+  {
+   "slug": "im703-venice-jesolo",
+   "name": "Ironman 70.3 Venice-Jesolo",
+   "type": "70.3",
+   "race_date": "2027-04-24",
+   "city": "Jesolo",
+   "country": "Italy",
+   "location": "Jesolo, Italy",
+   "registration_url": "https://www.ironman.com/races/im703-venice-jesolo"
+  },
+  {
+   "slug": "im-texas",
+   "name": "Ironman Texas",
+   "type": "IRONMAN",
+   "race_date": "2027-04-24",
+   "city": "The Woodlands",
+   "country": "United States",
+   "location": "The Woodlands, TX, United States",
+   "registration_url": "https://www.ironman.com/races/im-texas"
+  },
+  {
+   "slug": "im703-peru",
+   "name": "Ironman 70.3 Peru",
+   "type": "70.3",
+   "race_date": "2027-04-25",
+   "city": "Lima",
+   "country": "Peru",
+   "location": "Lima, Peru",
+   "registration_url": "https://www.ironman.com/races/im703-peru"
+  },
+  {
+   "slug": "im703-western-sydney",
+   "name": "Ironman 70.3 Western Sydney",
+   "type": "70.3",
+   "race_date": "2027-05-02",
+   "city": "Penrith",
+   "country": "Australia",
+   "location": "Penrith, NSW, Australia",
+   "registration_url": "https://www.ironman.com/races/im703-western-sydney"
+  },
+  {
+   "slug": "im703-mallorca",
+   "name": "Ironman 70.3 Alcúdia-Mallorca",
+   "type": "70.3",
+   "race_date": "2027-05-08",
+   "city": "Alcúdia",
+   "country": "Spain",
+   "location": "Alcúdia, Spain",
+   "registration_url": "https://www.ironman.com/races/im703-mallorca"
+  },
+  {
+   "slug": "im703-gulf-coast",
+   "name": "Ironman 70.3 Gulf Coast",
+   "type": "70.3",
+   "race_date": "2027-05-08",
+   "city": "Panama City Beach",
+   "country": "United States",
+   "location": "Panama City Beach, FL, United States",
+   "registration_url": "https://www.ironman.com/races/im703-gulf-coast"
+  },
+  {
+   "slug": "im703-danang",
+   "name": "Ironman 70.3 Da Nang",
+   "type": "70.3",
+   "race_date": "2027-05-09",
+   "city": "Danang",
+   "country": "Vietnam",
+   "location": "Danang, Vietnam",
+   "registration_url": "https://www.ironman.com/races/im703-danang"
+  },
+  {
+   "slug": "im-vietnam",
+   "name": "Ironman Vietnam",
+   "type": "IRONMAN",
+   "race_date": "2027-05-09",
+   "city": "Da Nang",
+   "country": "Vietnam",
+   "location": "Da Nang, Vietnam",
+   "registration_url": "https://www.ironman.com/races/im-vietnam"
+  },
+  {
+   "slug": "im-lanzarote",
+   "name": "Ironman Lanzarote",
+   "type": "IRONMAN",
+   "race_date": "2027-05-15",
+   "city": "Lanzarote",
+   "country": "Spain",
+   "location": "Lanzarote, Spain",
+   "registration_url": "https://www.ironman.com/races/im-lanzarote"
+  },
+  {
+   "slug": "im703-chattanooga",
+   "name": "Ironman 70.3 Chattanooga",
+   "type": "70.3",
+   "race_date": "2027-05-16",
+   "city": "Chattanooga",
+   "country": "United States",
+   "location": "Chattanooga, TN, United States",
+   "registration_url": "https://www.ironman.com/races/im703-chattanooga"
+  },
+  {
+   "slug": "im-jacksonville",
+   "name": "Ironman Jacksonville",
+   "type": "IRONMAN",
+   "race_date": "2027-05-16",
+   "city": "Jacksonville",
+   "country": "United States",
+   "location": "Jacksonville, FL, United States",
+   "registration_url": "https://www.ironman.com/races/im-jacksonville"
+  },
+  {
+   "slug": "im703-aix-en-provence",
+   "name": "Ironman 70.3 Aix-en-Provence",
+   "type": "70.3",
+   "race_date": "2027-05-23",
+   "city": "Aix en Provence",
+   "country": "France",
+   "location": "Aix en Provence, France",
+   "registration_url": "https://www.ironman.com/races/im703-aix-en-provence"
+  },
+  {
+   "slug": "im703-kraichgau",
+   "name": "Ironman 70.3 Kraichgau",
+   "type": "70.3",
+   "race_date": "2027-05-23",
+   "city": "Kraichgau",
+   "country": "Germany",
+   "location": "Kraichgau, Germany",
+   "registration_url": "https://www.ironman.com/races/im703-kraichgau"
+  },
+  {
+   "slug": "im703-northern-california",
+   "name": "Ironman 70.3 Northern California",
+   "type": "70.3",
+   "race_date": "2027-05-23",
+   "city": "Redding",
+   "country": "United States",
+   "location": "Redding, CA, United States",
+   "registration_url": "https://www.ironman.com/races/im703-northern-california"
+  },
+  {
+   "slug": "im703-pennsylvania",
+   "name": "Ironman 70.3 Pennsylvania Happy Valley",
+   "type": "70.3",
+   "race_date": "2027-05-23",
+   "city": "State College",
+   "country": "United States",
+   "location": "State College, PA, United States",
+   "registration_url": "https://www.ironman.com/races/im703-pennsylvania"
+  },
+  {
+   "slug": "im703-st-poelten",
+   "name": "Ironman 70.3 St. Pölten",
+   "type": "70.3",
+   "race_date": "2027-05-23",
+   "city": "St. Polten",
+   "country": "Austria",
+   "location": "St. Polten, Austria",
+   "registration_url": "https://www.ironman.com/races/im703-st-poelten"
+  },
+  {
+   "slug": "im703-alghero",
+   "name": "Ironman 70.3 Alghero",
+   "type": "70.3",
+   "race_date": "2027-05-30",
+   "city": "Alghero",
+   "country": "Italy",
+   "location": "Alghero, Italy",
+   "registration_url": "https://www.ironman.com/races/im703-alghero"
+  },
+  {
+   "slug": "im703-victoria",
+   "name": "Ironman 70.3 Victoria",
+   "type": "70.3",
+   "race_date": "2027-05-30",
+   "city": "Victoria",
+   "country": "Canada",
+   "location": "Victoria, BC, Canada",
+   "registration_url": "https://www.ironman.com/races/im703-victoria"
+  },
+  {
+   "slug": "im703-hawaii",
+   "name": "Ironman 70.3 Hawai`i",
+   "type": "70.3",
+   "race_date": "2027-06-05",
+   "city": "Kohala Coast",
+   "country": "United States",
+   "location": "Kohala Coast, HI, United States",
+   "registration_url": "https://www.ironman.com/races/im703-hawaii"
+  },
+  {
+   "slug": "im703-bolton",
+   "name": "Ironman 70.3 Bolton",
+   "type": "70.3",
+   "race_date": "2027-06-06",
+   "city": "Bolton",
+   "country": "United Kingdom",
+   "location": "Bolton, United Kingdom",
+   "registration_url": "https://www.ironman.com/races/im703-bolton"
+  },
+  {
+   "slug": "im703-durban",
+   "name": "Ironman 70.3 Durban",
+   "type": "70.3",
+   "race_date": "2027-06-06",
+   "city": "Durban",
+   "country": "South Africa",
+   "location": "Durban, South Africa",
+   "registration_url": "https://www.ironman.com/races/im703-durban"
+  },
+  {
+   "slug": "im703-omaha",
+   "name": "Ironman 70.3 Omaha",
+   "type": "70.3",
+   "race_date": "2027-06-06",
+   "city": "Omaha",
+   "country": "United States",
+   "location": "Omaha, NE, United States",
+   "registration_url": "https://www.ironman.com/races/im703-omaha"
+  },
+  {
+   "slug": "im703-switzerland",
+   "name": "Ironman 70.3 Switzerland",
+   "type": "70.3",
+   "race_date": "2027-06-06",
+   "city": "Rapperswil-Jona",
+   "country": "Switzerland",
+   "location": "Rapperswil-Jona, Switzerland",
+   "registration_url": "https://www.ironman.com/races/im703-switzerland"
+  },
+  {
+   "slug": "im703-tours",
+   "name": "Ironman 70.3 Tours Metropole - Loire Valley",
+   "type": "70.3",
+   "race_date": "2027-06-06",
+   "city": "Tours",
+   "country": "France",
+   "location": "Tours, France",
+   "registration_url": "https://www.ironman.com/races/im703-tours"
+  },
+  {
+   "slug": "im-hamburg",
+   "name": "Ironman Hamburg",
+   "type": "IRONMAN",
+   "race_date": "2027-06-06",
+   "city": "Hamburg",
+   "country": "Germany",
+   "location": "Hamburg, Germany",
+   "registration_url": "https://www.ironman.com/races/im-hamburg"
+  },
+  {
+   "slug": "im703-boulder",
+   "name": "Ironman 70.3 Boulder",
+   "type": "70.3",
+   "race_date": "2027-06-12",
+   "city": "Boulder",
+   "country": "United States",
+   "location": "Boulder, CO, United States",
+   "registration_url": "https://www.ironman.com/races/im703-boulder"
+  },
+  {
+   "slug": "im703-cairns",
+   "name": "Ironman 70.3 Cairns",
+   "type": "70.3",
+   "race_date": "2027-06-13",
+   "city": "Cairns",
+   "country": "Australia",
+   "location": "Cairns, QLD, Australia",
+   "registration_url": "https://www.ironman.com/races/im703-cairns"
+  },
+  {
+   "slug": "im703-davao-philippines",
+   "name": "Ironman 70.3 Davao Philippines",
+   "type": "70.3",
+   "race_date": "2027-06-13",
+   "city": "Davao City",
+   "country": "Philippines",
+   "location": "Davao City, Philippines",
+   "registration_url": "https://www.ironman.com/races/im703-davao-philippines"
+  },
+  {
+   "slug": "im703-eagleman",
+   "name": "Ironman 70.3 Eagleman",
+   "type": "70.3",
+   "race_date": "2027-06-13",
+   "city": "Cambridge",
+   "country": "United States",
+   "location": "Cambridge, MD, United States",
+   "registration_url": "https://www.ironman.com/races/im703-eagleman"
+  },
+  {
+   "slug": "im703-lake-george",
+   "name": "Ironman 70.3 Lake George",
+   "type": "70.3",
+   "race_date": "2027-06-13",
+   "city": "Lake George",
+   "country": "United States",
+   "location": "Lake George, NY, United States",
+   "registration_url": "https://www.ironman.com/races/im703-lake-george"
+  },
+  {
+   "slug": "im703-rockford-illinois",
+   "name": "Ironman 70.3 Rockford - Illinois",
+   "type": "70.3",
+   "race_date": "2027-06-13",
+   "city": "Rockford",
+   "country": "United States",
+   "location": "Rockford, IL, United States",
+   "registration_url": "https://www.ironman.com/races/im703-rockford-illinois"
+  },
+  {
+   "slug": "im-brazil",
+   "name": "Ironman Brazil",
+   "type": "IRONMAN",
+   "race_date": "2027-06-13",
+   "city": null,
+   "country": "Brazil",
+   "location": "SC, Brazil",
+   "registration_url": "https://www.ironman.com/races/im-brazil"
+  },
+  {
+   "slug": "im-cairns",
+   "name": "Ironman Cairns",
+   "type": "IRONMAN",
+   "race_date": "2027-06-13",
+   "city": "Cairns",
+   "country": "Australia",
+   "location": "Cairns, QLD, Australia",
+   "registration_url": "https://www.ironman.com/races/im-cairns"
+  },
+  {
+   "slug": "im-austria",
+   "name": "Ironman Kaernten-Klagenfurt, Austria",
+   "type": "IRONMAN",
+   "race_date": "2027-06-13",
+   "city": "Klagenfurt",
+   "country": "Austria",
+   "location": "Klagenfurt, Austria",
+   "registration_url": "https://www.ironman.com/races/im-austria"
+  },
+  {
+   "slug": "im-philippines",
+   "name": "Ironman Philippines Davao City",
+   "type": "IRONMAN",
+   "race_date": "2027-06-13",
+   "city": "Davao City",
+   "country": "Philippines",
+   "location": "Davao City, Philippines",
+   "registration_url": "https://www.ironman.com/races/im-philippines"
+  },
+  {
+   "slug": "im703-mont-tremblant",
+   "name": "Ironman 70.3 Mont-Tremblant",
+   "type": "70.3",
+   "race_date": "2027-06-20",
+   "city": "Mont-Tremblant",
+   "country": "Canada",
+   "location": "Mont-Tremblant, QC, Canada",
+   "registration_url": "https://www.ironman.com/races/im703-mont-tremblant"
+  },
+  {
+   "slug": "im703-westfriesland",
+   "name": "Ironman 70.3 Westfriesland",
+   "type": "70.3",
+   "race_date": "2027-06-20",
+   "city": "Hoorn",
+   "country": "Netherlands",
+   "location": "Hoorn, Netherlands",
+   "registration_url": "https://www.ironman.com/races/im703-westfriesland"
+  },
+  {
+   "slug": "im703-coeur-dalene",
+   "name": "Ironman 70.3 Coeur d'Alene",
+   "type": "70.3",
+   "race_date": "2027-06-27",
+   "city": "Coeur d'Alene",
+   "country": "United States",
+   "location": "Coeur d'Alene, ID, United States",
+   "registration_url": "https://www.ironman.com/races/im703-coeur-dalene"
+  },
+  {
+   "slug": "im703-elsinore",
+   "name": "Ironman 70.3 Elsinore",
+   "type": "70.3",
+   "race_date": "2027-06-27",
+   "city": "Elsinore",
+   "country": "Denmark",
+   "location": "Elsinore, Denmark",
+   "registration_url": "https://www.ironman.com/races/im703-elsinore"
+  },
+  {
+   "slug": "im-frankfurt",
+   "name": "Ironman Frankfurt",
+   "type": "IRONMAN",
+   "race_date": "2027-06-27",
+   "city": "Frankfurt",
+   "country": "Germany",
+   "location": "Frankfurt, Germany",
+   "registration_url": "https://www.ironman.com/races/im-frankfurt"
+  },
+  {
+   "slug": "im-les-sables-dolonne",
+   "name": "Ironman Les Sables d'Olonne-Vendee",
+   "type": "IRONMAN",
+   "race_date": "2027-06-27",
+   "city": "Les Sables d'Olonne",
+   "country": "France",
+   "location": "Les Sables d'Olonne, France",
+   "registration_url": "https://www.ironman.com/races/im-les-sables-dolonne"
+  },
+  {
+   "slug": "im-switzerland",
+   "name": "Ironman Switzerland Thun",
+   "type": "IRONMAN",
+   "race_date": "2027-07-04",
+   "city": "Thun",
+   "country": "Switzerland",
+   "location": "Thun, Switzerland",
+   "registration_url": "https://www.ironman.com/races/im-switzerland"
+  },
+  {
+   "slug": "im703-muncie",
+   "name": "Ironman 70.3 Muncie",
+   "type": "70.3",
+   "race_date": "2027-07-10",
+   "city": "Muncie",
+   "country": "United States",
+   "location": "Muncie, IN, United States",
+   "registration_url": "https://www.ironman.com/races/im703-muncie"
+  },
+  {
+   "slug": "im703-asuncion",
+   "name": "Ironman 70.3 Asunción",
+   "type": "70.3",
+   "race_date": "2027-07-11",
+   "city": "Asunción",
+   "country": "Paraguay",
+   "location": "Asunción, Paraguay",
+   "registration_url": "https://www.ironman.com/races/im703-asuncion"
+  },
+  {
+   "slug": "im703-jonkoping",
+   "name": "Ironman 70.3 Jonkoping",
+   "type": "70.3",
+   "race_date": "2027-07-11",
+   "city": "Jonkoping",
+   "country": "Sweden",
+   "location": "Jonkoping, Sweden",
+   "registration_url": "https://www.ironman.com/races/im703-jonkoping"
+  },
+  {
+   "slug": "im703-luxembourg",
+   "name": "Ironman 70.3 Luxembourg",
+   "type": "70.3",
+   "race_date": "2027-07-11",
+   "city": null,
+   "country": "Luxembourg",
+   "location": "Moselle, Luxembourg",
+   "registration_url": "https://www.ironman.com/races/im703-luxembourg"
+  },
+  {
+   "slug": "im703-musselman",
+   "name": "Ironman 70.3 Musselman",
+   "type": "70.3",
+   "race_date": "2027-07-11",
+   "city": "Geneva",
+   "country": "United States",
+   "location": "Geneva, NY, United States",
+   "registration_url": "https://www.ironman.com/races/im703-musselman"
+  },
+  {
+   "slug": "im703-ruidoso-new-mexico",
+   "name": "Ironman 70.3 Ruidoso New Mexico",
+   "type": "70.3",
+   "race_date": "2027-07-11",
+   "city": "Ruidoso",
+   "country": "United States",
+   "location": "Ruidoso, NM, United States",
+   "registration_url": "https://www.ironman.com/races/im703-ruidoso-new-mexico"
+  },
+  {
+   "slug": "im703-swansea",
+   "name": "Ironman 70.3 Swansea",
+   "type": "70.3",
+   "race_date": "2027-07-11",
+   "city": "Swansea Bay",
+   "country": "United Kingdom",
+   "location": "Swansea Bay, United Kingdom",
+   "registration_url": "https://www.ironman.com/races/im703-swansea"
+  },
+  {
+   "slug": "im703-vitoria",
+   "name": "Ironman 70.3 Vitoria-Gasteiz",
+   "type": "70.3",
+   "race_date": "2027-07-11",
+   "city": "Vitoria-Gasteiz",
+   "country": "Spain",
+   "location": "Vitoria-Gasteiz, Spain",
+   "registration_url": "https://www.ironman.com/races/im703-vitoria"
+  },
+  {
+   "slug": "im-vitoria",
+   "name": "Ironman Vitoria-Gasteiz",
+   "type": "IRONMAN",
+   "race_date": "2027-07-11",
+   "city": "Vitoria-Gasteiz",
+   "country": "Spain",
+   "location": "Vitoria-Gasteiz, Spain",
+   "registration_url": "https://www.ironman.com/races/im-vitoria"
+  },
+  {
+   "slug": "im703-muskoka",
+   "name": "Ironman 70.3 Muskoka",
+   "type": "70.3",
+   "race_date": "2027-07-18",
+   "city": "Huntsville",
+   "country": "Canada",
+   "location": "Huntsville, ON, Canada",
+   "registration_url": "https://www.ironman.com/races/im703-muskoka"
+  },
+  {
+   "slug": "im703-ohio",
+   "name": "Ironman 70.3 Ohio",
+   "type": "70.3",
+   "race_date": "2027-07-18",
+   "city": "Sandusky",
+   "country": "United States",
+   "location": "Sandusky, OH, United States",
+   "registration_url": "https://www.ironman.com/races/im703-ohio"
+  },
+  {
+   "slug": "im703-oregon",
+   "name": "Ironman 70.3 Oregon",
+   "type": "70.3",
+   "race_date": "2027-07-18",
+   "city": "Salem",
+   "country": "United States",
+   "location": "Salem, OR, United States",
+   "registration_url": "https://www.ironman.com/races/im703-oregon"
+  },
+  {
+   "slug": "im703-boise",
+   "name": "Ironman 70.3 Boise",
+   "type": "70.3",
+   "race_date": "2027-07-24",
+   "city": "Boise",
+   "country": "United States",
+   "location": "Boise, ID, United States",
+   "registration_url": "https://www.ironman.com/races/im703-boise"
+  },
+  {
+   "slug": "im703-calgary",
+   "name": "Ironman 70.3 Calgary",
+   "type": "70.3",
+   "race_date": "2027-07-25",
+   "city": "Calgary",
+   "country": "Canada",
+   "location": "Calgary, AB, Canada",
+   "registration_url": "https://www.ironman.com/races/im703-calgary"
+  },
+  {
+   "slug": "im703-desaru-coast",
+   "name": "Ironman 70.3 Desaru Coast",
+   "type": "70.3",
+   "race_date": "2027-07-25",
+   "city": "Desaru",
+   "country": "Malaysia",
+   "location": "Desaru, Malaysia",
+   "registration_url": "https://www.ironman.com/races/im703-desaru-coast"
+  },
+  {
+   "slug": "im703-ecuador",
+   "name": "Ironman 70.3 Ecuador",
+   "type": "70.3",
+   "race_date": "2027-07-25",
+   "city": "Manta",
+   "country": "Ecuador",
+   "location": "Manta, Ecuador",
+   "registration_url": "https://www.ironman.com/races/im703-ecuador"
+  },
+  {
+   "slug": "im703-maine",
+   "name": "Ironman 70.3 Maine",
+   "type": "70.3",
+   "race_date": "2027-07-25",
+   "city": "Augusta",
+   "country": "United States",
+   "location": "Augusta, ME, United States",
+   "registration_url": "https://www.ironman.com/races/im703-maine"
+  },
+  {
+   "slug": "im-lake-placid",
+   "name": "Ironman Lake Placid",
+   "type": "IRONMAN",
+   "race_date": "2027-07-25",
+   "city": "Lake Placid",
+   "country": "United States",
+   "location": "Lake Placid, NY, United States",
+   "registration_url": "https://www.ironman.com/races/im-lake-placid"
+  },
+  {
+   "slug": "im-tallinn",
+   "name": "Ironman Tallinn",
+   "type": "IRONMAN",
+   "race_date": "2027-08-07",
+   "city": "Tallinn",
+   "country": "Estonia",
+   "location": "Tallinn, Estonia",
+   "registration_url": "https://www.ironman.com/races/im-tallinn"
+  },
+  {
+   "slug": "im703-cebu-philippines",
+   "name": "Ironman 70.3 Lapu-Lapu",
+   "type": "70.3",
+   "race_date": "2027-08-08",
+   "city": "Lapu Lapu City",
+   "country": "Philippines",
+   "location": "Lapu Lapu City, Philippines",
+   "registration_url": "https://www.ironman.com/races/im703-cebu-philippines"
+  },
+  {
+   "slug": "im703-leipzig",
+   "name": "Ironman 70.3 Leipzig",
+   "type": "70.3",
+   "race_date": "2027-08-08",
+   "city": "Leipzig",
+   "country": "Germany",
+   "location": "Leipzig, Germany",
+   "registration_url": "https://www.ironman.com/races/im703-leipzig"
+  },
+  {
+   "slug": "im703-rio-de-janeiro",
+   "name": "Ironman 70.3 Rio de Janeiro",
+   "type": "70.3",
+   "race_date": "2027-08-08",
+   "city": "Rio de Janeiro",
+   "country": "Brazil",
+   "location": "Rio de Janeiro, RJ, Brazil",
+   "registration_url": "https://www.ironman.com/races/im703-rio-de-janeiro"
+  },
+  {
+   "slug": "im703-tallinn",
+   "name": "Ironman 70.3 Tallinn",
+   "type": "70.3",
+   "race_date": "2027-08-08",
+   "city": "Tallinn",
+   "country": "Estonia",
+   "location": "Tallinn, Estonia",
+   "registration_url": "https://www.ironman.com/races/im703-tallinn"
+  },
+  {
+   "slug": "im-canada-ottawa",
+   "name": "Ironman Canada-Ottawa",
+   "type": "IRONMAN",
+   "race_date": "2027-08-08",
+   "city": "Ottawa",
+   "country": "Canada",
+   "location": "Ottawa, ON, Canada",
+   "registration_url": "https://www.ironman.com/races/im-canada-ottawa"
+  },
+  {
+   "slug": "im-leeds",
+   "name": "Ironman Leeds",
+   "type": "IRONMAN",
+   "race_date": "2027-08-15",
+   "city": "Leeds",
+   "country": "United Kingdom",
+   "location": "Leeds, United Kingdom",
+   "registration_url": "https://www.ironman.com/races/im-leeds"
+  },
+  {
+   "slug": "im-montana",
+   "name": "Ironman Montana",
+   "type": "IRONMAN",
+   "race_date": "2027-08-15",
+   "city": "Great Falls",
+   "country": "United States",
+   "location": "Great Falls, MT, United States",
+   "registration_url": "https://www.ironman.com/races/im-montana"
+  },
+  {
+   "slug": "im703-utah",
+   "name": "Ironman 70.3 Utah",
+   "type": "70.3",
+   "race_date": "2027-08-21",
+   "city": "Orem",
+   "country": "United States",
+   "location": "Orem, UT, United States",
+   "registration_url": "https://www.ironman.com/races/im703-utah"
+  },
+  {
+   "slug": "im-kalmar",
+   "name": "Ironman Kalmar-Sweden",
+   "type": "IRONMAN",
+   "race_date": "2027-08-21",
+   "city": "Kalmar",
+   "country": "Sweden",
+   "location": "Kalmar, Sweden",
+   "registration_url": "https://www.ironman.com/races/im-kalmar"
+  },
+  {
+   "slug": "im703-colombo",
+   "name": "Ironman 70.3 Colombo",
+   "type": "70.3",
+   "race_date": "2027-08-22",
+   "city": "Colombo",
+   "country": "Sri Lanka",
+   "location": "Colombo, Sri Lanka",
+   "registration_url": "https://www.ironman.com/races/im703-colombo"
+  },
+  {
+   "slug": "im703-vichy",
+   "name": "Ironman 70.3 Vichy",
+   "type": "70.3",
+   "race_date": "2027-08-22",
+   "city": "Vichy",
+   "country": "France",
+   "location": "Vichy, France",
+   "registration_url": "https://www.ironman.com/races/im703-vichy"
+  },
+  {
+   "slug": "im-copenhagen",
+   "name": "Ironman Copenhagen",
+   "type": "IRONMAN",
+   "race_date": "2027-08-22",
+   "city": "Copenhagen",
+   "country": "Denmark",
+   "location": "Copenhagen, Denmark",
+   "registration_url": "https://www.ironman.com/races/im-copenhagen"
+  },
+  {
+   "slug": "im-vichy",
+   "name": "Ironman Vichy",
+   "type": "IRONMAN",
+   "race_date": "2027-08-22",
+   "city": "Vichy",
+   "country": "France",
+   "location": "Vichy, France",
+   "registration_url": "https://www.ironman.com/races/im-vichy"
+  },
+  {
+   "slug": "im703-world-championship-2027",
+   "name": "Ironman 70.3 World Championship",
+   "type": "70.3",
+   "race_date": "2027-08-28",
+   "city": "Chattanooga",
+   "country": "United States",
+   "location": "Chattanooga, TN, United States",
+   "registration_url": "https://www.ironman.com/races/im703-world-championship-2027"
+  },
+  {
+   "slug": "im703-duisburg",
+   "name": "Ironman 70.3 Duisburg",
+   "type": "70.3",
+   "race_date": "2027-08-29",
+   "city": "Duisburg",
+   "country": "Germany",
+   "location": "Duisburg, Germany",
+   "registration_url": "https://www.ironman.com/races/im703-duisburg"
+  },
+  {
+   "slug": "im703-zell-am-see",
+   "name": "Ironman 70.3 Zell am See-Kaprun",
+   "type": "70.3",
+   "race_date": "2027-08-29",
+   "city": "Zell am See",
+   "country": "Austria",
+   "location": "Zell am See, Austria",
+   "registration_url": "https://www.ironman.com/races/im703-zell-am-see"
+  },
+  {
+   "slug": "im-knokke-heist",
+   "name": "Ironman Belgium Knokke-Heist",
+   "type": "IRONMAN",
+   "race_date": "2027-09-05",
+   "city": "Knokke-Heist",
+   "country": "Belgium",
+   "location": "Knokke-Heist, Belgium",
+   "registration_url": "https://www.ironman.com/races/im-knokke-heist"
+  },
+  {
+   "slug": "im703-wisconsin",
+   "name": "Ironman 70.3 Wisconsin",
+   "type": "70.3",
+   "race_date": "2027-09-11",
+   "city": "Madison",
+   "country": "United States",
+   "location": "Madison, WI, United States",
+   "registration_url": "https://www.ironman.com/races/im703-wisconsin"
+  },
+  {
+   "slug": "im703-erkner",
+   "name": "Ironman 70.3 Erkner",
+   "type": "70.3",
+   "race_date": "2027-09-12",
+   "city": "Erkner",
+   "country": "Germany",
+   "location": "Erkner, Germany",
+   "registration_url": "https://www.ironman.com/races/im703-erkner"
+  },
+  {
+   "slug": "im703-nice",
+   "name": "Ironman 70.3 Nice",
+   "type": "70.3",
+   "race_date": "2027-09-12",
+   "city": "Nice",
+   "country": "France",
+   "location": "Nice, France",
+   "registration_url": "https://www.ironman.com/races/im703-nice"
+  },
+  {
+   "slug": "im703-santa-cruz",
+   "name": "Ironman 70.3 Santa Cruz",
+   "type": "70.3",
+   "race_date": "2027-09-12",
+   "city": "Santa Cruz",
+   "country": "United States",
+   "location": "Santa Cruz, CA, United States",
+   "registration_url": "https://www.ironman.com/races/im703-santa-cruz"
+  },
+  {
+   "slug": "im703-sunshine-coast",
+   "name": "Ironman 70.3 Sunshine Coast",
+   "type": "70.3",
+   "race_date": "2027-09-12",
+   "city": "Mooloolaba",
+   "country": "Australia",
+   "location": "Mooloolaba, QLD, Australia",
+   "registration_url": "https://www.ironman.com/races/im703-sunshine-coast"
+  },
+  {
+   "slug": "im703-weymouth",
+   "name": "Ironman 70.3 Weymouth",
+   "type": "70.3",
+   "race_date": "2027-09-12",
+   "city": "Weymouth",
+   "country": "United Kingdom",
+   "location": "Weymouth, United Kingdom",
+   "registration_url": "https://www.ironman.com/races/im703-weymouth"
+  },
+  {
+   "slug": "im-france",
+   "name": "Ironman France",
+   "type": "IRONMAN",
+   "race_date": "2027-09-12",
+   "city": "Nice",
+   "country": "France",
+   "location": "Nice, France",
+   "registration_url": "https://www.ironman.com/races/im-france"
+  },
+  {
+   "slug": "im-south-hokkaido",
+   "name": "Ironman Japan South Hokkaido",
+   "type": "IRONMAN",
+   "race_date": "2027-09-12",
+   "city": null,
+   "country": "Japan",
+   "location": "Hokkaido, Japan",
+   "registration_url": "https://www.ironman.com/races/im-south-hokkaido"
+  },
+  {
+   "slug": "im-wisconsin",
+   "name": "Ironman Wisconsin",
+   "type": "IRONMAN",
+   "race_date": "2027-09-12",
+   "city": "Madison",
+   "country": "United States",
+   "location": "Madison, WI, United States",
+   "registration_url": "https://www.ironman.com/races/im-wisconsin"
+  },
+  {
+   "slug": "im-emilia-romagna",
+   "name": "Ironman Italy Emilia Romagna",
+   "type": "IRONMAN",
+   "race_date": "2027-09-18",
+   "city": "Cervia",
+   "country": "Italy",
+   "location": "Cervia, Italy",
+   "registration_url": "https://www.ironman.com/races/im-emilia-romagna"
+  },
+  {
+   "slug": "im-maryland",
+   "name": "Ironman Maryland",
+   "type": "IRONMAN",
+   "race_date": "2027-09-18",
+   "city": "Cambridge",
+   "country": "United States",
+   "location": "Cambridge, MD, United States",
+   "registration_url": "https://www.ironman.com/races/im-maryland"
+  },
+  {
+   "slug": "im703-emilia-romagna",
+   "name": "Ironman 70.3 Emilia Romagna",
+   "type": "70.3",
+   "race_date": "2027-09-19",
+   "city": "Cervia",
+   "country": "Italy",
+   "location": "Cervia, Italy",
+   "registration_url": "https://www.ironman.com/races/im703-emilia-romagna"
+  },
+  {
+   "slug": "im703-sao-paulo",
+   "name": "Ironman 70.3 São Paulo",
+   "type": "70.3",
+   "race_date": "2027-09-19",
+   "city": null,
+   "country": "Brazil",
+   "location": "SP, Brazil",
+   "registration_url": "https://www.ironman.com/races/im703-sao-paulo"
+  },
+  {
+   "slug": "im703-washington-tri-cities",
+   "name": "Ironman 70.3 Washington Tri-Cities",
+   "type": "70.3",
+   "race_date": "2027-09-19",
+   "city": "Richland",
+   "country": "United States",
+   "location": "Richland, WA, United States",
+   "registration_url": "https://www.ironman.com/races/im703-washington-tri-cities"
+  },
+  {
+   "slug": "im-wales",
+   "name": "Ironman Wales",
+   "type": "IRONMAN",
+   "race_date": "2027-09-19",
+   "city": null,
+   "country": "United Kingdom",
+   "location": "Pembrokeshire, United Kingdom",
+   "registration_url": "https://www.ironman.com/races/im-wales"
+  },
+  {
+   "slug": "im703-augusta",
+   "name": "Ironman 70.3 Augusta",
+   "type": "70.3",
+   "race_date": "2027-09-26",
+   "city": "Augusta",
+   "country": "United States",
+   "location": "Augusta, GA, United States",
+   "registration_url": "https://www.ironman.com/races/im703-augusta"
+  },
+  {
+   "slug": "im703-cozumel",
+   "name": "Ironman 70.3 Cozumel",
+   "type": "70.3",
+   "race_date": "2027-09-26",
+   "city": "Cozumel",
+   "country": "Mexico",
+   "location": "Cozumel, ROO, Mexico",
+   "registration_url": "https://www.ironman.com/races/im703-cozumel"
+  },
+  {
+   "slug": "im703-mamaia",
+   "name": "Ironman 70.3 Mamaia Constanta, Romania",
+   "type": "70.3",
+   "race_date": "2027-09-26",
+   "city": "Mamaia",
+   "country": "Romania",
+   "location": "Mamaia, Romania",
+   "registration_url": "https://www.ironman.com/races/im703-mamaia"
+  },
+  {
+   "slug": "im-chattanooga",
+   "name": "Ironman Chattanooga",
+   "type": "IRONMAN",
+   "race_date": "2027-09-26",
+   "city": "Chattanooga",
+   "country": "United States",
+   "location": "Chattanooga, TN, United States",
+   "registration_url": "https://www.ironman.com/races/im-chattanooga"
+  },
+  {
+   "slug": "im-barcelona",
+   "name": "Ironman Calella-Barcelona",
+   "type": "IRONMAN",
+   "race_date": "2027-10-03",
+   "city": "Calella",
+   "country": "Spain",
+   "location": "Calella, Spain",
+   "registration_url": "https://www.ironman.com/races/im-barcelona"
+  },
+  {
+   "slug": "im-world-championship-kona",
+   "name": "Ironman World Championship",
+   "type": "IRONMAN",
+   "race_date": "2027-10-09",
+   "city": "Kona",
+   "country": "United States",
+   "location": "Kona, HI, United States",
+   "registration_url": "https://www.ironman.com/races/im-world-championship-kona"
+  },
+  {
+   "slug": "im703-north-carolina",
+   "name": "Ironman 70.3 North Carolina",
+   "type": "70.3",
+   "race_date": "2027-10-16",
+   "city": "Wilmington",
+   "country": "United States",
+   "location": "Wilmington, NC, United States",
+   "registration_url": "https://www.ironman.com/races/im703-north-carolina"
+  },
+  {
+   "slug": "im703-croatia",
+   "name": "Ironman 70.3 Poreč",
+   "type": "70.3",
+   "race_date": "2027-10-17",
+   "city": "Porec",
+   "country": "Croatia",
+   "location": "Porec, Croatia",
+   "registration_url": "https://www.ironman.com/races/im703-croatia"
+  },
+  {
+   "slug": "im703-port-macquarie",
+   "name": "Ironman 70.3 Port Macquarie",
+   "type": "70.3",
+   "race_date": "2027-10-17",
+   "city": "Port Macquarie",
+   "country": "Australia",
+   "location": "Port Macquarie, NSW, Australia",
+   "registration_url": "https://www.ironman.com/races/im703-port-macquarie"
+  },
+  {
+   "slug": "im-australia",
+   "name": "Ironman Australia",
+   "type": "IRONMAN",
+   "race_date": "2027-10-17",
+   "city": "Port Macquarie",
+   "country": "Australia",
+   "location": "Port Macquarie, NSW, Australia",
+   "registration_url": "https://www.ironman.com/races/im-australia"
+  },
+  {
+   "slug": "im703-cascais",
+   "name": "Ironman 70.3 Portugal-Cascais",
+   "type": "70.3",
+   "race_date": "2027-10-23",
+   "city": "Cascais",
+   "country": "Portugal",
+   "location": "Cascais, Portugal",
+   "registration_url": "https://www.ironman.com/races/im703-cascais"
+  },
+  {
+   "slug": "im-cascais",
+   "name": "Ironman Portugal-Cascais",
+   "type": "IRONMAN",
+   "race_date": "2027-10-23",
+   "city": "Cascais",
+   "country": "Portugal",
+   "location": "Cascais, Portugal",
+   "registration_url": "https://www.ironman.com/races/im-cascais"
+  },
+  {
+   "slug": "im703-florianopolis",
+   "name": "Ironman 70.3 Florianopolis",
+   "type": "70.3",
+   "race_date": "2027-10-24",
+   "city": null,
+   "country": "Brazil",
+   "location": "SC, Brazil",
+   "registration_url": "https://www.ironman.com/races/im703-florianopolis"
+  },
+  {
+   "slug": "im-california",
+   "name": "Ironman California",
+   "type": "IRONMAN",
+   "race_date": "2027-10-24",
+   "city": "Sacramento",
+   "country": "United States",
+   "location": "Sacramento, CA, United States",
+   "registration_url": "https://www.ironman.com/races/im-california"
+  },
+  {
+   "slug": "im703-malaga",
+   "name": "Ironman 70.3 Málaga",
+   "type": "70.3",
+   "race_date": "2027-10-31",
+   "city": "Malaga",
+   "country": "Spain",
+   "location": "Malaga, Spain",
+   "registration_url": "https://www.ironman.com/races/im703-malaga"
+  },
+  {
+   "slug": "im703-waco",
+   "name": "Ironman 70.3 Waco",
+   "type": "70.3",
+   "race_date": "2027-11-14",
+   "city": "Waco",
+   "country": "United States",
+   "location": "Waco, TX, United States",
+   "registration_url": "https://www.ironman.com/races/im703-waco"
+  }
+ ]
+}
