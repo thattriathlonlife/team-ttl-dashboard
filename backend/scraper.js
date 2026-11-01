@@ -9,6 +9,7 @@
 
 import 'dotenv/config';
 import * as cheerio from 'cheerio';
+import { appendFileSync } from 'fs';
 
 // --- Config ---
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -59,93 +60,111 @@ async function fetchTriathlonEvents() {
   console.log('[Scraper] Fetching events from triathlon.org API...');
 
   if (!TRIATHLON_API_KEY) {
-    console.error('[Scraper] TRIATHLON_API_KEY not set — cannot fetch events');
-    return [];
+    throw new Error('[Scraper] TRIATHLON_API_KEY not set — cannot fetch events');
   }
 
   const currentYear = new Date().getFullYear();
   const startDate = `${currentYear}-01-01`;
   const endDate = `${currentYear + 1}-12-31`;
 
-  const url = `${TRIATHLON_API_BASE}/events?start_date=${startDate}&end_date=${endDate}&per_page=500&order=asc`;
-  console.log(`[Scraper] Requesting: ${url}`);
-
-  const response = await fetch(url, {
-    headers: {
-      'apikey': TRIATHLON_API_KEY,
-      'Accept': 'application/json',
-    }
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    console.error(`[Scraper] API error ${response.status}:`, text);
-    return [];
-  }
-
-  const json = await response.json();
-  const events = json.data || [];
-  console.log(`[Scraper] API returned ${events.length} total events`);
-  if (events.length > 0) {
-    console.log('[Scraper] Sample event fields:', JSON.stringify(events[0], null, 2).substring(0, 500));
-  }
-
+  // Paginated fetch (audit F3, 2026-11-01): the API returns total /
+  // last_page metadata and the old single per_page=500 request silently
+  // truncated the window — ascending order meant the cap ate the
+  // furthest-future events first. Walk every page; fail loudly on HTTP
+  // errors instead of returning an empty list (audit F2).
   const races = [];
-  for (const event of events) {
-    const name = event.event_title || '';
-    const nameUpper = name.toUpperCase();
+  let page = 1;
+  let lastPage = 1;
+  let apiTotal = null;
+  let eventsSeen = 0;
 
-    // Classify type based on name
-    let type;
-    if (name.includes('70.3')) {
-      type = '70.3';
-    } else if (nameUpper.includes('IRONMAN')) {
-      type = 'IRONMAN';
-    } else if (nameUpper.includes('OLYMPIC')) {
-      type = 'Olympic';
-    } else if (nameUpper.includes('SPRINT')) {
-      type = 'Sprint';
-    } else if (nameUpper.includes('XTERRA')) {
-      type = 'XTERRA';
-    } else if (
-      nameUpper.includes('TRIATHLON') ||
-      nameUpper.includes('TRISTAR') ||
-      nameUpper.includes('TRI ') ||
-      nameUpper.includes('DUATHLON') ||
-      nameUpper.includes('AQUATHLON')
-    ) {
-      type = 'Other';
-    } else {
-      continue; // skip unrelated events
+  do {
+    const url = `${TRIATHLON_API_BASE}/events?start_date=${startDate}&end_date=${endDate}&per_page=500&order=asc&page=${page}`;
+    console.log(`[Scraper] Requesting page ${page}: ${url}`);
+
+    const response = await fetch(url, {
+      headers: {
+        'apikey': TRIATHLON_API_KEY,
+        'Accept': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`[Scraper] API error ${response.status}: ${text.slice(0, 300)}`);
     }
 
-    const race_date = event.event_date ? event.event_date.split('T')[0] : null;
-    if (!race_date) continue;
+    const json = await response.json();
+    if (page === 1) {
+      apiTotal = json.total ?? null;
+      lastPage = json.last_page ?? 1;
+      console.log(`[Scraper] API window total: ${apiTotal} events across ${lastPage} page(s)`);
+    }
+    const events = json.data || [];
+    eventsSeen += events.length;
+    if (page === 1 && events.length > 0) {
+      console.log('[Scraper] Sample event fields:', JSON.stringify(events[0], null, 2).substring(0, 500));
+    }
 
-    // triathlon.org field names — venue is the city/location name
-    const venue = event.event_venue || '';
-    const country = event.event_country || event.event_country_name || '';
-    const location = [venue, country].filter(Boolean).join(', ') || 'TBD';
+    for (const event of events) {
+      const name = event.event_title || '';
+      const nameUpper = name.toUpperCase();
 
-    // Coordinates come back as event_latitude / event_longitude
-    const lat = event.event_latitude ?? event.event_lat ?? null;
-    const lng = event.event_longitude ?? event.event_lng ?? null;
+      // Classify type based on name
+      let type;
+      if (name.includes('70.3')) {
+        type = '70.3';
+      } else if (nameUpper.includes('IRONMAN')) {
+        type = 'IRONMAN';
+      } else if (nameUpper.includes('OLYMPIC')) {
+        type = 'Olympic';
+      } else if (nameUpper.includes('SPRINT')) {
+        type = 'Sprint';
+      } else if (nameUpper.includes('XTERRA')) {
+        type = 'XTERRA';
+      } else if (
+        nameUpper.includes('TRIATHLON') ||
+        nameUpper.includes('TRISTAR') ||
+        nameUpper.includes('TRI ') ||
+        nameUpper.includes('DUATHLON') ||
+        nameUpper.includes('AQUATHLON')
+      ) {
+        type = 'Other';
+      } else {
+        continue; // skip unrelated events
+      }
 
-    races.push({
-      name,
-      type,
-      race_date,
-      location,
-      city: venue || null,
-      country: country || null,
-      latitude: lat ? parseFloat(lat) : null,
-      longitude: lng ? parseFloat(lng) : null,
-      external_id: `triorg_${event.event_id}`,
-      source: 'triathlon_api',
-      registration_url: event.event_website || event.event_listing || null,
-    });
-  }
+      const race_date = event.event_date ? event.event_date.split('T')[0] : null;
+      if (!race_date) continue;
 
+      // triathlon.org field names — venue is the city/location name
+      const venue = event.event_venue || '';
+      const country = event.event_country || event.event_country_name || '';
+      const location = [venue, country].filter(Boolean).join(', ') || 'TBD';
+
+      // Coordinates come back as event_latitude / event_longitude
+      const lat = event.event_latitude ?? event.event_lat ?? null;
+      const lng = event.event_longitude ?? event.event_lng ?? null;
+
+      races.push({
+        name,
+        type,
+        race_date,
+        location,
+        city: venue || null,
+        country: country || null,
+        latitude: lat ? parseFloat(lat) : null,
+        longitude: lng ? parseFloat(lng) : null,
+        external_id: `triorg_${event.event_id}`,
+        source: 'triathlon_api',
+        registration_url: event.event_website || event.event_listing || null,
+      });
+    }
+
+    page++;
+  } while (page <= lastPage);
+
+  console.log(`[Scraper] API returned ${eventsSeen} total events (advertised total: ${apiTotal})`);
   console.log(`[Scraper] Filtered to ${races.length} triathlon events`);
   return races;
 }
@@ -165,8 +184,9 @@ async function scrapeIronmanRaces() {
   });
 
   if (!response.ok) {
-    console.error('[PTO] Failed to fetch calendar:', response.status);
-    return [];
+    // Fail loudly (audit F2, 2026-11-01): a dead source must turn the
+    // run red, not silently contribute zero races.
+    throw new Error(`[PTO] Failed to fetch calendar: HTTP ${response.status}`);
   }
 
   const html = await response.text();
@@ -291,12 +311,63 @@ function extractCityFromLocation(location) {
   return parts[0] || null;
 }
 
-async function geocodeRaces(races) {
+// Curated coordinate overrides (audit F5, 2026-11-01): races whose
+// name-derived "city" is actually a state/region, pinned to their real
+// venues. These venues do not move; if one ever does, update the row
+// here and the DB cache picks it up on the next run.
+const GEOCODE_OVERRIDES = {
+  'Ironman Florida': { city: 'Panama City Beach', latitude: 30.1766, longitude: -85.8055 },
+  'Ironman Western Australia': { city: 'Busselton', latitude: -33.6525, longitude: 115.3459 },
+};
+
+// Cap on live Nominatim lookups per run. The DB cache absorbs repeat
+// races, so a healthy run geocodes only genuinely new ones; the cap
+// keeps a first run (or a source flood) polite to a free service.
+const GEOCODE_MAX_NEW_PER_RUN = 150;
+let geocodeLookupsThisRun = 0;
+
+// Coordinates already in the DB, keyed by external_id. The old flow
+// re-geocoded the entire PTO list from scratch every day because
+// scraped races arrive coord-less; now the DB is the cache.
+async function fetchCoordCache() {
+  const { data, error } = await supabaseRequest(
+    '/races?select=external_id,city,latitude,longitude&latitude=not.is.null&limit=2000'
+  );
+  const cache = new Map();
+  if (!error && Array.isArray(data)) {
+    for (const r of data) {
+      if (r.external_id && r.latitude && r.longitude) cache.set(r.external_id, r);
+    }
+  } else if (error) {
+    console.error('[Geocode] Coord cache read failed (continuing without):', error.message);
+  }
+  console.log(`[Geocode] DB coordinate cache: ${cache.size} races`);
+  return cache;
+}
+
+async function geocodeRaces(races, coordCache = new Map()) {
   console.log(`[Geocode] Geocoding ${races.length} races...`);
   const results = [];
 
   for (const race of races) {
+    const override = GEOCODE_OVERRIDES[race.name];
+    if (override) {
+      results.push({ ...race, city: override.city, latitude: override.latitude, longitude: override.longitude });
+      continue;
+    }
+
     if (race.latitude && race.longitude) {
+      results.push(race);
+      continue;
+    }
+
+    const cached = coordCache.get(race.external_id);
+    if (cached) {
+      results.push({ ...race, city: race.city || cached.city, latitude: parseFloat(cached.latitude), longitude: parseFloat(cached.longitude) });
+      continue;
+    }
+
+    if (geocodeLookupsThisRun >= GEOCODE_MAX_NEW_PER_RUN) {
       results.push(race);
       continue;
     }
@@ -310,6 +381,7 @@ async function geocodeRaces(races) {
       : race.location;
 
     try {
+      geocodeLookupsThisRun++;
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(geocodeQuery)}&format=json&limit=3&addressdetails=1`;
 
       const res = await fetch(url, {
@@ -336,23 +408,25 @@ async function geocodeRaces(races) {
         const geocodedCity = addr.city || addr.town || addr.village ||
           addr.municipality || addr.city_district || null;
 
+        // City-level results or nothing (audit F5): the old code
+        // accepted region results whenever the place type was not on a
+        // blocklist — 'administrative' was missing from it, which is
+        // how state centroids (Florida, Western Australia) became pins.
         const invalidTypes = ['bay', 'sea', 'ocean', 'river', 'lake', 'region',
-          'state', 'country', 'continent', 'county', 'district'];
-        const isInvalidType = invalidTypes.includes(placeType) && !geocodedCity;
+          'state', 'country', 'continent', 'county', 'district', 'administrative'];
+        const isInvalidType = invalidTypes.includes(placeType);
 
-        const confirmedCity = geocodedCity || (!isInvalidType ? bestCity : null);
-
-        if (!confirmedCity || isInvalidType) {
-          console.log(`[Geocode] "${race.name}" → type "${placeType}", no city found — skipping coords`);
-          results.push({ ...race, city: null, latitude: null, longitude: null });
+        if (!geocodedCity || isInvalidType) {
+          console.log(`[Geocode] "${race.name}" → type "${placeType}", no city-level result — skipping coords`);
+          results.push({ ...race, city: bestCity ?? race.city ?? null, latitude: null, longitude: null });
         } else {
           results.push({
             ...race,
-            city: confirmedCity,
+            city: geocodedCity,
             latitude: parseFloat(place.lat),
             longitude: parseFloat(place.lon),
           });
-          console.log(`[Geocode] ${race.name} → ${confirmedCity} (${place.lat}, ${place.lon})`);
+          console.log(`[Geocode] ${race.name} → ${geocodedCity} (${place.lat}, ${place.lon})`);
         }
       } else {
         console.log(`[Geocode] No result for: ${geocodeQuery} — skipping coords`);
@@ -368,7 +442,7 @@ async function geocodeRaces(races) {
     }
   }
 
-  console.log(`[Geocode] Done — ${results.filter(r => r.latitude).length}/${races.length} races geocoded`);
+  console.log(`[Geocode] Done — ${results.filter(r => r.latitude).length}/${races.length} races geocoded (${geocodeLookupsThisRun} live lookups)`);
   return results;
 }
 
@@ -548,18 +622,54 @@ async function main() {
 
   try {
     // 1. Fetch from triathlon.org API (Olympic, Sprint, WTS events)
-    const triEvents = await fetchTriathlonEvents();
+    const triEventsRaw = await fetchTriathlonEvents();
 
     // 2. Scrape PTO calendar for IRONMAN & 70.3 races
     const ironmanRaces = await scrapeIronmanRaces();
 
-    // 3. Geocode IRONMAN races — adds lat/lon and city via OpenStreetMap
-    const geocodedIronman = await geocodeRaces(ironmanRaces);
+    // Sanity thresholds (audit F2, 2026-11-01): zero from BOTH sources
+    // means the run learned nothing — fail loudly instead of letting a
+    // green check hide a dead pipeline. A thin branded haul only warns:
+    // the PTO source is known-degraded (audit F1) and its replacement is
+    // Phase C, but the warning keeps the rot visible on every run.
+    if (triEventsRaw.length === 0 && ironmanRaces.length === 0) {
+      throw new Error('[Main] Both sources returned zero races — treating as a failed run');
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    const brandedUpcoming = [...triEventsRaw, ...ironmanRaces]
+      .filter(r => (r.type === 'IRONMAN' || r.type === '70.3') && r.race_date >= todayStr).length;
+    console.log(`[Main] Branded (IRONMAN/70.3) upcoming races in this fetch: ${brandedUpcoming}`);
+    if (brandedUpcoming < 15) {
+      console.log(`::warning::Only ${brandedUpcoming} upcoming IRONMAN/70.3 races in this fetch (a healthy calendar has 40+) — branded coverage is likely broken upstream`);
+    }
+
+    // 3. Geocode both sources against the DB coordinate cache
+    // (audit F5 — API races were never geocoded at all before).
+    const coordCache = await fetchCoordCache();
+    const triEvents = await geocodeRaces(triEventsRaw, coordCache);
+    const geocodedIronman = await geocodeRaces(ironmanRaces, coordCache);
 
     // 4. Merge and upsert
     const all = [...triEvents, ...geocodedIronman];
     console.log(`[Main] Total combined races: ${all.length}`);
     await upsertRaces(all);
+
+    // Run summary — the health record F2 asked for. One block in the
+    // log and, under GitHub Actions, in the step summary.
+    const byType = {};
+    for (const r of all) byType[r.type] = (byType[r.type] || 0) + 1;
+    const summary = [
+      '## Scraper run summary',
+      `- triathlon_api parsed: ${triEvents.length}`,
+      `- pto_scrape parsed: ${geocodedIronman.length}`,
+      `- by type: ${Object.entries(byType).map(([k, v]) => `${k}=${v}`).join(', ')}`,
+      `- branded upcoming in fetch: ${brandedUpcoming}`,
+      `- geocoded: ${all.filter(r => r.latitude).length}/${all.length} (live lookups this run: ${geocodeLookupsThisRun})`,
+    ].join('\n');
+    console.log(summary);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n'); } catch { /* log copy stands */ }
+    }
 
     // 5. Check for weekend notifications (currently disabled — see NOTIFICATIONS_ENABLED flag)
     await checkAndNotify();
