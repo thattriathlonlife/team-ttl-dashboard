@@ -738,24 +738,27 @@ export default function Home({ session, profile }) {
               : null
         return (
           <>
-            {archiveTarget && (
+            {visibleFeed.slice(0, visibleCount).map(renderItem)}
+            <div ref={sentinelRef} style={{ height: '1px' }} />
+            {/* Archive entry: a slim link at the very end of a filtered
+                list — depth is offered once the recent stuff runs out,
+                never as a banner above the content. */}
+            {archiveTarget && visibleCount >= visibleFeed.length && (
               <button
                 onClick={() => navigate(`/content#${archiveTarget.hash}`)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left',
-                  padding: '13px 16px', marginBottom: '1rem', cursor: 'pointer',
-                  background: 'rgba(var(--brand-rgb),0.07)', border: '1px solid rgba(var(--brand-rgb),0.28)',
-                  borderRadius: '12px', color: '#fff',
-                  fontFamily: 'Barlow, sans-serif', fontSize: '14px', fontWeight: 600,
+                  display: 'block', width: '100%', textAlign: 'center',
+                  background: 'none', border: 'none',
+                  borderTop: '1px solid rgba(255,255,255,0.07)',
+                  padding: '18px 0 2px', marginTop: '8px', cursor: 'pointer',
+                  color: 'var(--brand)',
+                  fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13.5px',
+                  fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase',
                 }}
               >
-                <span style={{ fontSize: '17px' }}>🗂️</span>
-                <span style={{ flex: 1 }}>{archiveTarget.label}</span>
-                <span style={{ color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase' }}>Archive →</span>
+                {archiveTarget.label} →
               </button>
             )}
-            {visibleFeed.slice(0, visibleCount).map(renderItem)}
-            <div ref={sentinelRef} style={{ height: '1px' }} />
             <div style={{
               textAlign: 'center', padding: '1.5rem 0 0.5rem',
               fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px',
