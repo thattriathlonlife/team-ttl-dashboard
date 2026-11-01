@@ -22,10 +22,11 @@ const GEAR_TAB = { deals: 'deals', gear: 'guide', garage: 'garage' }
 
 const S = {
   wrap: { maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' },
-  segBar: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1.25rem' },
+  // One continuous lateral-scroll row (Zack, 2026-10-31) — never wraps.
+  segBar: { display: 'flex', gap: '6px', flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', marginBottom: '1.25rem', paddingBottom: '2px' },
   seg: active => ({
     fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600,
-    letterSpacing: '1.5px', textTransform: 'uppercase',
+    letterSpacing: '1.5px', textTransform: 'uppercase', whiteSpace: 'nowrap', flexShrink: 0,
     padding: '8px 16px', borderRadius: '999px', cursor: 'pointer',
     border: `1px solid ${active ? 'rgba(var(--brand-rgb),0.55)' : 'rgba(255,255,255,0.12)'}`,
     background: active ? 'rgba(var(--brand-rgb),0.12)' : 'transparent',
