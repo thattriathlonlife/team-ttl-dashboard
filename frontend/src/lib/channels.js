@@ -97,3 +97,52 @@ export function channelAccessLabel(channel) {
   if (isTeamOnlyChannel(channel)) return 'Team only'
   return null
 }
+
+// Find a race's channel of the given kind, creating it if needed.
+// Extracted from RaceDetail (2026-10-31) so race cards can offer the same
+// one-tap Discussion / Logistics actions. Tries the canonical encoding
+// first (migration 0003), then the live-DB encoding (type='race' + name
+// suffix) the CHECK constraint accepts today. Returns { channel } or
+// { error } — never fails silently.
+export async function ensureRaceChannel(supabase, race, kind, userId) {
+  async function find() {
+    const { data } = await supabase
+      .from('channels')
+      .select('id, name, type, category, race_id')
+      .eq('race_id', race.id)
+    return (data || []).find(ch => raceChannelKind(ch) === kind) || null
+  }
+
+  let channel = null
+  try { channel = await find() } catch { /* fall through to create */ }
+  if (channel) return { channel }
+
+  const slug = race.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+  const suffix = kind === 'discussion' ? 'discussion' : 'logistics'
+  const basePayload = {
+    name: `${slug}-${suffix}`,
+    category: 'race',
+    race_id: race.id,
+    description: kind === 'discussion'
+      ? `Public race discussion for ${race.name}`
+      : `Team-only logistics for ${race.name}: travel, lodging, and meetups`,
+    created_by: userId,
+  }
+
+  let { data: newChannel, error } = await supabase.from('channels')
+    .insert({ ...basePayload, type: raceChannelType(kind), audience: raceChannelAudience(kind) })
+    .select('id').single()
+  if (!error && newChannel) return { channel: newChannel }
+
+  channel = await find() // a parallel tap may have won
+  if (channel) return { channel }
+
+  ;({ data: newChannel, error } = await supabase.from('channels')
+    .insert({ ...basePayload, type: 'race' })
+    .select('id').single())
+  if (!error && newChannel) return { channel: newChannel }
+
+  channel = await find()
+  if (channel) return { channel }
+  return { error: error?.message || 'unknown error' }
+}

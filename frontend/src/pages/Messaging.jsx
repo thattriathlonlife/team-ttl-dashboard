@@ -66,6 +66,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 680)
   const [showNewChannel, setShowNewChannel] = useState(false)
   const [showMentions, setShowMentions] = useState(false)
+  const [sideFilter, setSideFilter] = useState('all') // sidebar category chips
   const [dmChannels, setDmChannels] = useState([])
   const [showNewDm, setShowNewDm] = useState(false)
   const [lockedChannel, setLockedChannel] = useState(null)
@@ -252,7 +253,13 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const regionChannels = channels.filter(c => c.category === 'regions')
   const publicRaceChannels = channels.filter(c => raceChannelKind(c) === 'discussion')
   const teamRaceChannels = channels.filter(c => raceChannelKind(c) === 'logistics')
+  // Announcement channels (readonly 📢 or the announcements category) pin
+  // as a gold card above the list — previously such channels weren't
+  // rendered in any sidebar group at all.
+  const announcementChannels = channels.filter(c => c.is_readonly || c.category === 'announcements')
+  const pinnedAnnouncement = announcementChannels[0] || null
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0)
+  const showGroup = (key) => sideFilter === 'all' || sideFilter === key
 
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Barlow Condensed', letterSpacing: 2, color: '#999', textTransform: 'uppercase' }}>Loading...</div>
 
@@ -261,13 +268,67 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
       {/* Sidebar */}
       {(showSidebar || !isMobile) && (
-        <div style={{ width: isMobile ? '100%' : '280px', background: '#111', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={{ width: isMobile ? '100%' : '280px', background: '#111', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'relative' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff' }}>Messages</div>
             {isAdmin && <button onClick={() => setShowNewChannel(true)} style={{ background: 'rgba(var(--brand-rgb),0.1)', border: '1px solid rgba(var(--brand-rgb),0.3)', borderRadius: '6px', color: 'var(--brand)', fontSize: '18px', cursor: 'pointer', padding: '2px 10px', lineHeight: 1 }}>+</button>}
           </div>
 
           <div style={{ flex: 1, overflow: 'auto' }}>
+            {/* Category chips — one lens over the channel list */}
+            <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', padding: '12px 16px 4px', scrollbarWidth: 'none' }}>
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'races', label: 'Races' },
+                { id: 'regions', label: 'Regions' },
+                { id: 'training', label: 'Training' },
+                { id: 'groups', label: 'Groups' },
+                { id: 'dms', label: 'DMs' },
+              ].map(f => {
+                const active = sideFilter === f.id
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setSideFilter(f.id)}
+                    style={{
+                      fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12.5px', fontWeight: 600,
+                      letterSpacing: '1.3px', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                      padding: '6px 14px', borderRadius: '999px', cursor: 'pointer',
+                      border: `1px solid ${active ? 'rgba(var(--brand-rgb),0.55)' : 'rgba(255,255,255,0.12)'}`,
+                      background: active ? 'rgba(var(--brand-rgb),0.14)' : '#161616',
+                      color: active ? 'var(--brand)' : '#888',
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Pinned announcement — the latest staff post, as a gold card */}
+            {pinnedAnnouncement && sideFilter === 'all' && (() => {
+              const last = lastMessages?.[pinnedAnnouncement.id]
+              return (
+                <button
+                  onClick={() => openChannel(pinnedAnnouncement)}
+                  style={{
+                    display: 'block', width: 'calc(100% - 32px)', margin: '10px 16px 4px', textAlign: 'left',
+                    background: 'linear-gradient(135deg, rgba(var(--highlight-rgb),0.1), rgba(var(--highlight-rgb),0.02))',
+                    border: '1px solid rgba(var(--highlight-rgb),0.35)', borderRadius: '14px',
+                    padding: '12px 14px', cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
+                    <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10.5px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', background: 'rgba(var(--highlight-rgb),0.14)', color: 'var(--highlight)', padding: '3px 8px', borderRadius: '5px' }}>📌 Announcement</span>
+                    {last?.profiles?.full_name && <span style={{ fontSize: '11.5px', color: '#777' }}>{last.profiles.full_name.split(' ')[0]}</span>}
+                  </div>
+                  <div style={{ fontSize: '13.5px', lineHeight: 1.45, color: '#e8e8e8', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {last ? (last.content || '📎 Image') : `Open ${channelDisplayName(pinnedAnnouncement)} for the latest announcement.`}
+                  </div>
+                </button>
+              )
+            })()}
+
             {/* Mentions row */}
             <button onClick={openMentions} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '14px 20px', background: showMentions ? 'rgba(var(--accent-rgb),0.08)' : 'none', border: 'none', borderLeft: showMentions ? '3px solid var(--accent)' : '3px solid transparent', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: showMentions ? 'rgba(var(--accent-rgb),0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0, color: showMentions ? 'var(--accent)' : '#666' }}>@</div>
@@ -278,15 +339,15 @@ export default function Messaging({ session, profile, onReadChannel }) {
               {mentionCount > 0 && <div style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, borderRadius: '10px', padding: '2px 8px', flexShrink: 0 }}>{mentionCount}</div>}
             </button>
 
-            <ChannelGroup label="General" channels={generalChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} locked={!teamView} />
-            {trainingChannels.length > 0 && <ChannelGroup label="Training" channels={trainingChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
-            {interestChannels.length > 0 && <ChannelGroup label="Groups" channels={interestChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
-            {regionChannels.length > 0 && <ChannelGroup label="Regions" channels={regionChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
-            {publicRaceChannels.length > 0 && <ChannelGroup label="Race Discussions" channels={publicRaceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} />}
-            {teamRaceChannels.length > 0 && <ChannelGroup label="Race Logistics" channels={teamRaceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
+            {showGroup('groups') && <ChannelGroup label="General" channels={generalChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} locked={!teamView} />}
+            {showGroup('training') && trainingChannels.length > 0 && <ChannelGroup label="Training" channels={trainingChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
+            {showGroup('groups') && interestChannels.length > 0 && <ChannelGroup label="Groups" channels={interestChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
+            {showGroup('regions') && regionChannels.length > 0 && <ChannelGroup label="Regions" channels={regionChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
+            {showGroup('races') && publicRaceChannels.length > 0 && <ChannelGroup label="Race Discussions" channels={publicRaceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={true} />}
+            {showGroup('races') && teamRaceChannels.length > 0 && <ChannelGroup label="Race Logistics" channels={teamRaceChannels} selected={selectedChannel} unread={unreadCounts} lastMessages={lastMessages} onSelect={openChannel} defaultOpen={false} locked={!teamView} />}
 
             {/* Direct Messages */}
-            {teamView ? (
+            {showGroup('dms') && (teamView ? (
               <DMGroup
                 dmChannels={dmChannels}
                 selected={selectedChannel}
@@ -307,7 +368,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
                   <span style={{ display: 'block', fontSize: '11px', color: '#444', marginTop: '1px' }}>Team members only</span>
                 </span>
               </button>
-            )}
+            ))}
 
             {/* Bottom hint when no channel selected on mobile */}
             {isMobile && !selectedChannel && !showMentions && (
@@ -316,6 +377,24 @@ export default function Messaging({ session, profile, onReadChannel }) {
               </div>
             )}
           </div>
+
+          {/* Compose FAB — new direct message (team view) */}
+          {teamView && (
+            <button
+              onClick={() => setShowNewDm(true)}
+              aria-label="New message"
+              style={{
+                position: 'absolute', right: '16px', bottom: '18px', zIndex: 30,
+                width: '52px', height: '52px', borderRadius: '50%',
+                background: 'var(--brand)', color: '#04282a', border: 'none',
+                fontSize: '21px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 10px 26px rgba(var(--brand-rgb),0.4)',
+              }}
+            >
+              ✎
+            </button>
+          )}
         </div>
       )}
 
@@ -460,8 +539,16 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
             <ChannelIcon ch={ch} isSelected={isSelected} size={32} />
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: unreadCount > 0 ? 700 : 500, color: isSelected ? '#fff' : unreadCount > 0 ? '#ddd' : '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
-                {displayName}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', fontWeight: unreadCount > 0 ? 700 : 500, color: isSelected ? '#fff' : unreadCount > 0 ? '#ddd' : '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                  {displayName}
+                </span>
+                {(() => {
+                  const kind = raceChannelKind(ch)
+                  if (kind === 'discussion') return <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--highlight-rgb),0.13)', color: 'var(--highlight)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Public</span>
+                  if (kind === 'logistics') return <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--brand-rgb),0.13)', color: 'var(--brand)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Team</span>
+                  return null
+                })()}
               </div>
               {previewText && (
                 <div style={{ fontSize: '11px', color: unreadCount > 0 ? '#999' : '#444', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
@@ -472,7 +559,7 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
 
             {locked && <div style={{ fontSize: '13px', color: '#555', flexShrink: 0 }}>🔒</div>}
             {unreadCount > 0 && (
-              <div style={{ background: 'var(--brand)', color: '#000', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '8px', padding: '1px 7px', flexShrink: 0 }}>
+              <div style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', fontWeight: 700, borderRadius: '999px', padding: '2px 8px', flexShrink: 0 }}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </div>
             )}

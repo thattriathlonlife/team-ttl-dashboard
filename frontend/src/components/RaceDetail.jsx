@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { isTeamTier, setDemoTier } from '../lib/tier'
-import { raceChannelAudience, raceChannelKind, raceChannelType } from '../lib/channels'
+import { ensureRaceChannel } from '../lib/channels'
 
 const MEMBER_COLORS = ['var(--brand)','var(--accent)','var(--highlight)','var(--accent)','#a78bfa','#34d399','#f472b6','#60a5fa']
 
@@ -116,16 +116,6 @@ export default function RaceDetail({ race, session, profile, onClose, onToggleEn
     setLoadingDetails(false)
   }
 
-  async function findRaceChannel(kindWanted) {
-    const { data } = await supabase
-      .from('channels')
-      .select('id, name, type, category, race_id')
-      .eq('race_id', race.id)
-    // Legacy type='race' channels normalize to logistics in lib/channels;
-    // they keep their history instead of being duplicated or made public.
-    return (data || []).find(ch => raceChannelKind(ch) === kindWanted) || null
-  }
-
   async function openRaceChannel(kind) {
     if (kind === 'logistics' && !teamView) {
       setShowLogisticsLock(true)
@@ -135,58 +125,15 @@ export default function RaceDetail({ race, session, profile, onClose, onToggleEn
     setThreadError('')
     setOpeningThread(kind)
 
-    let channel = null
-    try {
-      channel = await findRaceChannel(kind)
-    } catch (e) {
-      console.error('[openRaceChannel] lookup failed', e)
-    }
-
+    // The find-or-create logic lives in lib/channels (ensureRaceChannel)
+    // so race cards offer the identical one-tap behaviour.
+    const { channel, error } = await ensureRaceChannel(supabase, race, kind, session.user.id)
     if (!channel) {
-      const slug = race.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-      const suffix = kind === 'discussion' ? 'discussion' : 'logistics'
-      const basePayload = {
-        name: `${slug}-${suffix}`,
-        category: 'race',
-        race_id: race.id,
-        description: kind === 'discussion'
-          ? `Public race discussion for ${race.name}`
-          : `Team-only logistics for ${race.name}: travel, lodging, and meetups`,
-        created_by: session.user.id,
-      }
-
-      // Attempt 1: the canonical encoding (migration 0003: explicit type +
-      // audience). The live database rejects this today — its channels.type
-      // CHECK constraint predates the split (documented in CLAUDE.md).
-      let { data: newChannel, error } = await supabase.from('channels')
-        .insert({ ...basePayload, type: raceChannelType(kind), audience: raceChannelAudience(kind) })
-        .select('id').single()
-      if (!error && newChannel) channel = newChannel
-
-      // Attempt 2: the live-DB encoding — type stays 'race' (a value the
-      // CHECK constraint accepts) and the kind rides in the name suffix,
-      // which lib/channels recognizes.
-      if (!channel) {
-        channel = await findRaceChannel(kind) // a parallel tap may have won
-        if (!channel) {
-          ;({ data: newChannel, error } = await supabase.from('channels')
-            .insert({ ...basePayload, type: 'race' })
-            .select('id').single())
-          if (!error && newChannel) channel = newChannel
-        }
-      }
-
-      if (!channel) {
-        channel = await findRaceChannel(kind)
-        if (!channel) {
-          // Never fail silently: surface the database's own words so the
-          // blocker is visible on screen, not just in a console.
-          console.error('[openRaceChannel]', error?.message)
-          setThreadError(`Couldn't open the ${kind === 'discussion' ? 'discussion' : 'logistics'} channel${error?.message ? `: ${error.message}` : ''}`)
-          setOpeningThread(null)
-          return
-        }
-      }
+      // Never fail silently: surface the database's own words.
+      console.error('[openRaceChannel]', error)
+      setThreadError(`Couldn't open the ${kind === 'discussion' ? 'discussion' : 'logistics'} channel${error ? `: ${error}` : ''}`)
+      setOpeningThread(null)
+      return
     }
 
     setOpeningThread(null)

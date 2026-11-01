@@ -1,4 +1,5 @@
-import { getDemoTier, setDemoTier } from '../lib/tier'
+import { getDemoTier, setDemoTier, isTeamTier } from '../lib/tier'
+import { BRAND_THEME, TEAM_THEME } from '../lib/theme'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -185,14 +186,70 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
     return acc
   }, {})
 
+  const teamView = isTeamTier(profile)
+  const palette = teamView ? TEAM_THEME : BRAND_THEME
+  const nextRace = myRaces[0] || null
+  const nextDate = nextRace ? new Date(nextRace.race_date + 'T12:00:00') : null
+
   return (
     <div style={S.page}>
 
-      {/* Profile settings */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '32px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff', marginBottom: '4px' }}>Profile</div>
-        <div style={{ fontSize: '14px', color: '#999' }}>Manage your account and preferences.</div>
+      {/* Identity card (mockups, 2026-10-31): who you are in this app,
+          before any form fields. */}
+      <div style={{
+        background: 'linear-gradient(160deg, rgba(var(--brand-rgb),0.12), rgba(var(--accent-rgb),0.05))',
+        border: '1px solid rgba(255,255,255,0.09)', borderRadius: '16px',
+        padding: '22px 16px 18px', textAlign: 'center', marginBottom: '12px',
+      }}>
+        {avatarUrl
+          ? <img src={avatarUrl} alt="avatar" style={{ width: 76, height: 76, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(var(--brand-rgb),0.45)', display: 'block', margin: '0 auto' }} />
+          : <div style={{ width: 76, height: 76, borderRadius: '50%', background: avatarColor, border: '3px solid rgba(var(--brand-rgb),0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 26, fontWeight: 800, color: '#10131a' }}>{initials}</div>
+        }
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 24, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginTop: 11, lineHeight: 1.1 }}>
+          {fullName || 'Your profile'}
+        </div>
+        <div style={{ fontSize: 13, color: '#999', marginTop: 3 }}>{email}</div>
+        <div style={{ display: 'flex', gap: 7, justifyContent: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 10.5, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', background: 'rgba(var(--brand-rgb),0.13)', color: 'var(--brand)', border: '1px solid rgba(var(--brand-rgb),0.3)', padding: '3px 9px', borderRadius: 5 }}>
+            {teamView ? 'Team TTL member' : 'Community member'}
+          </span>
+          <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', background: '#101010', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '3px 10px' }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: palette.brand }} />
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: palette.accent }} />
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: palette.highlight }} />
+            <span style={{ fontSize: 10.5, color: '#999', marginLeft: 2 }}>{teamView ? 'Kit palette' : 'Brand palette'}</span>
+          </span>
+        </div>
       </div>
+
+      {/* Athlete stats */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+        {[
+          { v: loadingRaces ? '—' : myRaces.length, l: 'Upcoming races', c: '#fff' },
+          { v: loadingBadges ? '—' : earnedBadges.length, l: 'Badges earned', c: 'var(--highlight)' },
+          { v: profile?.training_streak_current ?? 0, l: 'Week streak', c: 'var(--brand)' },
+        ].map(t => (
+          <div key={t.l} style={{ flex: 1, background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '13px 8px', textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 25, fontWeight: 800, color: t.c, lineHeight: 1 }}>{t.v}</div>
+            <div style={{ fontSize: 10.5, color: '#777', letterSpacing: 1, textTransform: 'uppercase', marginTop: 4 }}>{t.l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Next race — the same date-block card as the Races page */}
+      {nextRace && (
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '13px 15px', marginBottom: '1.75rem' }}>
+          <div style={{ textAlign: 'center', background: '#1f1f1f', borderRadius: 12, padding: '8px 0', width: 56, flexShrink: 0 }}>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: 1.5, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)' }}>{nextDate.toLocaleDateString('en-US', { month: 'short' })}</div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 25, fontWeight: 800, lineHeight: 1.05, color: '#fff' }}>{nextDate.getDate()}</div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700 }}>Your next race</div>
+            <div style={{ fontWeight: 700, fontSize: 15.5, color: '#fff', marginTop: 2 }}>{nextRace.name}</div>
+            <div style={{ fontSize: 12.5, color: '#999' }}>{nextRace.location} · <span style={{ color: getDaysAway(nextRace.race_date).color }}>{getDaysAway(nextRace.race_date).text} away</span></div>
+          </div>
+        </div>
+      )}
 
       {success && <div style={S.success}>✓ Profile saved</div>}
       {error && <div style={S.error}>{error}</div>}
@@ -240,7 +297,7 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
       </div>
 
       <button style={S.saveBtn} onClick={handleSave} disabled={saving || uploading}>{saving ? 'Saving...' : 'Save Profile'}</button>
-      <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}>
+      <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Demo view (proof of concept)</div>
         <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#888', marginBottom: 10 }}>Preview the app as a fan or as a team member. Real access is set by team entitlement.</div>
         <div style={{ display: 'flex', gap: 8 }}>

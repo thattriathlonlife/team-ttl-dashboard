@@ -20,7 +20,7 @@ const S = {
   sectionTitleSpan: { color: '#fff' },
   btnGhost: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '8px 16px', background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#ccc', cursor: 'pointer', transition: 'all 0.15s' },
   filters: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' },
-  filterBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase', padding: '5px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', color: '#555', cursor: 'pointer', transition: 'all 0.15s' },
+  filterBtn: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12.5px', fontWeight: 600, letterSpacing: '1.2px', textTransform: 'uppercase', padding: '7px 15px', background: '#161616', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '999px', color: '#8f8f8f', cursor: 'pointer', transition: 'all 0.15s' },
   filterBtnActive: { border: '1px solid rgba(var(--brand-rgb),0.5)', color: 'var(--brand)', background: 'rgba(var(--brand-rgb),0.08)' },
   filterDivider: { width: '1px', background: 'rgba(255,255,255,0.08)', height: '20px', margin: '0 4px' },
   filterLabel: { fontFamily: 'Barlow Condensed, sans-serif', fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#333', marginRight: '2px' },
@@ -150,10 +150,17 @@ export default function Dashboard({ session }) {
         <RaceMap races={filteredRaces} />
       </div>
 
-      {/* List / Calendar view toggle (replaces the old tab bar) */}
-      <div style={S.viewToggle}>
-        <button style={{ ...S.viewBtn, ...(view === 'list' ? S.viewBtnActive : {}) }} onClick={() => setView('list')}>List</button>
-        <button style={{ ...S.viewBtn, ...(view === 'calendar' ? S.viewBtnActive : {}) }} onClick={() => setView('calendar')}>Calendar</button>
+      {/* Controls row: List/Calendar segmented toggle + the All / I'm
+          racing lens as chips in the one system (mockups, 2026-10-31). */}
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
+        <div style={{ ...S.viewToggle, marginBottom: 0 }}>
+          <button style={{ ...S.viewBtn, ...(view === 'list' ? S.viewBtnActive : {}) }} onClick={() => setView('list')}>List</button>
+          <button style={{ ...S.viewBtn, ...(view === 'calendar' ? S.viewBtnActive : {}) }} onClick={() => setView('calendar')}>Calendar</button>
+        </div>
+        <button style={{ ...S.filterBtn, ...(viewMode === 'all' ? S.filterBtnActive : {}) }} onClick={() => setViewMode('all')}>All races</button>
+        <button style={{ ...S.filterBtn, ...(viewMode === 'mine' ? S.filterBtnActive : {}) }} onClick={() => setViewMode('mine')}>
+          I'm racing {myRaceCount > 0 ? `(${myRaceCount})` : ''}
+        </button>
       </div>
 
       {view === 'list' && (
@@ -161,14 +168,6 @@ export default function Dashboard({ session }) {
           <div style={S.sectionHead}>
             <div style={S.sectionTitle}>Upcoming <span style={S.sectionTitleSpan}>Races</span></div>
             <button style={S.btnGhost} onClick={() => setShowAddRace(true)}>+ Add Race</button>
-          </div>
-
-          {/* All / My Races toggle */}
-          <div style={S.viewToggle}>
-            <button style={{ ...S.viewBtn, ...(viewMode === 'all' ? S.viewBtnActive : {}) }} onClick={() => setViewMode('all')}>All Races</button>
-            <button style={{ ...S.viewBtn, ...(viewMode === 'mine' ? S.viewBtnActive : {}) }} onClick={() => setViewMode('mine')}>
-              My Races {myRaceCount > 0 ? `(${myRaceCount})` : ''}
-            </button>
           </div>
 
           {/* Search */}

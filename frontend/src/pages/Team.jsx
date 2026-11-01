@@ -49,6 +49,19 @@ export default function Team({ session, profile }) {
   const [roster, setRoster] = useState(null)
   const [showInvite, setShowInvite] = useState(false)
 
+  // Hub pulse (mockups, 2026-10-31): light counts so the Training segment
+  // can preview the hub's other rooms as living cards.
+  const [hub, setHub] = useState(null)
+  useEffect(() => {
+    ;(async () => {
+      const [profilesRes, dealsRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, avatar_color').limit(300),
+        supabase.from('discounts').select('id', { count: 'exact', head: true }),
+      ])
+      setHub({ members: profilesRes.data || [], dealCount: dealsRes.count ?? 0 })
+    })()
+  }, [])
+
   useEffect(() => {
     if (segment !== 'roster' || roster) return
     ;(async () => {
@@ -77,6 +90,35 @@ export default function Team({ session, profile }) {
           ))}
         </div>
       </div>
+
+      {segment === 'training' && hub && (
+        <div style={{ ...S.wrap, paddingTop: 0, paddingBottom: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px', marginBottom: '1.25rem' }}>
+            <button onClick={() => setSegment('deals')} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '14px 16px', cursor: 'pointer', textAlign: 'left' }}>
+              <span style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'rgba(var(--accent-rgb),0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, color: 'var(--accent)', fontSize: '13px', flexShrink: 0 }}>%</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 700, fontSize: '15px', color: '#fff' }}>Partner deals</span>
+                <span style={{ display: 'block', fontSize: '12.5px', color: '#999', marginTop: '1px' }}>{hub.dealCount} partner code{hub.dealCount !== 1 ? 's' : ''} in the hub</span>
+              </span>
+              <span style={{ color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', fontSize: '12px', fontWeight: 700 }}>VIEW →</span>
+            </button>
+            <button onClick={() => setSegment('roster')} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '14px 16px', cursor: 'pointer', textAlign: 'left' }}>
+              <span style={{ display: 'flex', flexShrink: 0 }}>
+                {hub.members.slice(0, 3).map((m, i) => (
+                  <span key={m.id} style={{ width: '30px', height: '30px', borderRadius: '50%', border: '2px solid #161616', marginLeft: i === 0 ? 0 : '-8px', background: m.avatar_color || '#3d7a8c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#10131a', fontFamily: 'Barlow Condensed, sans-serif' }}>
+                    {(m.full_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2)}
+                  </span>
+                ))}
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 700, fontSize: '15px', color: '#fff' }}>{hub.members.length} teammates</span>
+                <span style={{ display: 'block', fontSize: '12.5px', color: '#999', marginTop: '1px' }}>Roster, regions &amp; who's near you</span>
+              </span>
+              <span style={{ color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', fontSize: '12px', fontWeight: 700 }}>VIEW →</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {segment === 'training' && <Training session={session} profile={profile} />}
 

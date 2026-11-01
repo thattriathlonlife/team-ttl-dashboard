@@ -123,9 +123,24 @@ function WeeklySummary({ activities, challenges }) {
       c: completedCount > 0 ? 'var(--highlight)' : '#555',
     },
   ].filter(Boolean)
+
+  // Team volume by day, last 7 days (mockups, 2026-10-31): brand bars,
+  // the biggest day in coral — glanceable, no axes.
+  const days = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i)
+    const next = new Date(d.getTime() + 86400000)
+    const secs = activities
+      .filter(a => { const t = new Date(a.start_date); return t >= d && t < next })
+      .reduce((s, a) => s + (a.moving_time || 0), 0)
+    days.push({ label: 'SMTWTFS'[d.getDay()], hours: secs / 3600 })
+  }
+  const maxHours = Math.max(...days.map(d => d.hours), 0.5)
+  const weekHours = days.reduce((s, d) => s + d.hours, 0)
+
   return (
-    <div style={{ background: 'rgba(252,76,2,0.06)', border: '1px solid rgba(252,76,2,0.18)', borderTop: '2px solid #FC4C02', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
-      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2.5px', textTransform: 'uppercase', color: STRAVA_ORANGE, marginBottom: 10 }}>This Week — Team Training</div>
+    <div style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
+      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--brand)', marginBottom: 10 }}>This Week — Team Training</div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: 8 }}>
         {cols.map(c => (
           <div key={c.l}>
@@ -134,6 +149,23 @@ function WeeklySummary({ activities, challenges }) {
             <div style={{ fontSize: 10, color: '#444', marginTop: 2 }}>{c.s}</div>
           </div>
         ))}
+      </div>
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 14, paddingTop: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 9 }}>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: '#888' }}>Team volume · 7 days</span>
+          <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>{weekHours.toFixed(1)}h total</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 7, height: 64 }}>
+          {days.map((d, i) => {
+            const isMax = d.hours === Math.max(...days.map(x => x.hours)) && d.hours > 0
+            return (
+              <div key={i} title={`${d.hours.toFixed(1)}h`} style={{ flex: 1, height: `${Math.max(6, (d.hours / maxHours) * 100)}%`, borderRadius: '5px 5px 2px 2px', background: d.hours === 0 ? '#222526' : isMax ? 'var(--accent)' : 'rgba(var(--brand-rgb),0.65)' }} />
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 7, marginTop: 5 }}>
+          {days.map((d, i) => <span key={i} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: '#555' }}>{d.label}</span>)}
+        </div>
       </div>
     </div>
   )
