@@ -1,31 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { supabase } from '../lib/supabase'
 import { ensureRaceChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
+import RaceMapLeaflet from './RaceMapLeaflet'
 
-// The modern map (Concept A, approved 2026-10-31; visual v3 "Deep Atlas"
-// picked 2026-10-31): Leaflet on inverted full-colour OpenStreetMap
-// tiles, framed on the densest race cluster instead of the whole world,
-// with count pins as first-class data: pills carry start-line counts,
-// big fields go coral, races the member has entered get a gold ring, and
-// tapping a pin opens the race's card in place with its roster. (Tile
-// history: CARTO watermarked its free tiles "API KEY REQUIRED"; Esri
-// Dark Gray worked but read flat at world framing.)
+// The 3D map (Zack, 2026-10-31: "I want a 3d map like the lovable one —
+// in the current aesthetic of ours"). The teammate's Race Compass is
+// Mapbox; this is MapLibre GL (the open-source GL engine): a real globe
+// at low zoom with atmosphere, a tilted perspective camera, and vector
+// tiles — recoloured at runtime into the app's Deep Atlas aesthetic
+// (deep-navy water, charcoal land, brand-lit pins). Tile source: CARTO's
+// keyless GL basemap (vector .mvt tiles verified by content on
+// 2026-10-31 — valid gzipped protobuf; unlike CARTO's raster CDN, which
+// watermarks). If WebGL or the style fails, the verified Leaflet map
+// renders instead (RaceMapLeaflet).
+const STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MEMBER_COLORS = ['#2BB3A3', '#E87362', '#E8B84B', '#FF5A1F', '#a78bfa', '#34d399', '#f472b6', '#60a5fa']
+const PITCH = 48
 
 const MAP_CSS = `
-.leaflet-container { background: #0a0f12; font-family: 'Barlow', sans-serif; }
-/* Deep Atlas recipe: invert the full-colour OSM tiles and rotate the
-   hue back, so oceans land deep navy and land keeps its tint variation
-   instead of flattening to grey. Tiles only — markers live in other
-   panes and keep their true colours. */
-.leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) saturate(.72) brightness(.9) contrast(1.07); }
-.leaflet-div-icon { background: transparent; border: none; }
-.ttl-pin { transform: translate(-50%, -100%); text-align: center; cursor: pointer; }
+.maplibregl-map { background: #05090e; font-family: 'Barlow', sans-serif; border-radius: 16px; }
+.maplibregl-ctrl-group { background: rgba(18,21,23,.92) !important; border: 1px solid rgba(255,255,255,.12); border-radius: 10px !important; overflow: hidden; box-shadow: 0 10px 26px rgba(0,0,0,.5) !important; }
+.maplibregl-ctrl-group button { background: transparent !important; }
+.maplibregl-ctrl-group button span { filter: invert(0.85); }
+.maplibregl-ctrl-attrib { background: rgba(10,12,13,.72) !important; color: #5c6a68 !important; font-size: 9px !important; }
+.maplibregl-ctrl-attrib a { color: #7d8f8c !important; }
+.maplibregl-ctrl-attrib-button { filter: invert(0.7); background-color: transparent !important; }
+.ttl-pin { text-align: center; cursor: pointer; }
 .ttl-pin .pill { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: .4px; padding: 5px 12px; border-radius: 999px; white-space: nowrap; background: var(--brand); color: #03292b; box-shadow: 0 0 0 4px rgba(var(--brand-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
 .ttl-pin.coral .pill { background: var(--accent); color: #2b0f0b; box-shadow: 0 0 0 4px rgba(var(--accent-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
 .ttl-pin.compact .pill { background: rgba(var(--brand-rgb),.18); color: #d8f2f0; border: 1px solid rgba(var(--brand-rgb),.45); box-shadow: 0 0 0 3px rgba(var(--brand-rgb),.1), 0 8px 20px rgba(0,0,0,.5); backdrop-filter: blur(2px); }
@@ -37,51 +42,64 @@ const MAP_CSS = `
 .ttl-pin.zero .dot { width: 12px; height: 12px; background: rgba(var(--brand-rgb),.3); border: 2px solid rgba(var(--brand-rgb),.85); margin: 0 auto; box-shadow: 0 0 10px rgba(var(--brand-rgb),.45); }
 .ttl-pin .pulse { position: absolute; left: 50%; bottom: -1px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid rgba(232,184,75,.65); animation: ttlPinPulse 2.2s ease-out infinite; }
 @keyframes ttlPinPulse { 0% { transform: scale(.55); opacity: .9; } 70% { transform: scale(2.1); opacity: 0; } 100% { transform: scale(2.1); opacity: 0; } }
-.leaflet-control-attribution { background: rgba(10,12,13,.72) !important; color: #5c6a68 !important; font-size: 9px !important; padding: 1px 5px; }
-.leaflet-control-attribution a { color: #7d8f8c !important; }
-.leaflet-bar a { background: rgba(18,21,23,.92) !important; color: #cfd8d6 !important; border-color: rgba(255,255,255,.1) !important; backdrop-filter: blur(6px); }
-.leaflet-bar { border: 1px solid rgba(255,255,255,.12) !important; border-radius: 10px !important; overflow: hidden; box-shadow: 0 10px 26px rgba(0,0,0,.5) !important; }
 `
 
-function pinIcon(race, count, mine) {
+function pinHtml(count, mine) {
   let cls = 'ttl-pin'
   if (mine) cls += ' mine'
   else if (count >= 15) cls += ' coral'
   else if (count > 0 && count < 5) cls += ' compact'
-  let html
-  if (count === 0 && !mine) {
-    html = `<div class="${cls} zero"><div class="dot"></div></div>`
-  } else {
-    const label = mine ? `★ ${count}` : count >= 5 ? `${count} racing` : `${count}`
-    html = `<div class="${cls}" style="position: relative"><span class="pill">${label}</span><div class="dot"></div>${mine ? '<span class="pulse"></span>' : ''}</div>`
-  }
-  return L.divIcon({ html, className: '', iconSize: [0, 0] })
+  if (count === 0 && !mine) return `<div class="${cls} zero"><div class="dot"></div></div>`
+  const label = mine ? `★ ${count}` : count >= 5 ? `${count} racing` : `${count}`
+  return `<div class="${cls}" style="position: relative"><span class="pill">${label}</span><div class="dot"></div>${mine ? '<span class="pulse"></span>' : ''}</div>`
 }
 
-// Framing (visual v3): never fit the whole world — six pins on four
-// continents framed that way is what made the map read "uninspired"
-// (grey blobs, an Antarctica band, no labels at that zoom). Instead,
-// find the pin with the most neighbours inside a regional box and frame
-// that neighbourhood; for TTL today it is the Americas cluster, and the
-// far pins stay a pan away. Falls back to fitting everything only when
-// no real cluster exists.
-function frameRaces(map, pts) {
-  if (pts.length === 1) { map.setView(pts[0], 5); return }
+// Same cluster framing as the 2D map: the densest neighbourhood wins;
+// far pins stay a pan away.
+function clusterOf(pts) {
+  if (pts.length <= 1) return pts
   let best = null
   for (const p of pts) {
-    const hood = pts.filter(q => Math.abs(q[1] - p[1]) <= 45 && Math.abs(q[0] - p[0]) <= 35)
+    const hood = pts.filter(q => Math.abs(q[0] - p[0]) <= 45 && Math.abs(q[1] - p[1]) <= 35)
     if (!best || hood.length > best.length) best = hood
   }
-  const use = best && (best.length >= 3 || best.length >= Math.ceil(pts.length / 2)) ? best : pts
-  if (use.length === 1) map.setView(use[0], 5)
-  else map.fitBounds(use, { padding: [30, 30], maxZoom: 5 })
+  return best && (best.length >= 3 || best.length >= Math.ceil(pts.length / 2)) ? best : pts
 }
 
-export default function RaceMap({ races, allEntries = [], myEntries = [], profile, session, onToggle }) {
+// Paint the CARTO Dark Matter style into our aesthetic: Deep Atlas
+// water/land, muted roads and boundaries, readable labels.
+function recolor(map) {
+  const layers = map.getStyle()?.layers || []
+  for (const layer of layers) {
+    const id = (layer.id || '').toLowerCase()
+    try {
+      if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', '#05090e')
+      else if (id.includes('water') || id.includes('ocean') || id.includes('sea')) {
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#0a2438')
+        if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', '#123a52')
+      } else if (id.includes('land') || id.includes('earth')) {
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#10161d')
+      } else if (id.includes('building')) {
+        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', '#161e26')
+      } else if (id.includes('boundary') || id.includes('border') || id.includes('admin')) {
+        if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', 'rgba(158,184,198,0.28)')
+      } else if (layer.type === 'line' && (id.includes('road') || id.includes('street') || id.includes('highway') || id.includes('transport') || id.includes('bridge') || id.includes('tunnel'))) {
+        map.setPaintProperty(layer.id, 'line-color', 'rgba(148,170,182,0.32)')
+      } else if (layer.type === 'symbol') {
+        map.setPaintProperty(layer.id, 'text-color', '#cfe0e2')
+        map.setPaintProperty(layer.id, 'text-halo-color', 'rgba(3,8,12,0.9)')
+        map.setPaintProperty(layer.id, 'text-halo-width', 1.2)
+      }
+    } catch { /* a layer that doesn't take the paint is fine */ }
+  }
+}
+
+function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, onToggle, onFail }) {
+  const containerRef = useRef(null)
   const mapRef = useRef(null)
-  const mapObjRef = useRef(null)
-  const layerRef = useRef(null)
+  const markersRef = useRef([])
   const fitKeyRef = useRef('')
+  const loadedRef = useRef(false)
   const [selected, setSelected] = useState(null)
   const [opening, setOpening] = useState(null)
   const [note, setNote] = useState('')
@@ -101,58 +119,89 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
     return map
   }, [allEntries])
 
-  // Create the map once (Dashboard gates rendering on data being loaded,
-  // so the geocoded set is present on first render in practice; the guard
-  // also covers it arriving later).
+  // Create the globe once.
   useEffect(() => {
-    if (!mapRef.current || mapObjRef.current || racesWithCoords.length === 0) return
-    const map = L.map(mapRef.current, {
-      zoomControl: false,
-      scrollWheelZoom: false,
-      attributionControl: true,
-      // Bounds: Antarctica and the pole caps are cut, the world doesn't
-      // tile-repeat into mush, and zooming out stops at a useful floor.
-      minZoom: 2,
-      maxBounds: [[-58, -178], [80, 190]],
-      maxBoundsViscosity: 0.8,
-      worldCopyJump: true,
+    if (!containerRef.current || mapRef.current || racesWithCoords.length === 0) return
+    let map
+    try {
+      map = new maplibregl.Map({
+        container: containerRef.current,
+        style: STYLE_URL,
+        center: [-98, 33],
+        zoom: 2.3,
+        pitch: PITCH,
+        bearing: -8,
+        attributionControl: { compact: true },
+        scrollZoom: false, // never trap page scroll (long-standing rule)
+        dragRotate: true,
+        touchPitch: true,
+        pitchWithRotate: true,
+        minZoom: 1.6,
+        maxBounds: [[-178, -58], [190, 82]],
+        maxPitch: 70,
+      })
+    } catch {
+      onFail()
+      return
+    }
+    mapRef.current = map
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
+
+    const watchdog = setTimeout(() => { if (!loadedRef.current) onFail() }, 9000)
+    map.on('load', () => {
+      loadedRef.current = true
+      clearTimeout(watchdog)
+      try { map.setProjection({ type: 'globe' }) } catch { /* flat 3D is fine */ }
+      try {
+        map.setFog({
+          range: [0.4, 9],
+          color: '#0a1a28',
+          'high-color': '#14405c',
+          'space-color': '#020507',
+          'horizon-blend': 0.14,
+          'star-intensity': 0.3,
+        })
+      } catch { /* atmosphere is decoration */ }
+      recolor(map)
     })
-    L.control.zoom({ position: 'topright' }).addTo(map)
-    // Deep Atlas (visual v3, picked by Zack 2026-10-31 from rendered
-    // mockups): OpenStreetMap's full-colour tiles, darkened by the
-    // tile-pane filter in MAP_CSS — navy oceans, tinted land, real place
-    // labels. Tile history: CARTO watermarked its free tiles ("API KEY
-    // REQUIRED", 22:13 screenshot); Esri Dark Gray worked but read flat
-    // and uninspired at world framing. OSM tiles are fine at POC volume
-    // with attribution; a production rollout moves to a tile host.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 18,
-    }).addTo(map)
-    layerRef.current = L.layerGroup().addTo(map)
-    mapObjRef.current = map
-    return () => { map.remove(); mapObjRef.current = null; layerRef.current = null }
+    map.on('error', () => { if (!loadedRef.current) { clearTimeout(watchdog); onFail() } })
+    return () => { clearTimeout(watchdog); map.remove(); mapRef.current = null }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [racesWithCoords.length])
 
-  // Sync markers with the (filtered) race set + entry counts.
+  // Sync markers + framing with the filtered race set.
   useEffect(() => {
-    const map = mapObjRef.current
-    const layer = layerRef.current
-    if (!map || !layer) return
-    layer.clearLayers()
-    const bounds = []
+    const map = mapRef.current
+    if (!map) return
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+    const pts = []
     for (const race of racesWithCoords) {
       const count = (entriesByRace[race.id] || []).length
       const mine = myEntries.includes(race.id)
-      const marker = L.marker([race.latitude, race.longitude], { icon: pinIcon(race, count, mine) })
-      marker.on('click', () => { setSelected(race); setNote('') })
-      marker.addTo(layer)
-      bounds.push([race.latitude, race.longitude])
+      const el = document.createElement('div')
+      el.innerHTML = pinHtml(count, mine)
+      el.addEventListener('click', (ev) => { ev.stopPropagation(); setSelected(race); setNote('') })
+    const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([race.longitude, race.latitude])
+        .addTo(map)
+      markersRef.current.push(marker)
+      pts.push([race.longitude, race.latitude])
     }
     const fitKey = racesWithCoords.map(r => r.id).join(',')
-    if (bounds.length && fitKey !== fitKeyRef.current) {
+    if (pts.length && fitKey !== fitKeyRef.current) {
       fitKeyRef.current = fitKey
-      frameRaces(map, bounds)
+      const cluster = clusterOf(pts)
+      if (cluster.length === 1) {
+        map.easeTo({ center: cluster[0], zoom: 5, pitch: PITCH, duration: 0 })
+      } else {
+        const lngs = cluster.map(p => p[0])
+        const lats = cluster.map(p => p[1])
+        map.fitBounds(
+          [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+          { padding: 44, pitch: PITCH, bearing: -8, maxZoom: 5, duration: 0 }
+        )
+      }
     }
   }, [racesWithCoords, entriesByRace, myEntries])
 
@@ -199,16 +248,13 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
     <div style={{
       borderRadius: '16px', overflow: 'hidden',
       border: '1px solid rgba(255,255,255,0.1)',
-      position: 'relative', background: '#0a0f12',
+      position: 'relative', background: '#05090e',
       boxShadow: '0 20px 46px rgba(0,0,0,0.5)',
     }}>
       <style>{MAP_CSS}</style>
-      <div ref={mapRef} style={{ width: '100%', height: '262px', zIndex: 0 }} />
+      <div ref={containerRef} style={{ width: '100%', height: '300px', zIndex: 0 }} />
 
-      {/* Vignette + edge fades: the panel melts into the page instead of
-          ending at a hard rectangle — the difference between an embed and
-          a designed surface. Pointer-transparent; the race card (z 600)
-          renders above it. */}
+      {/* Vignette + edge fades, same as the 2D panel */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 450, pointerEvents: 'none',
         background: 'radial-gradient(125% 95% at 50% 38%, transparent 56%, rgba(4,6,8,0.5)), linear-gradient(180deg, rgba(10,13,14,0.28), transparent 16%, transparent 84%, rgba(10,13,14,0.5))',
@@ -281,4 +327,16 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
       )}
     </div>
   )
+}
+
+export default function RaceMap(props) {
+  const [glFailed, setGlFailed] = useState(false)
+  const webglOk = useMemo(() => {
+    try {
+      const canvas = document.createElement('canvas')
+      return !!(window.WebGLRenderingContext && (canvas.getContext('webgl2') || canvas.getContext('webgl')))
+    } catch { return false }
+  }, [])
+  if (glFailed || !webglOk) return <RaceMapLeaflet {...props} />
+  return <RaceMapGL {...props} onFail={() => setGlFailed(true)} />
 }
