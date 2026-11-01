@@ -15,15 +15,15 @@ const SEGMENTS = [
   { id: 'deals', label: 'Deals' },
   { id: 'gear', label: 'Gear' },
   { id: 'garage', label: 'Garage' },
-  { id: 'roster', label: 'Roster' },
+  { id: 'roster', label: 'Team' },
 ]
 
 const GEAR_TAB = { deals: 'deals', gear: 'guide', garage: 'garage' }
 
 const S = {
-  wrap: { maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' },
+  wrap: { maxWidth: '1100px', margin: '0 auto', padding: '1rem 1.5rem 1.5rem' },
   // One continuous lateral-scroll row (Zack, 2026-10-31) — never wraps.
-  segBar: { display: 'flex', gap: '6px', flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', marginBottom: '1.25rem', paddingBottom: '2px' },
+  segBar: { display: 'flex', gap: '6px', flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', marginBottom: '0.9rem', paddingBottom: '2px' },
   seg: active => ({
     fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600,
     letterSpacing: '1.5px', textTransform: 'uppercase', whiteSpace: 'nowrap', flexShrink: 0,
@@ -113,7 +113,7 @@ export default function Team({ session, profile }) {
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontWeight: 700, fontSize: '15px', color: '#fff' }}>{hub.members.length} teammates</span>
-                <span style={{ display: 'block', fontSize: '12.5px', color: '#999', marginTop: '1px' }}>Roster, regions &amp; who's near you</span>
+                <span style={{ display: 'block', fontSize: '12.5px', color: '#999', marginTop: '1px' }}>Members, regions &amp; who's near you</span>
               </span>
               <span style={{ color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '1px', fontSize: '12px', fontWeight: 700 }}>VIEW →</span>
             </button>

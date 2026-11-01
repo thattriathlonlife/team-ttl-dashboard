@@ -484,17 +484,16 @@ function PartnerDeals({ profile }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '2rem', gap: '1rem', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '28px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff', marginBottom: '4px' }}>Partner Deals</div>
-          <div style={{ fontSize: '14px', color: '#999' }}>Exclusive member benefits from our partners. Tap a code to copy it.</div>
-        </div>
-        {isAdmin && (
-          <button onClick={handleAdd} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 20px', background: 'var(--brand)', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer', flexShrink: 0 }}>
+      {/* No page-title header (Zack, 2026-10-31 — the hub pill already
+          names the segment). Only the deals tab's admin action survives,
+          as a slim right-aligned row. */}
+      {tab === 'deals' && isAdmin && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.9rem' }}>
+          <button onClick={handleAdd} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '8px 16px', background: 'var(--brand)', border: 'none', borderRadius: '6px', color: '#000', cursor: 'pointer' }}>
             + Add Discount
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {discounts.length === 0 ? (
         <div style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '4rem 2rem', textAlign: 'center' }}>

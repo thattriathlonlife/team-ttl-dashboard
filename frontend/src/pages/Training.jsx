@@ -617,22 +617,19 @@ function TrainingPage({ session, profile }) {
         }
       `}</style>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem', gap: '1rem', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 32, fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#fff', marginBottom: 2 }}>Training</div>
-          <div style={{ fontSize: 13, color: '#999' }}>
-            {connectedCount > 0 ? `${connectedCount} teammate${connectedCount !== 1 ? 's' : ''} connected via Strava` : 'Connect Strava to share your training'}
-            {syncLabel ? ` · ${syncLabel}` : ''}
-          </div>
+      {/* Slim utility row — no page-title header (Zack, 2026-10-31: the
+          segment pill already says "Training"; a 32px title + subline
+          stack was ~110px of dead space before any content). */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem', gap: '1rem' }}>
+        <div style={{ fontSize: '12.5px', color: '#8a8a8a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {connectedCount > 0 ? `${connectedCount} teammate${connectedCount !== 1 ? 's' : ''} connected via Strava` : 'Connect Strava to share your training'}
+          {syncLabel ? ` · ${syncLabel}` : ''}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          {isConnected && (
-            <button onClick={handleRefresh} disabled={syncing} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '1px', textTransform: 'uppercase', padding: '7px 12px', background: syncing ? 'rgba(252,76,2,0.1)' : 'none', border: '1px solid rgba(252,76,2,0.3)', borderRadius: 4, color: STRAVA_ORANGE, cursor: syncing ? 'not-allowed' : 'pointer' }}>
-              {syncing ? 'Syncing...' : '↻ Refresh'}
-            </button>
-          )}
-        </div>
+        {isConnected && (
+          <button onClick={handleRefresh} disabled={syncing} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: '1px', textTransform: 'uppercase', padding: '6px 11px', background: syncing ? 'rgba(252,76,2,0.1)' : 'none', border: '1px solid rgba(252,76,2,0.3)', borderRadius: 4, color: STRAVA_ORANGE, cursor: syncing ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
+            {syncing ? 'Syncing...' : '↻ Refresh'}
+          </button>
+        )}
       </div>
 
       {!isConnected && <ConnectBanner userId={userId} />}
