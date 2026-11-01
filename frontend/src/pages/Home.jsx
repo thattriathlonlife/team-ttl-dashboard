@@ -414,6 +414,10 @@ export default function Home({ session, profile }) {
   const [feedSource, setFeedSource] = useState(() => cachedHome?.feedSource || null)
   const [geo, setGeo] = useState(null)
   const [geoPrompt, setGeoPrompt] = useState(false)
+  // The location opt-in is a one-time slim line, dismissible for good
+  // (Zack, 2026-11-01: the old card banner was distracting chrome).
+  const [geoDismissed, setGeoDismissed] = useState(() => { try { return localStorage.getItem('ttl-geo-prompt-dismissed') === '1' } catch { return false } })
+  const dismissGeo = () => { setGeoDismissed(true); try { localStorage.setItem('ttl-geo-prompt-dismissed', '1') } catch { /* private mode */ } }
   const [nearCount, setNearCount] = useState(0)
   const [filter, setFilter] = useState('all')
   const [archiveMeta, setArchiveMeta] = useState(() => cachedHome?.archiveMeta || null)
@@ -869,81 +873,25 @@ export default function Home({ session, profile }) {
 
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto', padding: '0.6rem 1.25rem 2rem' }}>
-      {/* Pinned: this week's racing */}
-      {weekRaces.length > 0 && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(var(--brand-rgb),0.06) 0%, rgba(var(--accent-rgb),0.06) 100%)',
-          border: '1px solid rgba(var(--brand-rgb),0.2)',
-          borderRadius: '12px', padding: '1.4rem 1.5rem',
-          marginBottom: '1rem', position: 'relative', overflow: 'hidden',
-        }}>
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
-            background: 'linear-gradient(90deg, var(--brand), var(--accent), var(--highlight), var(--accent))',
-          }} />
-          <div style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontSize: '12px', letterSpacing: '3px',
-            textTransform: 'uppercase', color: 'var(--brand)', marginBottom: '8px',
-          }}>
-            This week
-          </div>
-          <div style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontSize: '24px', fontWeight: 800,
-            letterSpacing: '1px', color: '#fff',
-            lineHeight: 1.2, marginBottom: '12px',
-          }}>
-            {totalRacers === 1
-              ? '1 teammate is racing this week 🏁'
-              : `${totalRacers} teammates are racing this week 🏁`}
-          </div>
-          <div>
-            {weekRaces.map(race => (
-              <RaceRow key={race.id} race={race} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Pinned: your next race */}
-      {nextRace && (() => {
-        const days = Math.ceil((new Date(nextRace.race_date + 'T12:00:00') - new Date()) / 86400000)
-        return (
-          <button onClick={() => navigate('/races')} style={{
-            display: 'flex', alignItems: 'center', gap: '16px', width: '100%', textAlign: 'left',
-            background: '#161616', border: '1px solid rgba(var(--accent-rgb),0.3)', borderRadius: '10px',
-            padding: '1.1rem 1.4rem', marginBottom: '1rem', cursor: 'pointer',
-          }}>
-            <div style={{ fontSize: '26px', flexShrink: 0 }}>🏁</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '3px' }}>
-                Your next race{days >= 0 ? ` — ${days === 0 ? 'today!' : `in ${days} day${days === 1 ? '' : 's'}`}` : ''}
-              </div>
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '18px', fontWeight: 700, letterSpacing: '1px', color: '#fff' }}>{nextRace.name}</div>
-              <div style={{ fontSize: '13px', color: '#aaa' }}>{getDayName(nextRace.race_date)} · {nextRace.location}</div>
-            </div>
-            <div style={{ color: '#555', fontSize: '20px', flexShrink: 0 }}>→</div>
-          </button>
-        )
-      })()}
-
-      {/* The "Your feed" heading is gone (Zack, 2026-10-31: the page IS
-          the Feed now — the label was redundant). This slot carries only
+      {/* The Feed opens clean (Zack, 2026-10-31 + 2026-11-01): no
+          heading, and no pinned cards — the "This week" and "Your next
+          race" cards were removed 2026-11-01 as distracting chrome above
+          the river (both live on the Races page). This slot carries only
           live context: a location line when geo serving found something
-          near the member, or the one-time location opt-in. */}
+          near the member, or the one-time slim location opt-in. */}
       {geo && nearCount > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0.85rem 0 0.2rem', fontSize: '13px', color: '#bbb' }}>
           <span>📍</span>
           <span>Near <b style={{ color: '#fff' }}>{geo.city ? `${geo.city}${geo.state ? `, ${geo.state}` : ''}` : 'you'}</b> — local races &amp; chats floated to the top of your feed</span>
         </div>
       )}
-      {!geo && geoPrompt && (
-        <button onClick={requestGeo} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', margin: '0.85rem 0 0.2rem', padding: '10px 14px', background: 'rgba(var(--accent-rgb),0.07)', border: '1px solid rgba(var(--accent-rgb),0.25)', borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
-          <span style={{ fontSize: '15px' }}>📍</span>
-          <span style={{ flex: 1, fontSize: '13px', color: '#ccc' }}>Traveling? Float races &amp; chats near you to the top</span>
-          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)' }}>Enable location</span>
-        </button>
+      {!geo && geoPrompt && !geoDismissed && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0.85rem 0 0.2rem', fontSize: '13px', color: '#bbb' }}>
+          <span>📍</span>
+          <span style={{ flex: 1 }}>Traveling? Float races &amp; chats near you to the top</span>
+          <button onClick={requestGeo} style={{ background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)' }}>Enable</button>
+          <button onClick={dismissGeo} aria-label="Dismiss location prompt" style={{ background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer', fontSize: '13px', color: '#777' }}>✕</button>
+        </div>
       )}
 
       {/* Filter chips — one lens across every source. A sticky overlay:
