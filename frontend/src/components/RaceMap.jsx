@@ -6,23 +6,24 @@ import { supabase } from '../lib/supabase'
 import { ensureRaceChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
 
-// The modern map (Concept A, approved 2026-10-31): Leaflet on Esri's
-// World Dark Gray basemap — a real dark map instead of the light
-// OpenStreetMap iframe — with count pins as first-class data: pills carry
-// start-line counts, big fields go coral, races the member has entered
-// get a gold ring, and tapping a pin opens the race's card in place with
-// its roster. (Originally CARTO dark tiles; that CDN began watermarking
-// free tiles "API KEY REQUIRED", so the source moved to Esri.)
+// The modern map (Concept A, approved 2026-10-31; visual v3 "Deep Atlas"
+// picked 2026-10-31): Leaflet on inverted full-colour OpenStreetMap
+// tiles, framed on the densest race cluster instead of the whole world,
+// with count pins as first-class data: pills carry start-line counts,
+// big fields go coral, races the member has entered get a gold ring, and
+// tapping a pin opens the race's card in place with its roster. (Tile
+// history: CARTO watermarked its free tiles "API KEY REQUIRED"; Esri
+// Dark Gray worked but read flat at world framing.)
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MEMBER_COLORS = ['#2BB3A3', '#E87362', '#E8B84B', '#FF5A1F', '#a78bfa', '#34d399', '#f472b6', '#60a5fa']
 
 const MAP_CSS = `
 .leaflet-container { background: #0a0f12; font-family: 'Barlow', sans-serif; }
-/* Design treatment (2026-10-31, after "still looks basic"): deepen the
-   Esri grey toward slate and pull its saturation down so the basemap sits
-   inside the app's palette instead of reading as a stock embed. Tiles
-   only — markers live in other panes and keep their true colours. */
-.leaflet-tile-pane { filter: brightness(.82) contrast(1.18) saturate(.6) hue-rotate(5deg); }
+/* Deep Atlas recipe: invert the full-colour OSM tiles and rotate the
+   hue back, so oceans land deep navy and land keeps its tint variation
+   instead of flattening to grey. Tiles only — markers live in other
+   panes and keep their true colours. */
+.leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) saturate(.72) brightness(.9) contrast(1.07); }
 .leaflet-div-icon { background: transparent; border: none; }
 .ttl-pin { transform: translate(-50%, -100%); text-align: center; cursor: pointer; }
 .ttl-pin .pill { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: .4px; padding: 5px 12px; border-radius: 999px; white-space: nowrap; background: var(--brand); color: #03292b; box-shadow: 0 0 0 4px rgba(var(--brand-rgb),.16), 0 10px 24px rgba(0,0,0,.55); }
@@ -55,6 +56,25 @@ function pinIcon(race, count, mine) {
     html = `<div class="${cls}" style="position: relative"><span class="pill">${label}</span><div class="dot"></div>${mine ? '<span class="pulse"></span>' : ''}</div>`
   }
   return L.divIcon({ html, className: '', iconSize: [0, 0] })
+}
+
+// Framing (visual v3): never fit the whole world — six pins on four
+// continents framed that way is what made the map read "uninspired"
+// (grey blobs, an Antarctica band, no labels at that zoom). Instead,
+// find the pin with the most neighbours inside a regional box and frame
+// that neighbourhood; for TTL today it is the Americas cluster, and the
+// far pins stay a pan away. Falls back to fitting everything only when
+// no real cluster exists.
+function frameRaces(map, pts) {
+  if (pts.length === 1) { map.setView(pts[0], 5); return }
+  let best = null
+  for (const p of pts) {
+    const hood = pts.filter(q => Math.abs(q[1] - p[1]) <= 45 && Math.abs(q[0] - p[0]) <= 35)
+    if (!best || hood.length > best.length) best = hood
+  }
+  const use = best && (best.length >= 3 || best.length >= Math.ceil(pts.length / 2)) ? best : pts
+  if (use.length === 1) map.setView(use[0], 5)
+  else map.fitBounds(use, { padding: [30, 30], maxZoom: 5 })
 }
 
 export default function RaceMap({ races, allEntries = [], myEntries = [], profile, session, onToggle }) {
@@ -90,19 +110,24 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
       zoomControl: false,
       scrollWheelZoom: false,
       attributionControl: true,
+      // Bounds: Antarctica and the pole caps are cut, the world doesn't
+      // tile-repeat into mush, and zooming out stops at a useful floor.
+      minZoom: 2,
+      maxBounds: [[-58, -178], [80, 190]],
+      maxBoundsViscosity: 0.8,
+      worldCopyJump: true,
     })
     L.control.zoom({ position: 'topright' }).addTo(map)
-    // Esri World Dark Gray (base + label reference). CARTO's free basemap
-    // CDN started serving "API KEY REQUIRED" watermark tiles (Zack's
-    // screenshot, 2026-10-31 22:13) — an HTTP 200 with watermark content,
-    // which is why a status check missed it. Esri tiles were verified by
-    // content (real Portland tile imagery) before this swap.
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
-      maxZoom: 16,
-    }).addTo(map)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 16,
+    // Deep Atlas (visual v3, picked by Zack 2026-10-31 from rendered
+    // mockups): OpenStreetMap's full-colour tiles, darkened by the
+    // tile-pane filter in MAP_CSS — navy oceans, tinted land, real place
+    // labels. Tile history: CARTO watermarked its free tiles ("API KEY
+    // REQUIRED", 22:13 screenshot); Esri Dark Gray worked but read flat
+    // and uninspired at world framing. OSM tiles are fine at POC volume
+    // with attribution; a production rollout moves to a tile host.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 18,
     }).addTo(map)
     layerRef.current = L.layerGroup().addTo(map)
     mapObjRef.current = map
@@ -127,8 +152,7 @@ export default function RaceMap({ races, allEntries = [], myEntries = [], profil
     const fitKey = racesWithCoords.map(r => r.id).join(',')
     if (bounds.length && fitKey !== fitKeyRef.current) {
       fitKeyRef.current = fitKey
-      if (bounds.length === 1) map.setView(bounds[0], 6)
-      else map.fitBounds(bounds, { padding: [28, 28] })
+      frameRaces(map, bounds)
     }
   }, [racesWithCoords, entriesByRace, myEntries])
 
