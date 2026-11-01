@@ -67,7 +67,7 @@ function postScore(p) {
   return p.reactionCount * 3 + p.replyCount * 2 + recency
 }
 
-function buildFeed(content, posts) {
+function buildFeed(content, posts, activity = []) {
   const ranked = [...posts].sort((a, b) => b.score - a.score)
   const out = []
   // Popular discussions lead the river (Zack, 2026-10-31): when the top
@@ -81,7 +81,53 @@ function buildFeed(content, posts) {
     for (let n = 0; n < 2 && ci < content.length; n++) out.push(content[ci++])
     if (pi < ranked.length) out.push(ranked[pi++])
   }
+  applyMixRules(out)
+  // Team activity cards (race buzz, just-added races) weave in at fixed
+  // early slots so the river feels inhabited even before chat takes off
+  // (Zack, 2026-11-01 — "make the feed feel alive").
+  const slots = [3, 10, 18]
+  activity.slice(0, 3).forEach((item, i) => {
+    out.splice(Math.min(slots[i], out.length), 0, item)
+  })
   return out
+}
+
+// The mix rules (Zack, 2026-11-01): chronology stays the spine, with two
+// adjustments so the river breathes —
+//  1. Story guarantee: TTL's own editorial voice shouldn't drown under a
+//     weekly podcast cadence; the newest story (<45 days old) earns a
+//     first-screen seat if chronology buried it deeper than slot 4.
+//  2. Diversity: never 3+ cards of the same content kind in a row when a
+//     different kind is available within the next few cards to swap in.
+function applyMixRules(out) {
+  const storyIdx = out.findIndex(i => i.kind === 'story')
+  if (storyIdx > 4) {
+    const story = out[storyIdx]
+    if ((Date.now() - (story.at || 0)) / 864e5 <= 45) {
+      out.splice(storyIdx, 1)
+      out.splice(4, 0, story)
+    }
+  }
+  const isContent = k => k === 'episode' || k === 'video' || k === 'story'
+  let runKind = null
+  let runLen = 0
+  for (let i = 0; i < out.length; i++) {
+    const k = out[i].kind
+    if (!isContent(k)) { runKind = null; runLen = 0; continue }
+    if (k === runKind) runLen++
+    else { runKind = k; runLen = 1 }
+    if (runLen >= 3) {
+      for (let j = i + 1; j <= Math.min(i + 4, out.length - 1); j++) {
+        if (isContent(out[j].kind) && out[j].kind !== runKind) {
+          const [swap] = out.splice(j, 1)
+          out.splice(i, 0, swap)
+          runKind = swap.kind
+          runLen = 1
+          break
+        }
+      }
+    }
+  }
 }
 
 // ─── Location-aware serving (Zack, 2026-10-31) ──────────────────────────
@@ -220,6 +266,56 @@ function Avatar({ profile, size = 36 }) {
       fontFamily: 'Barlow Condensed, sans-serif', fontSize: size * 0.38, fontWeight: 700, color: '#000',
     }}>{initials}</div>
   )
+}
+
+// Team activity for the river (Zack, 2026-11-01): real member pulses
+// from data that already exists — teammates gathering on near-term
+// races, and races newly added to the calendar. Counts only, never
+// names, so the cards are safe for every tier. race_entries.created_at
+// is not confirmed in the live schema, so the timestamped select falls
+// back to a plain one; "entered this week" appears only when the
+// timestamps are really there.
+async function loadActivityItems(supabase) {
+  const today = new Date().toISOString().split('T')[0]
+  const in60 = new Date(Date.now() + 60 * 864e5).toISOString().split('T')[0]
+  const { data: races } = await supabase.from('races')
+    .select('id, name, type, race_date, city, country, created_at')
+    .gte('race_date', today).order('race_date').limit(120)
+  if (!races?.length) return []
+  const items = []
+  const near = races.filter(r => r.race_date <= in60)
+  if (near.length) {
+    const ids = near.map(r => r.id)
+    let entries = []
+    const withTs = await supabase.from('race_entries').select('race_id, athlete_id, created_at').in('race_id', ids)
+    if (!withTs.error) entries = withTs.data || []
+    else {
+      const plain = await supabase.from('race_entries').select('race_id, athlete_id').in('race_id', ids)
+      entries = plain.data || []
+    }
+    const byRace = new Map()
+    for (const e of entries) {
+      const g = byRace.get(e.race_id) || { athletes: new Set(), recent: 0 }
+      g.athletes.add(e.athlete_id)
+      if (e.created_at && Date.now() - new Date(e.created_at).getTime() < 7 * 864e5) g.recent++
+      byRace.set(e.race_id, g)
+    }
+    const buzz = near
+      .map(r => ({ race: r, count: byRace.get(r.id)?.athletes.size || 0, recent: byRace.get(r.id)?.recent || 0 }))
+      .filter(b => b.count >= 2)
+      .sort((a, b) => a.race.race_date.localeCompare(b.race.race_date))
+      .slice(0, 2)
+    for (const b of buzz) {
+      items.push({ kind: 'activity', key: `activity-buzz-${b.race.id}`, at: Date.now(), data: { activityType: 'buzz', ...b } })
+    }
+  }
+  const fresh = races
+    .filter(r => r.created_at && Date.now() - new Date(r.created_at).getTime() < 14 * 864e5)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+  if (fresh) {
+    items.push({ kind: 'activity', key: `activity-new-${fresh.id}`, at: Date.now(), data: { activityType: 'newrace', race: fresh } })
+  }
+  return items
 }
 
 async function loadFeedPosts(team, userId) {
@@ -443,11 +539,14 @@ export default function Home({ session, profile }) {
     let posts = []
     try { posts = await loadFeedPosts(team, userId) } catch { /* feed still runs on content alone */ }
 
+    let activity = []
+    try { activity = await loadActivityItems(supabase) } catch { /* dressing only */ }
+
     // Hero slot (DESIGN-SPEC §5): the newest story/video with artwork
     // headlines the river and is pulled out of the interleave.
     const heroItem = content.find(c => (c.kind === 'story' || c.kind === 'video') && c.data.image) || null
     setHero(heroItem)
-    setFeedSource({ content, posts })
+    setFeedSource({ content, posts, activity })
     setLoading(false)
   }
 
@@ -463,7 +562,7 @@ export default function Home({ session, profile }) {
       return { ...p, score: p.score + hit.boost, data: { ...p.data, nearLabel: hit.label } }
     })
     setNearCount(near)
-    setFeed(buildFeed(feedSource.content, boosted).filter(i => !hero || i.key !== hero.key))
+    setFeed(buildFeed(feedSource.content, boosted, feedSource.activity || []).filter(i => !hero || i.key !== hero.key))
   }, [feedSource, geo, hero])
 
   // Location: if permission is already granted, resolve silently; if it
@@ -605,7 +704,7 @@ export default function Home({ session, profile }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
               <span style={F.chip('var(--brand)')}>Podcast</span>
-              <span style={{ fontSize: '12px', color: '#777' }}>{fmtDate(ep.published)}{ep.duration ? ` · ${ep.duration}` : ''}</span>
+              <span style={{ fontSize: '12px', color: '#777' }}>{timeAgo(ep.published)}{ep.duration ? ` · ${ep.duration}` : ''}</span>
             </div>
             <div style={F.cardTitle}>{ep.title}</div>
             {ep.summary && <div style={F.summary}>{ep.summary}</div>}
@@ -661,7 +760,7 @@ export default function Home({ session, profile }) {
         <div style={{ padding: '1rem 1.25rem' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '5px' }}>
             <span style={F.chip('var(--highlight)')}>Story</span>
-            <span style={{ fontSize: '12px', color: '#777' }}>{fmtDate(st.published)}</span>
+            <span style={{ fontSize: '12px', color: '#777' }}>{timeAgo(st.published)}</span>
           </div>
           <div style={F.cardTitle}>{st.title}</div>
           {st.summary && <div style={F.summary}>{st.summary}</div>}
@@ -706,10 +805,39 @@ export default function Home({ session, profile }) {
     )
   }
 
+  // Team activity cards: slim, warm, one line of life from the roster —
+  // "N TTLers racing X" or a race that just landed on the calendar.
+  function renderActivity(item) {
+    const d = item.data
+    const race = d.race
+    const where = [race.city, race.country].filter(Boolean).join(', ')
+    const isBuzz = d.activityType === 'buzz'
+    return (
+      <button key={item.key} onClick={() => navigate('/races')} style={{ ...F.card, cursor: 'pointer', display: 'flex', gap: '13px', alignItems: 'center' }}>
+        <div style={{
+          width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
+          background: isBuzz ? 'rgba(var(--brand-rgb),0.16)' : 'rgba(var(--highlight-rgb),0.16)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '19px',
+        }}>{isBuzz ? '🏁' : '🗓️'}</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '3px' }}>
+            <span style={F.chip(isBuzz ? 'var(--brand)' : 'var(--highlight)')}>{isBuzz ? 'Team activity' : 'Just added'}</span>
+            {isBuzz && d.recent > 0 && <span style={{ fontSize: '12px', color: 'var(--brand)' }}>{d.recent} entered this week</span>}
+          </div>
+          <div style={F.cardTitle}>{race.name}</div>
+          <div style={F.meta}>
+            {isBuzz ? `${d.count} TTLers racing · ` : ''}{fmtDate(race.race_date)}{where ? ` · ${where}` : ''}
+          </div>
+        </div>
+      </button>
+    )
+  }
+
   function renderItem(item) {
     if (item.kind === 'post') return renderPost(item)
     if (item.kind === 'episode') return renderEpisode(item)
     if (item.kind === 'video') return renderVideo(item)
+    if (item.kind === 'activity') return renderActivity(item)
     return renderStory(item)
   }
 
