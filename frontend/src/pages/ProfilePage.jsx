@@ -106,6 +106,7 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
   const [earnedBadges, setEarnedBadges] = useState([])
   const [allBadges, setAllBadges] = useState([])
   const [loadingBadges, setLoadingBadges] = useState(true)
+  const [raceEntryCount, setRaceEntryCount] = useState(0)
   const fileRef = useRef()
   const userId = session.user.id
   const email = session.user.email
@@ -124,7 +125,11 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
   }
 
   async function loadBadges() {
-    const [earnedRes, allRes] = await Promise.all([
+    const [countRes, earnedRes, allRes] = await Promise.all([
+      supabase
+        .from('race_entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('athlete_id', userId),
       supabase
         .from('profile_badges')
         .select('badge_key, earned_at, badges(name, icon, tier, description, sort_order)')
@@ -135,6 +140,7 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
         .select('key, name, icon, tier, description, sort_order')
         .order('sort_order'),
     ])
+    if (typeof countRes?.count === 'number') setRaceEntryCount(countRes.count)
     if (earnedRes.data) setEarnedBadges(earnedRes.data)
     if (allRes.data)    setAllBadges(allRes.data)
     setLoadingBadges(false)
@@ -377,56 +383,101 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
         <div style={{ color: '#555', fontSize: '13px' }}>Loading...</div>
       ) : (
         <>
-          {/* Standard badges */}
+          {/* Badge groups render for EVERY tier present in the
+              catalog (standard/silver/gold/elite) — the old grid
+              hardcoded standard + elite, so any silver/gold badges
+              in the table were earned invisibly. Locked badges with
+              a measurable total get a progress bar and sort by
+              closeness within their group (PROFILE-REFRESH-SPEC
+              §3.2); thresholds mirror evaluateBadges in the Strava
+              sync exactly. Single-effort and combo badges are binary
+              and honestly get no bar. */}
           {(() => {
-            const earnedKeys = new Set(earnedBadges.map(b => b.badge_key))
-            const standard = allBadges.filter(b => b.tier === 'standard')
-            const elite    = allBadges.filter(b => b.tier === 'elite')
-
+            const totals = {
+              streak: profile?.training_streak_current || 0,
+              runKm: parseFloat(profile?.total_run_km) || 0,
+              bikeKm: parseFloat(profile?.total_bike_km) || 0,
+              prs: profile?.total_pr_count || 0,
+              kudos: profile?.total_kudos_received || 0,
+              races: raceEntryCount,
+            }
+            const PROGRESS = {
+              streak_4: ['streak', 4, 'wks'], streak_8: ['streak', 8, 'wks'], streak_12: ['streak', 12, 'wks'], streak_20: ['streak', 20, 'wks'], streak_52: ['streak', 52, 'wks'],
+              pr_first: ['prs', 1, ''], pr_10: ['prs', 10, ''], pr_50: ['prs', 50, ''], pr_100: ['prs', 100, ''],
+              kudos_100: ['kudos', 100, ''], kudos_500: ['kudos', 500, ''],
+              run_1000: ['runKm', 1000, 'km'], run_5000: ['runKm', 5000, 'km'],
+              bike_10000: ['bikeKm', 10000, 'km'], bike_25000: ['bikeKm', 25000, 'km'],
+              race_first: ['races', 1, ''], race_5: ['races', 5, ''], race_10: ['races', 10, ''],
+            }
+            const progressOf = (key) => {
+              const spec = PROGRESS[key]
+              if (!spec) return null
+              const cur = totals[spec[0]]
+              return { cur: Math.floor(cur), target: spec[1], unit: spec[2], frac: Math.min(1, cur / spec[1]) }
+            }
+            const TIER_ORDER = ['standard', 'silver', 'gold', 'elite']
+            const TIER_LABEL = { standard: 'Standard', silver: 'Silver', gold: 'Gold', elite: 'Elite' }
+            const tiersPresent = [...new Set(allBadges.map(b => b.tier || 'standard'))]
+              .sort((a, b) => {
+                const ia = TIER_ORDER.indexOf(a); const ib = TIER_ORDER.indexOf(b)
+                if (ia !== -1 && ib !== -1) return ia - ib
+                if (ia !== -1) return -1
+                if (ib !== -1) return 1
+                return a.localeCompare(b)
+              })
+            const renderTile = (b) => {
+              const earned = earnedBadges.find(e => e.badge_key === b.key)
+              const prog = !earned ? progressOf(b.key) : null
+              return (
+                <div key={b.key} style={{ ...S.badgeTile, ...(earned ? S.badgeTileEarned : {}) }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', ...(earned ? {} : S.badgeTileLocked) }}>
+                    <div style={S.badgeIcon}>{b.icon}</div>
+                    <div style={S.badgeName}>{b.name}</div>
+                    <div style={S.badgeDesc}>{b.description}</div>
+                    {earned && (
+                      <div style={S.badgeDate}>
+                        {new Date(earned.earned_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+                  {prog && (
+                    <div style={{ width: '100%', marginTop: '2px' }}>
+                      <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${Math.max(3, Math.round(prog.frac * 100))}%`, background: 'var(--brand)', borderRadius: 2 }} />
+                      </div>
+                      <div style={{ fontSize: 10, color: '#999', marginTop: 4, fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>
+                        {prog.cur.toLocaleString()} / {prog.target.toLocaleString()}{prog.unit ? ` ${prog.unit}` : ''}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            const byCloseness = (a, b) => {
+              const ea = earnedBadges.some(e => e.badge_key === a.key)
+              const eb = earnedBadges.some(e => e.badge_key === b.key)
+              if (ea !== eb) return ea ? -1 : 1
+              if (!ea) {
+                const pa = progressOf(a.key); const pb = progressOf(b.key)
+                if (pa && pb) return pb.frac - pa.frac
+                if (pa) return -1
+                if (pb) return 1
+              }
+              return (a.sort_order || 0) - (b.sort_order || 0)
+            }
             return (
               <>
-                {/* Standard */}
-                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#555', marginBottom: '10px' }}>Standard</div>
-                <div style={{ ...S.badgeGrid, marginBottom: '1.5rem' }}>
-                  {standard.map(b => {
-                    const earned = earnedBadges.find(e => e.badge_key === b.key)
-                    return (
-                      <div key={b.key} style={{ ...S.badgeTile, ...(earned ? S.badgeTileEarned : S.badgeTileLocked) }}>
-                        <div style={S.badgeIcon}>{b.icon}</div>
-                        <div style={S.badgeName}>{b.name}</div>
-                        <div style={S.badgeDesc}>{b.description}</div>
-                        {earned && (
-                          <div style={S.badgeDate}>
-                            {new Date(earned.earned_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Elite */}
-                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#555', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  Elite
-                  <span style={{ ...S.badgeTierLabel, ...S.badgeTierElite }}>Hard to earn</span>
-                </div>
-                <div style={S.badgeGrid}>
-                  {elite.map(b => {
-                    const earned = earnedBadges.find(e => e.badge_key === b.key)
-                    return (
-                      <div key={b.key} style={{ ...S.badgeTile, ...(earned ? S.badgeTileEarned : S.badgeTileLocked) }}>
-                        <div style={S.badgeIcon}>{b.icon}</div>
-                        <div style={S.badgeName}>{b.name}</div>
-                        <div style={S.badgeDesc}>{b.description}</div>
-                        {earned && (
-                          <div style={S.badgeDate}>
-                            {new Date(earned.earned_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                {tiersPresent.map(tier => (
+                  <div key={tier}>
+                    <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#555', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {TIER_LABEL[tier] || tier}
+                      {tier === 'elite' && <span style={{ ...S.badgeTierLabel, ...S.badgeTierElite }}>Hard to earn</span>}
+                    </div>
+                    <div style={{ ...S.badgeGrid, marginBottom: '1.5rem' }}>
+                      {allBadges.filter(b => (b.tier || 'standard') === tier).sort(byCloseness).map(renderTile)}
+                    </div>
+                  </div>
+                ))}
               </>
             )
           })()}
