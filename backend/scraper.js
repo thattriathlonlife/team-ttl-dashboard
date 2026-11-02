@@ -575,7 +575,6 @@ async function cleanupOldRaceChannels() {
 // ---------------------------------------------------------------
 // MAIN
 // ---------------------------------------------------------------
-
 async function main() {
   console.log('=== TriTeam Scraper/Notifier ===', new Date().toISOString());
 
