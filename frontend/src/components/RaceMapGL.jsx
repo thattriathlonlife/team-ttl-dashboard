@@ -99,17 +99,38 @@ function recolor(map) {
   }
 }
 
+// ── Shared map instance (flicker fix, 2026-11-02) ──────────────────
+// The Races page unmounts on every tab switch, and a fresh MapLibre
+// map replays its whole birth sequence on each mount: Mercator paint,
+// style fetch, recolor, globe projection snap, camera jump, tile
+// refill. On the phone that reads as the map flickering every time
+// you come back to Races. So the map lives at module scope instead:
+// created once per session, its element re-parented into whichever
+// host div the component renders, and merely detached on unmount —
+// never destroyed. Camera, tiles, projection and markers survive the
+// round trip and the return paints instantly. Markers talk to the
+// live component instance through sharedSelectCb, re-registered on
+// every render, so pins kept across a remount still open the card.
+let sharedMap = null
+let sharedEl = null
+let sharedLoaded = false
+let sharedFailed = false
+let sharedMarkers = []
+let sharedMarkersKey = ''
+let sharedFitKey = ''
+let sharedPendingFrame = null
+let sharedSelectCb = null
+
 export default function RaceMapGL({ races, allEntries = [], myEntries = [], profile, session, onToggle, onFail, teamIds = [] }) {
   const containerRef = useRef(null)
-  const mapRef = useRef(null)
-  const markersRef = useRef([])
-  const fitKeyRef = useRef('')
-  const loadedRef = useRef(false)
-  const pendingFrameRef = useRef(null)
+  const failRef = useRef(null)
   const [selected, setSelected] = useState(null)
   const [opening, setOpening] = useState(null)
   const [note, setNote] = useState('')
   const navigate = useNavigate()
+  useEffect(() => {
+    sharedSelectCb = (race) => { setSelected(race); setNote('') }
+  })
   const teamView = isTeamTier(profile)
 
   const racesWithCoords = useMemo(
@@ -125,99 +146,128 @@ export default function RaceMapGL({ races, allEntries = [], myEntries = [], prof
     return map
   }, [allEntries])
 
-  // Create the globe once.
+  // Attach the shared globe: create it on first mount, re-parent its
+  // element on every later mount, detach (never destroy) on unmount.
   useEffect(() => {
-    if (!containerRef.current || mapRef.current || racesWithCoords.length === 0) return
-    let map
-    try {
-      map = new maplibregl.Map({
-        container: containerRef.current,
-        style: STYLE_URL,
-        center: [-98, 24],
-        zoom: 2.0,
-        pitch: PITCH,
-        bearing: -8,
-        attributionControl: { compact: true },
-        scrollZoom: false, // never trap page scroll (long-standing rule)
-        dragRotate: true,
-        touchPitch: true,
-        pitchWithRotate: true,
-        minZoom: 1.6,
-        maxBounds: [[-178, -58], [190, 82]],
-        maxPitch: 70,
-      })
-    } catch {
-      onFail()
-      return
-    }
-    mapRef.current = map
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
-
-    const watchdog = setTimeout(() => { if (!loadedRef.current) onFail() }, 9000)
-    map.on('load', () => {
-      loadedRef.current = true
-      clearTimeout(watchdog)
-      try { map.setProjection({ type: 'globe' }) } catch { /* flat 3D is fine */ }
+    const host = containerRef.current
+    if (!host || racesWithCoords.length === 0) return
+    failRef.current = onFail
+    if (sharedFailed) { onFail(); return }
+    if (!sharedMap) {
+      sharedEl = document.createElement('div')
+      sharedEl.style.cssText = 'width: 100%; height: 100%;'
+      host.appendChild(sharedEl)
+      let map
       try {
-        map.setFog({
-          range: [0.4, 9],
-          color: '#0d2233',
-          'high-color': '#1a4a66',
-          'space-color': '#020507',
-          'horizon-blend': 0.14,
-          'star-intensity': 0.3,
+        map = new maplibregl.Map({
+          container: sharedEl,
+          style: STYLE_URL,
+          center: [-98, 24],
+          zoom: 2.0,
+          pitch: PITCH,
+          bearing: -8,
+          attributionControl: { compact: true },
+          scrollZoom: false, // never trap page scroll (long-standing rule)
+          dragRotate: true,
+          touchPitch: true,
+          pitchWithRotate: true,
+          minZoom: 1.6,
+          maxBounds: [[-178, -58], [190, 82]],
+          maxPitch: 70,
         })
-      } catch { /* atmosphere is decoration */ }
-      recolor(map)
-      // Apply framing only now (fix pass 2): an easeTo issued before
-      // load runs in Mercator, then setProjection('globe') re-interprets
-      // the camera — which is how the map could open over empty ocean.
-      if (pendingFrameRef.current) {
-        map.jumpTo(pendingFrameRef.current)
-        pendingFrameRef.current = null
+      } catch {
+        sharedFailed = true
+        onFail()
+        return
       }
-    })
-    map.on('error', () => { if (!loadedRef.current) { clearTimeout(watchdog); onFail() } })
-    return () => { clearTimeout(watchdog); map.remove(); mapRef.current = null }
+      sharedMap = map
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
+
+      const watchdog = setTimeout(() => {
+        if (!sharedLoaded) { sharedFailed = true; failRef.current?.() }
+      }, 9000)
+      map.on('load', () => {
+        sharedLoaded = true
+        clearTimeout(watchdog)
+        try { map.setProjection({ type: 'globe' }) } catch { /* flat 3D is fine */ }
+        try {
+          map.setFog({
+            range: [0.4, 9],
+            color: '#0d2233',
+            'high-color': '#1a4a66',
+            'space-color': '#020507',
+            'horizon-blend': 0.14,
+            'star-intensity': 0.3,
+          })
+        } catch { /* atmosphere is decoration */ }
+        recolor(map)
+        // Apply framing only now (fix pass 2): an easeTo issued before
+        // load runs in Mercator, then setProjection('globe') re-interprets
+        // the camera — which is how the map could open over empty ocean.
+        if (sharedPendingFrame) {
+          map.jumpTo(sharedPendingFrame)
+          sharedPendingFrame = null
+        }
+      })
+      map.on('error', () => {
+        if (!sharedLoaded) { clearTimeout(watchdog); sharedFailed = true; failRef.current?.() }
+      })
+    } else {
+      host.appendChild(sharedEl)
+      try { sharedMap.resize() } catch { /* not laid out yet */ }
+    }
+    return () => {
+      if (failRef.current === onFail) failRef.current = null
+      if (sharedEl && sharedEl.parentElement === host) host.removeChild(sharedEl)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [racesWithCoords.length])
 
-  // Sync markers + framing with the filtered race set.
+  // Sync markers + framing with the filtered race set. When the pin
+  // set is unchanged (the tab-return case) the rebuild is skipped
+  // entirely — the shared markers simply stayed on the shared map.
   useEffect(() => {
-    const map = mapRef.current
+    const map = sharedMap
     if (!map) return
-    markersRef.current.forEach(m => m.remove())
-    markersRef.current = []
-    const pts = []
-    for (const race of racesWithCoords) {
-      const raceEntries = entriesByRace[race.id] || []
-      const count = raceEntries.length
-      const kind = raceEntries.some(e => teamIds.includes(e.athlete_id)) ? 'team' : 'community'
-      const mine = myEntries.includes(race.id)
-      const el = document.createElement('div')
-      el.innerHTML = pinHtml(count, mine, kind)
-      el.addEventListener('click', (ev) => { ev.stopPropagation(); setSelected(race); setNote('') })
-    const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([race.longitude, race.latitude])
-        .addTo(map)
-      markersRef.current.push(marker)
-      pts.push([race.longitude, race.latitude])
+    const sig = racesWithCoords.map(r => {
+      const es = entriesByRace[r.id] || []
+      const kind = es.some(e => teamIds.includes(e.athlete_id)) ? 't' : 'c'
+      return `${r.id}:${es.length}:${kind}:${myEntries.includes(r.id) ? 1 : 0}`
+    }).join('|')
+    if (sig !== sharedMarkersKey) {
+      sharedMarkersKey = sig
+      sharedMarkers.forEach(m => m.remove())
+      sharedMarkers = []
+      for (const race of racesWithCoords) {
+        const raceEntries = entriesByRace[race.id] || []
+        const count = raceEntries.length
+        const kind = raceEntries.some(e => teamIds.includes(e.athlete_id)) ? 'team' : 'community'
+        const mine = myEntries.includes(race.id)
+        const el = document.createElement('div')
+        el.innerHTML = pinHtml(count, mine, kind)
+        el.addEventListener('click', (ev) => { ev.stopPropagation(); sharedSelectCb?.(race) })
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([race.longitude, race.latitude])
+          .addTo(map)
+        sharedMarkers.push(marker)
+      }
     }
+    const pts = racesWithCoords.map(r => [r.longitude, r.latitude])
     const fitKey = racesWithCoords.map(r => r.id).join(',')
-    if (pts.length && fitKey !== fitKeyRef.current) {
-      fitKeyRef.current = fitKey
+    if (pts.length && fitKey !== sharedFitKey) {
+      sharedFitKey = fitKey
       const cluster = clusterOf(pts)
       if (cluster.length === 1) {
         const frame = { center: cluster[0], zoom: 5, pitch: PITCH }
-        if (loadedRef.current) map.jumpTo(frame)
-        else pendingFrameRef.current = frame
+        if (sharedLoaded) map.jumpTo(frame)
+        else sharedPendingFrame = frame
       } else {
         // Frame by computed center + zoom on the cluster's hemisphere
         // (Zack's reference, 2026-10-31 23:29: the Americas disc with
         // the pins in frame — the Lovable globe framing). Span fills
         // ~40% of the world-width so neighbouring continents stay on
         // the disc; the frame is applied via jumpTo AFTER the style +
-        // globe projection load (see pendingFrameRef), never before.
+        // globe projection load (see sharedPendingFrame), never before.
         const lngs = cluster.map(p => p[0])
         const lats = cluster.map(p => p[1])
         const spanLng = Math.max(...lngs) - Math.min(...lngs)
@@ -229,11 +279,11 @@ export default function RaceMapGL({ races, allEntries = [], myEntries = [], prof
           center: [(Math.min(...lngs) + Math.max(...lngs)) / 2, (Math.min(...lats) + Math.max(...lats)) / 2],
           zoom, pitch: PITCH, bearing: -8,
         }
-        if (loadedRef.current) map.jumpTo(frame)
-        else pendingFrameRef.current = frame
+        if (sharedLoaded) map.jumpTo(frame)
+        else sharedPendingFrame = frame
       }
     }
-  }, [racesWithCoords, entriesByRace, myEntries])
+  }, [racesWithCoords, entriesByRace, myEntries, teamIds])
 
   async function openChannel(kind) {
     if (!selected) return
