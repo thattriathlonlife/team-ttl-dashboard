@@ -119,6 +119,35 @@ async function probeImageSize(url) {
   } catch { return null }
 }
 
+
+// Shopify's CDN resizes on the fly via a width parameter. The blog's
+// originals run 550-850 KB at ~1900px wide for a ~400px slot — the
+// main reason story images arrive slowly (Zack's recording, 2026-11-02:
+// the reader's hero sat black for ~3s). Serving width=1080 (~2.5x
+// retina for the slot) cuts each image to roughly a third of the
+// bytes with no visible difference; aspect is preserved, so the
+// probed dimensions above stay truthful. URLs that already carry a
+// width (Shopify email images) are left alone.
+function sizedShopify(url, width = 1080) {
+  if (!url || typeof url !== 'string') return url
+  if (!url.includes('cdn.shopify.com') || url.includes('width=')) return url
+  return url + (url.includes('?') ? '&' : '?') + `width=${width}`
+}
+
+function sizeBodyImages(html) {
+  if (!html) return html
+  return html.replace(/(<img[^>]+src=")(https:\/\/cdn\.shopify\.com\/[^"]+)(")/g,
+    (m, pre, url, post) => pre + sizedShopify(url) + post)
+}
+
+function sizeStories(stories) {
+  for (const st of stories) {
+    st.image = sizedShopify(st.image)
+    st.body = sizeBodyImages(st.body)
+  }
+  return stories
+}
+
 async function withImageSizes(stories) {
   await Promise.all(stories.map(async (st) => {
     if (!st.image) return
@@ -263,7 +292,7 @@ export default async function handler(req, res) {
     // along so the feed can label its archive entry points truthfully.
     const full = (req.url || '').includes('full=1')
     return res.status(200).json({
-      stories: await withImageSizes(parseAtom(storiesXml, full ? 60 : 20)),
+      stories: sizeStories(await withImageSizes(parseAtom(storiesXml, full ? 60 : 20))),
       storiesTotal: (storiesXml.match(/<entry>/g) || []).length,
       episodes: parseRss(episodesXml, full ? 300 : 30).map(ep => ({ ...ep, image: ep.image || podcastImage })),
       episodesTotal: (episodesXml.match(/<item>/g) || []).length,

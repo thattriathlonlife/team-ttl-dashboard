@@ -163,7 +163,7 @@ const S = {
   },
   scroll: { overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' },
   articleWrap: { maxWidth: 680, margin: '0 auto', padding: '1.1rem 1.25rem 3rem' },
-  hero: { width: '100%', borderRadius: 14, display: 'block', marginBottom: '1.1rem' },
+  hero: { width: '100%', borderRadius: 14, display: 'block', marginBottom: '1.1rem', background: '#161616' },
   title: {
     fontFamily: "'Barlow Condensed', sans-serif", fontSize: 34, lineHeight: 1.08,
     textTransform: 'uppercase', margin: '0 0 0.5rem', color: '#fff',
