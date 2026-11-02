@@ -6,7 +6,8 @@
   "main": "scraper.js",
   "scripts": {
     "scrape": "node scraper.js",
-    "dev": "node --watch scraper.js"
+    "dev": "node --watch scraper.js",
+    "test": "node --test scraper-pure.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

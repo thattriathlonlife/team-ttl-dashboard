@@ -10,6 +10,7 @@
 import 'dotenv/config';
 import * as cheerio from 'cheerio';
 import { appendFileSync, readFileSync } from 'fs';
+import { applyDedupeGuard, sameCity, extractCityFromName, extractCityFromLocation, GEOCODE_CITY_ALIASES, brandedExternalId, triathlonExternalId } from './scraper-pure.js';
 
 // --- Config ---
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -155,7 +156,7 @@ async function fetchTriathlonEvents() {
         country: country || null,
         latitude: lat ? parseFloat(lat) : null,
         longitude: lng ? parseFloat(lng) : null,
-        external_id: `triorg_${event.event_id}`,
+        external_id: triathlonExternalId(event.event_id),
         source: 'triathlon_api',
         registration_url: event.event_website || event.event_listing || null,
       });
@@ -190,7 +191,7 @@ function fetchBrandedCalendar() {
     country: r.country || null,
     latitude: null,
     longitude: null,
-    external_id: `im_${r.slug}_${String(r.race_date).slice(0, 4)}`,
+    external_id: brandedExternalId(r.slug, r.race_date),
     source: 'ironman_calendar',
     registration_url: r.registration_url || null,
   }));
@@ -203,34 +204,12 @@ function fetchBrandedCalendar() {
 // Adds lat/lon and city to a race based on its location string
 // ---------------------------------------------------------------
 
-function extractCityFromName(raceName) {
-  const stripped = raceName
-    .replace(/^ironman\s+70\.3\s+/i, '')
-    .replace(/^ironman\s+/i, '')
-    .trim();
-  if (stripped && stripped.split(' ').length <= 3 && !/championship|world|series/i.test(stripped)) {
-    return stripped;
-  }
-  return null;
-}
 
-function extractCityFromLocation(location) {
-  if (!location || location === 'TBD') return null;
-  const parts = location.split(',').map(p => p.trim());
-  if (parts.length < 2) return null;
-  return parts[0] || null;
-}
 
 // Curated coordinate overrides (audit F5, 2026-11-01): races whose
 // name-derived "city" is actually a state/region, pinned to their real
 // venues. These venues do not move; if one ever does, update the row
 // here and the DB cache picks it up on the next run.
-// Cities Nominatim knows by a different name than the race listing
-// (Port Elizabeth was renamed Gqeberha in 2021; the listing still uses
-// the old name). Checked alongside sameCity at acceptance time.
-const GEOCODE_CITY_ALIASES = {
-  'Port Elizabeth': ['Gqeberha'],
-};
 
 const GEOCODE_OVERRIDES = {
   'Ironman Florida': { city: 'Panama City Beach', latitude: 30.1766, longitude: -85.8055 },
@@ -274,15 +253,6 @@ async function fetchCoordCache() {
   return cache;
 }
 
-// Accent/punctuation-insensitive city comparison ("Poreč" ~ "Porec",
-// "São Paulo" ~ "Sao Paulo"). Containment counts as a match so
-// "Galveston" ~ "Galveston Island" passes.
-function sameCity(a, b) {
-  if (!a || !b) return false;
-  const norm = x => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-  const na = norm(a), nb = norm(b);
-  return na === nb || na.includes(nb) || nb.includes(na);
-}
 
 async function geocodeRaces(races, coordCache = new Map()) {
   console.log(`[Geocode] Geocoding ${races.length} races...`);
@@ -413,33 +383,6 @@ async function geocodeRaces(races, coordCache = new Map()) {
 // IDENTITY + RECONCILIATION (Phase B, 2026-11-01)
 // ---------------------------------------------------------------
 
-// Cross-source dedupe guard (audit F4/F9): if a race about to be
-// upserted matches an existing DB row — or an earlier race in this same
-// batch — on normalized name + date under a DIFFERENT external_id,
-// adopt the existing identity so the upsert updates that row instead
-// of forking a twin that splits the entries.
-function applyDedupeGuard(races, existingRows) {
-  const norm = (x) => (x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const byKey = new Map();
-  for (const r of existingRows || []) {
-    const k = `${norm(r.name)}|${r.race_date}`;
-    if (!byKey.has(k)) byKey.set(k, r.external_id);
-  }
-  let adopted = 0;
-  for (const race of races) {
-    const k = `${norm(race.name)}|${race.race_date}`;
-    const hit = byKey.get(k);
-    if (hit && hit !== race.external_id) {
-      console.log(`[Dedupe] "${race.name}" (${race.race_date}) adopts existing identity ${hit} instead of ${race.external_id}`);
-      race.external_id = hit;
-      adopted++;
-    } else if (!hit) {
-      byKey.set(k, race.external_id);
-    }
-  }
-  if (adopted) console.log(`[Dedupe] ${adopted} adoption(s) — no duplicate rows created`);
-  return races;
-}
 
 // Reconciliation visibility (Phase B1): which upcoming DB rows did this
 // run NOT see? Without last_seen columns (migration 0005, pending) this
