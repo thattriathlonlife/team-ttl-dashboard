@@ -576,65 +576,10 @@ async function cleanupOldRaceChannels() {
 // MAIN
 // ---------------------------------------------------------------
 
-// ── TEMPORARY (2026-11-01, run 50): duplicate-edition merge ─────────
-// Two upcoming races exist twice: once from the retired PTO scrape
-// under a variant name, once from the curated seed (Phase C). The
-// name+date dedupe guard could not match them (names differ). Merge
-// each pair onto the seed row, preserving entries; the PTO twin is
-// deleted. Self-guarding and idempotent: aborts a pair if the dates
-// differ, the survivor is missing, channels hang off the duplicate,
-// or the channel check itself errors. Removed in the follow-up commit
-// once the merge is verified in the database.
-async function mergeDuplicateEditions() {
-  const pairs = [
-    { loser: 'pto_ironman-703-aracaju-sergipe_2026', survivor: 'im_im703-sergipe_2026' },
-    { loser: 'pto_im-703-indian-wells_2026', survivor: 'im_im703-la-quinta_2026' },
-  ];
-  for (const { loser, survivor } of pairs) {
-    const tag = `[Merge] ${loser} -> ${survivor}:`;
-    try {
-      const { data: rows, error: rowErr } = await supabaseRequest(
-        `/races?select=id,name,race_date,source,external_id&external_id=in.(${loser},${survivor})`
-      );
-      if (rowErr) { console.log(`${tag} ABORT — row read failed: ${rowErr.message}`); continue; }
-      const loseRow = (rows || []).find(r => r.external_id === loser);
-      const keepRow = (rows || []).find(r => r.external_id === survivor);
-      if (!loseRow) { console.log(`${tag} duplicate already gone — nothing to do`); continue; }
-      if (!keepRow) { console.log(`${tag} ABORT — survivor row missing`); continue; }
-      if (loseRow.race_date !== keepRow.race_date) {
-        console.log(`${tag} ABORT — dates differ (${loseRow.race_date} vs ${keepRow.race_date})`);
-        continue;
-      }
-      const { data: chans, error: chanErr } = await supabaseRequest(`/channels?select=id&race_id=eq.${loseRow.id}`);
-      if (chanErr) { console.log(`${tag} ABORT — channel check failed: ${chanErr.message}`); continue; }
-      if (chans && chans.length) { console.log(`${tag} ABORT — ${chans.length} channel(s) attached to the duplicate`); continue; }
-      const { data: loseEntries } = await supabaseRequest(`/race_entries?select=id,athlete_id&race_id=eq.${loseRow.id}`);
-      const { data: keepEntries } = await supabaseRequest(`/race_entries?select=id,athlete_id&race_id=eq.${keepRow.id}`);
-      const keepAthletes = new Set((keepEntries || []).map(e => e.athlete_id));
-      let moved = 0, dropped = 0;
-      for (const e of loseEntries || []) {
-        if (keepAthletes.has(e.athlete_id)) {
-          await supabaseRequest(`/race_entries?id=eq.${e.id}`, 'DELETE');
-          dropped++;
-        } else {
-          await supabaseRequest(`/race_entries?id=eq.${e.id}`, 'PATCH', { race_id: keepRow.id });
-          moved++;
-        }
-      }
-      const del = await supabaseRequest(`/races?id=eq.${loseRow.id}`, 'DELETE');
-      console.log(`${tag} entries moved ${moved}, duplicate entries dropped ${dropped}, duplicate row deleted (${del.error ? 'ERROR ' + del.error.message : 'ok'})`);
-    } catch (err) {
-      console.log(`${tag} ABORT — unexpected error: ${err.message}`);
-    }
-  }
-}
-
 async function main() {
   console.log('=== TriTeam Scraper/Notifier ===', new Date().toISOString());
 
   try {
-    await mergeDuplicateEditions();
-
     // 1. Fetch from triathlon.org API (Olympic, Sprint, WTS events)
     const triEventsRaw = await fetchTriathlonEvents();
 
