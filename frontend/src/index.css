@@ -67,6 +67,7 @@ input, select, textarea {
   transition: border-color 0.15s;
 }
 input:focus, select:focus { border-color: var(--cyan); }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cyan, #2BB3A3); outline-offset: 2px; }
 select option { background: var(--surface2); }
 
 /* Scrollbar */

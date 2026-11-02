@@ -4,11 +4,20 @@
 -- behind the database so direct API writes are moderated too, adds the
 -- audit log, repeat-offender auto-mute, and the report path.
 -- Apply only after the 0002/0003 review, against the live schema export.
+--
+-- RECONCILED 2026-11-01 against 0001 + CLAUDE.md — changes marked
+-- [reconciled 2026-11-01]; see README.md in this folder.
+-- Vocabulary: "staff" throughout this file means profiles.role = 'admin'
+-- — 0001 defines only role in ('athlete','admin'); there is no separate
+-- staff role or staff table in 0001–0003.
 
 -- 1) Verdict log. Content itself is NOT stored; a hash lets staff match
 --    a report to an event without retaining blocked text.
 create table if not exists public.moderation_events (
-  id uuid primary key default gen_random_uuid(),
+  -- [reconciled 2026-11-01] Was gen_random_uuid(); 0001 uses
+  -- uuid_generate_v4() (uuid-ossp) for every id default. Aligned to 0001
+  -- so the draft set depends on one UUID extension, not two.
+  id uuid primary key default uuid_generate_v4(),
   created_at timestamptz not null default now(),
   channel_id uuid references public.channels(id) on delete set null,
   message_id uuid references public.messages(id) on delete set null,
@@ -41,6 +50,14 @@ create table if not exists public.moderation_terms (
   term text primary key,
   severity text not null default 'severe' check (severity in ('severe', 'spam_phrase'))
 );
+
+-- [reconciled 2026-11-01] RLS was not enabled on either new table, unlike
+-- 0001 (RLS enabled on all tables) and 0002 (linked_identities). Enable it
+-- here; the policies themselves stay as the §5 intent below until they can
+-- be written against the exported live policy set. NOTE: as with 0002,
+-- RLS-on with no policies yet is deny-all for non-service-role access.
+alter table public.moderation_events enable row level security;
+alter table public.moderation_terms enable row level security;
 
 -- create or replace function public.moderate_message() returns trigger ...
 -- create trigger messages_moderate before insert on public.messages

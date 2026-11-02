@@ -245,7 +245,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
       {isAdmin && (
         <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '4px', zIndex: 2 }}>
           <button onClick={() => onEdit(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: '#aaa', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>Edit</button>
-          <button onClick={() => onDelete(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: '4px', color: 'var(--accent)', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>×</button>
+          <button aria-label="Delete" onClick={() => onDelete(discount)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: '4px', color: 'var(--accent)', fontSize: '11px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>×</button>
         </div>
       )}
 
@@ -395,7 +395,7 @@ function DiscountModal({ discount, onSave, onClose }) {
               <div style={{ fontSize: '11px', color: '#555' }}>PNG or SVG recommended, max 1MB</div>
             </div>
             {form.logo_url && (
-              <button onClick={() => set('logo_url', '')} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
+              <button aria-label="Remove logo" onClick={() => set('logo_url', '')} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
             )}
           </div>
         </div>
@@ -855,7 +855,7 @@ function GearPickRow({ pick, reviews, netScore, myVote, onVote, onEdit, onDelete
               edit
             </button>
             {isAdmin && (
-              <button onClick={onDelete} style={{ background: 'none', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: 4, color: 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '3px 8px', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>
+              <button aria-label="Delete" onClick={onDelete} style={{ background: 'none', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: 4, color: 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '3px 8px', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>
                 delete
               </button>
             )}
@@ -1198,7 +1198,7 @@ function GarageListingCard({ listing: l, profile, isAdmin, onMessageSeller, onMa
         {canEdit && (
           <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
             <button onClick={onEdit} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, color: '#555', cursor: 'pointer', fontSize: 11, padding: '4px 8px' }}>✎</button>
-            <button onClick={onDelete} style={{ background: 'none', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: 4, color: 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '4px 8px' }}>✕</button>
+            <button aria-label="Delete" onClick={onDelete} style={{ background: 'none', border: '1px solid rgba(var(--accent-rgb),0.2)', borderRadius: 4, color: 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '4px 8px' }}>✕</button>
           </div>
         )}
       </div>

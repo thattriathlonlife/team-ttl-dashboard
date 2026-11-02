@@ -135,8 +135,15 @@ create table channel_reads (                           -- EVIDENCED (upsert on c
 );
 
 -- RPCs (signatures INFERRED from call sites; bodies live only in the live DB):
---   create_dm_channel(p_user_id uuid, p_other_user_id uuid) returns channels row / id
---   get_dm_peers(p_user_id uuid)
+--   [reconciled 2026-11-01 — comment only, no schema change: the two
+--   signatures below originally drafted here contradicted CLAUDE.md and
+--   every call site in the code. Corrected from the call sites:]
+--   create_dm_channel(other_athlete_id uuid) returns uuid
+--     (caller is auth.uid() inside the security-definer body;
+--      GearHub.jsx + Messaging.jsx call it with { other_athlete_id })
+--   get_dm_peers(p_channel_ids uuid[]) returns
+--     table(channel_id, id, full_name, avatar_color, avatar_url)
+--     (Messaging.jsx calls it with { p_channel_ids })
 --   get_unread_counts(p_user_id uuid) returns (channel_id, unread_count)
 --   get_unread_count(p_user_id uuid)  returns integer
 

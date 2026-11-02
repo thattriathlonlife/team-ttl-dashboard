@@ -528,7 +528,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
       {(!showSidebar || !isMobile) && lockedChannel && !showMentions && (
         <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
           {isMobile && (
-            <button onClick={() => { setShowSidebar(true); setLockedChannel(null) }} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '14px 16px 0' }}>←</button>
+            <button aria-label="Back to channels" onClick={() => { setShowSidebar(true); setLockedChannel(null) }} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '14px 16px 0' }}>←</button>
           )}
           <TeamLocked feature={lockedChannel.type === 'dm' ? 'Direct messages' : channelDisplayName(lockedChannel)} />
         </div>
@@ -847,7 +847,7 @@ function MentionsView({ session, profile, isMobile, channels, teamView, onBack, 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
       <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, background: '#111' }}>
-        {isMobile && <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '0', marginRight: '4px' }}>←</button>}
+        {isMobile && <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '0', marginRight: '4px' }}>←</button>}
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff' }}>@ Mentions</div>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px' }}>
@@ -1166,7 +1166,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
       {/* Header */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, background: '#111' }}>
-        {isMobile && <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '0', marginRight: '4px' }}>←</button>}
+        {isMobile && <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '0', marginRight: '4px' }}>←</button>}
         {channel.type === 'dm' ? (
           // DM header — show other person's avatar + name
           (() => {
@@ -1365,7 +1365,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
             <span style={{ fontSize: '12px', color: '#555' }}>↩ Replying to</span>
             <span style={{ fontSize: '12px', color: 'var(--brand)', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600 }}>{replyTo.profiles?.full_name || 'Athlete'}</span>
             <span style={{ fontSize: '12px', color: '#555', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyTo.content}</span>
-            <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#555', fontSize: '16px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
+            <button aria-label="Cancel reply" onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#555', fontSize: '16px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>×</button>
           </div>
         )}
 
@@ -1383,7 +1383,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(var(--highlight-rgb),0.1)', border: '1px solid rgba(var(--highlight-rgb),0.35)', borderRadius: '10px', padding: '8px 12px', marginBottom: '6px' }}>
             <span style={{ fontSize: '13px' }}>🛡️</span>
             <span style={{ flex: 1, fontSize: '12.5px', color: '#e8d9a8', lineHeight: 1.4 }}>{modNotice}</span>
-            <button onClick={() => setModNotice(null)} style={{ background: 'none', border: 'none', color: '#999', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+            <button aria-label="Dismiss notice" onClick={() => setModNotice(null)} style={{ background: 'none', border: 'none', color: '#999', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
           </div>
         )}
 

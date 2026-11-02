@@ -152,7 +152,7 @@ export default function RaceDetail({ race, session, profile, onClose, onToggleEn
 
           {/* Header */}
           <div style={S.header}>
-            <button style={S.closeBtn} onClick={onClose}>×</button>
+            <button style={S.closeBtn} onClick={onClose} aria-label="Close">×</button>
             <div style={S.raceName}>{race.name}</div>
             <div style={S.raceMeta}>
               <span>{formatDate(race.race_date)}</span>

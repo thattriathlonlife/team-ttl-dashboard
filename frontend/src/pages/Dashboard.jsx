@@ -243,7 +243,7 @@ export default function Dashboard({ session }) {
           <div style={S.searchWrap}>
             <span style={S.searchIcon}>🔍</span>
             <input style={S.searchInput} type="text" placeholder="Search by name, location or type..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-            {searchQuery && <button style={S.searchClear} onClick={() => setSearchQuery('')}>×</button>}
+            {searchQuery && <button style={S.searchClear} onClick={() => setSearchQuery('')} aria-label="Clear search">×</button>}
           </div>
           {searchQuery && <div style={S.searchResults}>{filteredRaces.length} result{filteredRaces.length !== 1 ? 's' : ''} for "{searchQuery}"</div>}
 

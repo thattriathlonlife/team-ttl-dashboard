@@ -2,6 +2,12 @@
 -- Phase 0, 2026-10-31. DO NOT RUN against production until the live RLS
 -- policies and channel constraints have been exported and reviewed.
 --
+-- APPLY ORDER: after 0002 (the RLS helper in §2 reads
+-- profiles.team_entitled). RECONCILED 2026-11-01 against 0001 + CLAUDE.md
+-- — changes in this pass are marked [reconciled 2026-11-01]; see README.md.
+-- Vocabulary: "Staff" in §2 means profiles.role = 'admin' — 0001 defines
+-- only role in ('athlete','admin'); there is no separate staff role.
+--
 -- Product rule (ACCESS-AND-UI-SPEC.md):
 --   * Every race may have one PUBLIC discussion. Any signed-in Community,
 --     Team, or Staff account may read and post.
@@ -22,6 +28,13 @@
 -- 'race_discussion' and 'race_logistics' alongside every existing value.
 -- The exact drop/add statements must be written from the exported
 -- definitions — do not guess the existing value list.
+-- [reconciled 2026-11-01] Two clarifications: (a) 0001's reconstruction
+-- OMITS these live CHECK constraints entirely — that is a known gap in
+-- 0001, not evidence the constraints do not exist; CLAUDE.md + the live
+-- client failures are authoritative here. (b) This migration introduces
+-- no new category value (race channels keep category='race', already in
+-- 0001), so only the TYPE check needs widening — but confirm the exported
+-- category check still permits 'race' and 'dm' before running.
 -- Until this migration runs, the client uses the compatible encoding:
 -- type='race' + a '-discussion'/'-logistics' name suffix (lib/channels.js).
 
@@ -30,7 +43,20 @@ alter table channels
 
 update channels
 set audience = case
-  when type = 'race_discussion' or name like '%-discussion' then 'public'
+  -- [reconciled 2026-11-01] DM channels first: as originally drafted they
+  -- fell through to 'team', which misdescribes them — DM visibility is
+  -- membership-based (channel_members, per CLAUDE.md/0001), never
+  -- entitlement-based. Leave audience NULL for DMs; §2's SELECT rule and
+  -- the shape check below both already treat DM separately, and the
+  -- audience CHECK passes on NULL.
+  when type = 'dm' then null
+  -- [reconciled 2026-11-01] The '-discussion' name suffix only encodes a
+  -- race channel (frontend/src/lib/channels.js reads it only in race
+  -- context). Guard the public branch to race context so a non-race
+  -- channel whose name happens to end in '-discussion' is not silently
+  -- made public.
+  when type = 'race_discussion'
+    or (name like '%-discussion' and (race_id is not null or category = 'race' or type = 'race')) then 'public'
   when type in ('race', 'race_logistics') or name like '%-logistics' then 'team'
   else coalesce(audience, 'team')
 end;
