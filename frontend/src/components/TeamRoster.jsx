@@ -1,4 +1,5 @@
 import MemberChips from './MemberChips'
+import { openMember } from '../lib/memberView'
 
 const MEMBER_COLORS = ['var(--brand)','var(--accent)','var(--highlight)','var(--accent)','#a78bfa','#34d399','#f472b6','#60a5fa']
 
@@ -69,7 +70,7 @@ export default function TeamRoster({ profiles, allEntries, races }) {
         const color = MEMBER_COLORS[idx % MEMBER_COLORS.length]
 
         return (
-          <div key={member.id} style={S.card}>
+          <div key={member.id} style={{ ...S.card, cursor: 'pointer' }} onClick={() => openMember(member.id)} role="button" aria-label={`View ${displayName}'s profile`}>
             <div style={{ ...S.avatar, background: color }}>{initials}</div>
             <div style={S.name}>{displayName}</div>
             <div style={{ marginTop: '4px' }}><MemberChips profile={member} /></div>

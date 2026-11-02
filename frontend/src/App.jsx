@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import ErrorBoundary from './components/ErrorBoundary'
+import MemberProfileHost from './components/MemberProfile'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
@@ -75,6 +76,7 @@ function AppRoutes({ session, profile, setProfile }) {
       </Routes>
       </ErrorBoundary>
     </Layout>
+    <MemberProfileHost />
     </AudioPlayerProvider>
   )
 }

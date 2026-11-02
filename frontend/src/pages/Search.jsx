@@ -6,6 +6,7 @@ import StoryReader from '../components/StoryReader'
 import { channelDisplayName, channelAccessLabel, raceChannelKind, isTeamOnlyChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
 import MemberChips from '../components/MemberChips'
+import { openMember } from '../lib/memberView'
 
 // Global search (DESIGN-SPEC §2.6): one box across races, athletes,
 // channels, and TTL content (podcast / videos / stories). Indexes are small
@@ -159,7 +160,7 @@ export default function Search({ profile }) {
         <>
           <div style={S.h}>Athletes</div>
           {results.athletes.map(a => (
-            <button key={a.id} style={S.row} onClick={() => { remember(query); navigate('/team?tab=roster') }}>
+            <button key={a.id} style={S.row} onClick={() => { remember(query); openMember(a.id) }}>
               <span style={{ width: 32, height: 32, borderRadius: '50%', background: a.avatar_color || '#3d7a8c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#10131a', fontFamily: 'Barlow Condensed, sans-serif', flexShrink: 0 }}>
                 {(a.full_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2)}
               </span>

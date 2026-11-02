@@ -1,4 +1,5 @@
 import { getDemoTier, setDemoTier, isTeamTier } from '../lib/tier'
+import MemberChips from '../components/MemberChips'
 import { BRAND_THEME, TEAM_THEME } from '../lib/theme'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
@@ -249,6 +250,7 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
           <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 10.5, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', background: 'rgba(var(--brand-rgb),0.13)', color: 'var(--brand)', border: '1px solid rgba(var(--brand-rgb),0.3)', padding: '3px 9px', borderRadius: 5 }}>
             {teamView ? 'Team TTL member' : 'Community member'}
           </span>
+          <MemberChips profile={{ ...profile, team_entitled: teamView ? undefined : false }} />
           <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', background: '#101010', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '3px 10px' }}>
             <span style={{ width: 9, height: 9, borderRadius: '50%', background: palette.brand }} />
             <span style={{ width: 9, height: 9, borderRadius: '50%', background: palette.accent }} />

@@ -7,6 +7,7 @@ import TeamLocked from '../components/TeamLocked'
 import { moderateOutgoing, shouldHide } from '../lib/moderation'
 import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 import MemberChips from '../components/MemberChips'
+import { openMember } from '../lib/memberView'
 
 // Given a DM channel (with dm_members hydrated), return the other person's profile
 function dmOtherProfile(channel, userId) {
@@ -863,8 +864,13 @@ function MentionsView({ session, profile, isMobile, channels, teamView, onBack, 
             return (
               <div key={m.id} onClick={() => onOpenChannel(channels.find(full => full.id === ch?.id) || ch)} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid var(--accent)', borderRadius: '8px', padding: '12px', marginBottom: '8px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <Avatar profile={msg?.profiles} size={24} />
-                  <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600, color: '#fff' }}>{msg?.profiles?.full_name || 'Athlete'}</span>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); if (msg?.athlete_id) openMember(msg.athlete_id) }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: msg?.athlete_id ? 'pointer' : 'default' }}
+                  >
+                    <Avatar profile={msg?.profiles} size={24} />
+                    <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600, color: '#fff' }}>{msg?.profiles?.full_name || 'Athlete'}</span>
+                  </span>
                   <MemberChips profile={msg?.profiles} />
                   <span style={{ fontSize: '11px', color: '#555' }}>in #{chName}</span>
                   <span style={{ fontSize: '11px', color: '#555', marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>

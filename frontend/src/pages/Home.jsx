@@ -6,6 +6,7 @@ import { isTeamTier } from '../lib/tier'
 import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 import MemberChips from '../components/MemberChips'
 import { postScore, buildFeed } from '../lib/feed'
+import { openMember } from '../lib/memberView'
 import { useAudio } from '../lib/audio'
 import VideoPlayer from '../components/VideoPlayer'
 import StoryReader from '../components/StoryReader'
@@ -595,6 +596,10 @@ export default function Home({ session, profile }) {
     return (
       <div key={item.key} onClick={() => navigate(`/messages?channel=${m.channel_id}`)} style={{ ...F.card, cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); if (m.athlete_id) openMember(m.athlete_id) }}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, cursor: m.athlete_id ? 'pointer' : 'default' }}
+          >
           <Avatar profile={m.profiles} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -603,6 +608,7 @@ export default function Home({ session, profile }) {
             </div>
             <div style={{ fontSize: '12px', color: '#777' }}>{timeAgo(m.created_at)}</div>
           </div>
+          </span>
           {ch && (
             <span style={F.chip(ch.feedKind === 'discussion' ? 'var(--brand)' : 'var(--highlight)')}>
               {channelDisplayName(ch)}
