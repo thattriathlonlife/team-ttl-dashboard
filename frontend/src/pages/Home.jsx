@@ -410,7 +410,9 @@ export default function Home({ session, profile }) {
   // a fixed 16/9.5 frame center-crops portrait covers — heads and feet
   // amputated). Ratios are learned on image load, clamped so a hero
   // is never a sliver nor a full-screen wall.
-  const [heroRatios, setHeroRatios] = useState({})
+  const [heroRatios, setHeroRatios] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ttl-img-ratios') || '{}') } catch { return {} }
+  })
   const [nextRace, setNextRace] = useState(() => cachedHome?.nextRace || null)
   const [myProfile, setMyProfile] = useState(() => cachedHome?.myProfile || null)
   const [feed, setFeed] = useState([])
@@ -803,6 +805,16 @@ export default function Home({ session, profile }) {
   function renderHero(item) {
     const d = item.data
     const isVideo = item.kind === 'video'
+    // Frame shape: the API's measured dimensions first (known before
+    // first paint — no snap), then this device's remembered shape,
+    // then the wide default. Videos keep the cinematic frame: their
+    // thumbnails carry letterbox bars that SHOULD be cropped.
+    const clampRatio = (r) => Math.min(1.9, Math.max(0.85, r))
+    const heroRatio = isVideo
+      ? '16/9.5'
+      : String(clampRatio(
+          (d.imageWidth && d.imageHeight) ? d.imageWidth / d.imageHeight : (heroRatios[d.image] || 16 / 9.5),
+        ))
     return (
       <button
         onClick={() => { if (isVideo) setPlayingVideo(d); else setReadingStory(d) }}
@@ -817,9 +829,16 @@ export default function Home({ session, profile }) {
           alt=""
           onLoad={(e) => {
             const { naturalWidth: w, naturalHeight: h } = e.currentTarget
-            if (w && h) setHeroRatios(prev => (prev[d.image] ? prev : { ...prev, [d.image]: Math.min(1.9, Math.max(0.85, w / h)) }))
+            if (!w || !h || heroRatios[d.image]) return
+            const r = Math.min(1.9, Math.max(0.85, w / h))
+            setHeroRatios(prev => {
+              if (prev[d.image]) return prev
+              const next = { ...prev, [d.image]: r }
+              try { localStorage.setItem('ttl-img-ratios', JSON.stringify(next)) } catch { /* private mode */ }
+              return next
+            })
           }}
-          style={{ width: '100%', aspectRatio: heroRatios[d.image] ? String(heroRatios[d.image]) : '16/9.5', objectFit: 'cover', display: 'block' }}
+          style={{ width: '100%', aspectRatio: heroRatio, objectFit: 'cover', display: 'block' }}
         />
         <div style={{
           position: 'absolute', inset: 0,

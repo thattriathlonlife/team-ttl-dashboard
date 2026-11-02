@@ -118,7 +118,15 @@ export default function StoryReader({ story, onClose }) {
       </div>
       <div style={S.scroll}>
         <div style={S.articleWrap}>
-          {story.image && <img src={story.image} alt="" style={S.hero} />}
+          {story.image && (
+            <img
+              src={story.image}
+              alt=""
+              style={(story.imageWidth && story.imageHeight)
+                ? { ...S.hero, aspectRatio: `${story.imageWidth}/${story.imageHeight}`, objectFit: 'cover' }
+                : S.hero}
+            />
+          )}
           <h1 style={S.title}>{story.title}</h1>
           {(story.author || dateLabel) && (
             <div style={S.byline}>{[story.author, dateLabel].filter(Boolean).join(' · ')}</div>

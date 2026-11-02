@@ -59,6 +59,75 @@ function firstImage(block) {
   return img ? img[1] : null
 }
 
+// Cover-photo dimensions, measured server-side (Zack, 2026-11-01: the
+// hero "flicker"). The Feed frames each hero by its photo's own aspect;
+// if the client only learns that shape when the image loads, the frame
+// snaps mid-paint. So the API probes each story image's header bytes
+// (capped read — never a full download) and ships the dimensions with
+// the payload. Best-effort: any failure just omits the fields and the
+// client falls back to its on-device memory of the shape.
+function parseImageSize(buf) {
+  try {
+    if (buf.length > 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+      return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) } // PNG
+    }
+    if (buf.length > 10 && buf.toString('ascii', 0, 3) === 'GIF') {
+      return { w: buf.readUInt16LE(6), h: buf.readUInt16LE(8) } // GIF
+    }
+    if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) { // JPEG
+      let off = 2
+      while (off + 9 < buf.length) {
+        if (buf[off] !== 0xff) { off++; continue }
+        const marker = buf[off + 1]
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+          return { w: buf.readUInt16BE(off + 7), h: buf.readUInt16BE(off + 5) } // SOF
+        }
+        const len = buf.readUInt16BE(off + 2)
+        if (len < 2) break
+        off += 2 + len
+      }
+      return null
+    }
+    if (buf.length > 30 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 4) === 'WEBP') {
+      const fmt = buf.toString('ascii', 12, 4)
+      if (fmt === 'VP8X') return { w: buf.readUIntLE(24, 3) + 1, h: buf.readUIntLE(27, 3) + 1 }
+      if (fmt === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff }
+      return null
+    }
+  } catch { /* truncated header — shape unknown */ }
+  return null
+}
+
+async function probeImageSize(url) {
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 2500)
+    const r = await fetch(url, { signal: ctrl.signal, headers: { Range: 'bytes=0-65535' } })
+    if (!r.ok && r.status !== 206) { clearTimeout(timer); return null }
+    const reader = r.body.getReader()
+    const chunks = []
+    let total = 0
+    while (total < 65536) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+      total += value.length
+    }
+    try { await reader.cancel() } catch { /* stream already closed */ }
+    clearTimeout(timer)
+    return parseImageSize(Buffer.concat(chunks))
+  } catch { return null }
+}
+
+async function withImageSizes(stories) {
+  await Promise.all(stories.map(async (st) => {
+    if (!st.image) return
+    const size = await probeImageSize(st.image)
+    if (size && size.w > 0 && size.h > 0) { st.imageWidth = size.w; st.imageHeight = size.h }
+  }))
+  return stories
+}
+
 function parseAtom(xml, limit) {
   const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].slice(0, limit)
   return entries.map(([, block]) => {
@@ -194,7 +263,7 @@ export default async function handler(req, res) {
     // along so the feed can label its archive entry points truthfully.
     const full = (req.url || '').includes('full=1')
     return res.status(200).json({
-      stories: parseAtom(storiesXml, full ? 60 : 20),
+      stories: await withImageSizes(parseAtom(storiesXml, full ? 60 : 20)),
       storiesTotal: (storiesXml.match(/<entry>/g) || []).length,
       episodes: parseRss(episodesXml, full ? 300 : 30).map(ep => ({ ...ep, image: ep.image || podcastImage })),
       episodesTotal: (episodesXml.match(/<item>/g) || []).length,
