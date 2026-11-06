@@ -1,5 +1,6 @@
-import { Component, Suspense, lazy, useMemo, useState } from 'react'
+import { Component, Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import RaceMapLeaflet from './RaceMapLeaflet'
+import { track } from '../lib/track'
 
 // Code-split (2026-11-01 backlog): the MapLibre GL implementation lives in
 // RaceMapGL.jsx and loads on demand, so first paint no longer carries the
@@ -15,6 +16,9 @@ class GLBoundary extends Component {
 }
 
 export default function RaceMap(props) {
+  // Analytics: the map opening is R1 reach (app surface; the future
+  // website embed will fire the same event with surface 'embed').
+  useEffect(() => { track('map_viewed', { surface: 'app' }) }, [])
   const [glFailed, setGlFailed] = useState(false)
   const webglOk = useMemo(() => {
     try {

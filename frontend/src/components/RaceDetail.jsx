@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { isTeamTier, setDemoTier } from '../lib/tier'
 import { ensureRaceChannel } from '../lib/channels'
+import { track } from '../lib/track'
 
 const MEMBER_COLORS = ['var(--brand)','var(--accent)','var(--highlight)','var(--accent)','#a78bfa','#34d399','#f472b6','#60a5fa']
 
@@ -94,6 +95,10 @@ export default function RaceDetail({ race, session, profile, onClose, onToggleEn
   const teamView = isTeamTier(profile)
 
   useEffect(() => {
+    // Analytics: opening the race sheet is the suite's race_viewed.
+    // The maps render their own in-place card and fire the same event;
+    // the tracker dedupes per session per race across both surfaces.
+    track('race_viewed', { race_id: race.id })
     loadEntries()
     loadRaceDetails()
     document.body.style.overflow = 'hidden'

@@ -1,4 +1,5 @@
 import { createContext, useContext, useRef, useState, useCallback } from 'react'
+import { track } from './track'
 
 // Global podcast player (DESIGN-SPEC §2.3): one <audio> element owned by the
 // provider, mounted above the router, so playback follows the member around
@@ -46,6 +47,9 @@ export function AudioPlayerProvider({ children }) {
     }
     setCurrent({ audio: ep.audio, title: ep.title, image: ep.image || null })
     setProgress(0)
+    // Analytics: starting a new episode is a content play (the tracker
+    // dedupes per session, so pause/resume never inflates the count).
+    track('content_played', { kind: 'podcast', item_id: ep.link || ep.audio })
     // The <audio> element picks up the new src on this render, then plays.
     requestAnimationFrame(() => {
       const el = audioRef.current
@@ -66,6 +70,7 @@ export function AudioPlayerProvider({ children }) {
     pendingSeekRef.current = saved.progress
     setCurrent({ audio: saved.audio, title: saved.title, image: saved.image })
     setProgress(saved.progress)
+    track('content_played', { kind: 'podcast', item_id: saved.audio })
     requestAnimationFrame(() => {
       const el = audioRef.current
       if (el) { el.load(); el.play().catch(() => {}) }

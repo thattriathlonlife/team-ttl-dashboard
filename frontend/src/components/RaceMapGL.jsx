@@ -5,6 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { supabase } from '../lib/supabase'
 import { ensureRaceChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
+import { track } from '../lib/track'
 
 // The 3D map (Zack, 2026-10-31: "I want a 3d map like the lovable one —
 // in the current aesthetic of ours"). The teammate's Race Compass is
@@ -132,6 +133,11 @@ export default function RaceMapGL({ races, allEntries = [], myEntries = [], prof
     sharedSelectCb = (race) => { setSelected(race); setNote('') }
   })
   const teamView = isTeamTier(profile)
+
+  // Analytics: opening the in-place race card is race_viewed, the same
+  // event the RaceDetail sheet fires (the tracker dedupes per session
+  // per race, so the two surfaces never double-count).
+  useEffect(() => { if (selected) track('race_viewed', { race_id: selected.id }) }, [selected])
 
   const racesWithCoords = useMemo(
     () => races.filter(r => r.latitude && r.longitude),

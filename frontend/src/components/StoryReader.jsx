@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { track } from '../lib/track'
 
 // In-app article reader (Zack, 2026-11-01): stories are read INSIDE the
 // app, never by booting the user to the TTL website. The feeds API
@@ -52,6 +53,11 @@ export default function StoryReader({ story, onClose }) {
   // overlay truly viewport-fixed, above header and nav.
   const overlayRef = useRef(null)
   const dragRef = useRef(null)
+  // Analytics: opening the reader is a story read (content_played,
+  // deduped per session per story by the tracker).
+  useEffect(() => {
+    if (story) track('content_played', { kind: 'story', item_id: story.link || story.title || undefined })
+  }, [story])
   // Swipe back to the feed: a rightward, mostly-horizontal drag pulls
   // the article with the finger; past ~90px it dismisses, short of that
   // it snaps back. Transform only — the scroll position never fights it

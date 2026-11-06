@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { track } from '../lib/track'
 
 const S = {
   page: {
@@ -117,6 +118,7 @@ export default function CompleteProfile({ session, onComplete }) {
       badge_key:  'welcome_team',
     })
 
+    track('profile_completed')
     onComplete()
   }
 

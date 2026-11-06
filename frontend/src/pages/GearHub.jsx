@@ -16,6 +16,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { track } from '../lib/track'
 
 // ─────────────────────────────────────────────
 // Constants
@@ -212,10 +213,12 @@ function ErrorMsg({ msg }) {
 // TAB 1 — PARTNER DEALS (exact Discounts.jsx code, wrapped in a tab panel)
 // ═══════════════════════════════════════════════
 
-function CopyButton({ code }) {
+function CopyButton({ code, dealId }) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
     navigator.clipboard.writeText(code)
+    // Analytics: code copy is the deals conversion action (R4).
+    track('deal_code_copied', { deal_id: dealId })
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -235,6 +238,10 @@ function CopyButton({ code }) {
 function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
   const isExpired = discount.expiry && new Date(discount.expiry) < new Date()
   const daysLeft = discount.expiry ? Math.ceil((new Date(discount.expiry) - new Date()) / 86400000) : null
+
+  // Analytics: a rendered deal card is an impression (the suite's
+  // definition); the tracker dedupes per session per deal.
+  useEffect(() => { track('deal_viewed', { deal_id: discount.id }) }, [discount.id])
 
   return (
     <div style={{
@@ -270,7 +277,7 @@ function DiscountCard({ discount, isAdmin, onEdit, onDelete }) {
         <div style={{ fontSize: '13px', color: '#bbb', lineHeight: 1.5 }}>{discount.description}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: 'auto' }}>
           {discount.code
-            ? <CopyButton code={discount.code} />
+            ? <CopyButton code={discount.code} dealId={discount.id} />
             : <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', letterSpacing: '1px', textTransform: 'uppercase', color: '#555', padding: '6px 0' }}>Code coming soon</div>
           }
           {discount.single_use && (

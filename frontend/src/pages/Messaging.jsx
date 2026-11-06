@@ -8,6 +8,7 @@ import { moderateOutgoing, shouldHide } from '../lib/moderation'
 import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 import MemberChips from '../components/MemberChips'
 import { openMember } from '../lib/memberView'
+import { track } from '../lib/track'
 
 // Given a DM channel (with dm_members hydrated), return the other person's profile
 function dmOtherProfile(channel, userId) {
@@ -911,6 +912,10 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   const userId = session.user.id
 
   useEffect(() => {
+    // Analytics: opening the announcements thread is the suite's
+    // announcement_viewed (owned-audience response; first view per
+    // session — the tracker dedupes). Same predicate the list uses.
+    if (channel.is_readonly || channel.category === 'announcements') track('announcement_viewed')
     loadMessages()
     loadProfiles()
     const sub = supabase.channel(`messages:${channel.id}`)
@@ -1053,6 +1058,9 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
 
     if (!error && data) {
       setMessages(prev => prev.map(m => m.id === optimisticId ? data : m))
+      // Analytics: engagement is counted by channel category only —
+      // never content (reporting-suite governance).
+      track('message_posted', { category: raceChannelKind(channel) ? 'race' : (channel.type === 'dm' ? 'dm' : (channel.category || 'general')) })
       // Mark channel as read for sender — use a timestamp slightly ahead to ensure
       // the just-sent message is always counted as read by get_unread_counts
       const readAt = new Date(Date.now() + 1000).toISOString()

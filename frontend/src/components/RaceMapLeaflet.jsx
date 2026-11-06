@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
 import { ensureRaceChannel } from '../lib/channels'
 import { isTeamTier } from '../lib/tier'
+import { track } from '../lib/track'
 
 // FALLBACK map (Leaflet / Deep Atlas) — used when WebGL is unavailable
 // or the GL style fails to load. The primary map is the 3D MapLibre
@@ -90,6 +91,11 @@ export default function RaceMapLeaflet({ races, allEntries = [], myEntries = [],
   const [note, setNote] = useState('')
   const navigate = useNavigate()
   const teamView = isTeamTier(profile)
+
+  // Analytics: opening the in-place race card is race_viewed, the same
+  // event the RaceDetail sheet fires (the tracker dedupes per session
+  // per race, so the two surfaces never double-count).
+  useEffect(() => { if (selected) track('race_viewed', { race_id: selected.id }) }, [selected])
 
   const racesWithCoords = useMemo(
     () => races.filter(r => r.latitude && r.longitude),

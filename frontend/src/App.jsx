@@ -13,6 +13,7 @@ import Team from './pages/Team'
 import Content from './pages/Content'
 import Search from './pages/Search'
 import { AudioPlayerProvider } from './lib/audio'
+import { track, setAnalyticsUser } from './lib/track'
 import Layout from './components/Layout'
 import TeamLocked from './components/TeamLocked'
 import { isTeamTier } from './lib/tier'
@@ -100,6 +101,16 @@ export default function App() {
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // Analytics (reporting-suite taxonomy): one app_session per browser
+  // session. The tracker dedupes via sessionStorage, so auth-state
+  // re-fires across the session are harmless.
+  useEffect(() => {
+    if (session) {
+      setAnalyticsUser(session.user.id)
+      track('app_session')
+    }
+  }, [session])
 
   async function checkProfile(userId) {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()

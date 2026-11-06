@@ -23,6 +23,7 @@ Confidence tags per table in the SQL: **CONFIRMED** (source 1 or 2 states it), *
 - `0004_automoderation_draft.sql` adds server-side auto-moderation (verdict log, message moderation state, auto-mute, term list). Apply only after the 0002/0003 review.
 - `0005_race_reconciliation_draft.sql` adds `races.last_seen_at` + `races.is_active` for scraper Phase B2 (stamping + 14-run retirement). Draft only; the scraper-side code ships only after this lands.
 - `0006_profile_refresh_draft.sql` also exists (profile refresh: `member_class`, bio/home city/achievement/pinned badge, race finish flags, badge-catalog seed). It was **not** part of the 2026-11-01 reconciliation pass over 0002–0005 — see open question Q2 for its overlap with 0002.
+- `0007_analytics_events_draft.sql` adds `analytics_events`, the reporting suite's event store (insert-only RLS; the app's tracker + `/api/events` collector already ship against it and drop events quietly until this lands). Independent of all other drafts; apply any time to start capture.
 
 **Apply order (draft intent):** 0001 → 0002 → 0003 → 0004; 0005 is independent of 0002–0004 (races only) but must land before any Phase B2 scraper code; 0006 depends on 0001 (`badges`) and interacts with 0002 (see Q2).
 

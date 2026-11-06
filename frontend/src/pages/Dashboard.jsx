@@ -5,6 +5,7 @@ import CalendarView from '../components/CalendarView'
 import AddRaceModal from '../components/AddRaceModal'
 import RaceMap from '../components/RaceMap'
 import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
+import { track } from '../lib/track'
 
 const S = {
   page: { maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' },
@@ -101,10 +102,12 @@ export default function Dashboard({ session }) {
       await supabase.from('race_entries').delete().eq('race_id', raceId).eq('athlete_id', userId)
       setMyEntries(prev => prev.filter(id => id !== raceId))
       setAllEntries(prev => prev.filter(e => !(e.race_id === raceId && e.athlete_id === userId)))
+      track('race_withdrawn', { race_id: raceId })
     } else {
       const { data } = await supabase.from('race_entries').insert({ race_id: raceId, athlete_id: userId }).select('*, profiles(full_name, id)').single()
       setMyEntries(prev => [...prev, raceId])
       if (data) setAllEntries(prev => [...prev, data])
+      if (data) track('race_entered', { race_id: raceId })
     }
   }
 

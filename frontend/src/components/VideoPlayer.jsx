@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { track } from '../lib/track'
 
 // In-app YouTube player (Zack, 2026-11-01): videos used to kick members
 // out to YouTube in a new tab; now they play inline in a sheet via
@@ -18,6 +19,12 @@ export default function VideoPlayer({ video, onClose }) {
       document.body.style.overflow = prevOverflow
     }
   }, [video, onClose])
+
+  // Analytics: opening the player is the play start (the embed
+  // autoplays), counted once per session per video by the tracker.
+  useEffect(() => {
+    if (video?.id) track('content_played', { kind: 'video', item_id: video.id })
+  }, [video])
 
   if (!video) return null
   const embedUrl = `https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&playsinline=1`
