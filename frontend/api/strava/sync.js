@@ -63,22 +63,41 @@ export default async function handler(req, res) {
       .from('profiles')
       .select(`
         id, full_name,
-        strava_athlete_id, strava_access_token, strava_refresh_token, strava_token_expires_at,
+        strava_athlete_id,
         strava_bootstrap_status,
         training_streak_current, training_streak_longest, training_streak_last_active,
         total_run_km, total_bike_km, total_swim_km, total_pr_count, total_kudos_received
       `)
       .not('strava_athlete_id', 'is', null)
-      .not('strava_refresh_token', 'is', null)
       .neq('strava_bootstrap_status', 'in_progress')
 
     // Filter to a single athlete when called from the Refresh button
     if (singleUserId) query = query.eq('id', singleUserId)
 
-    const { data: athletes, error: profilesErr } = await query
+    const { data: profiles, error: profilesErr } = await query
 
     if (profilesErr) throw new Error(`Failed to fetch profiles: ${profilesErr.message}`)
-    if (!athletes?.length) return res.status(200).json({ message: 'No athletes connected', ...results })
+    if (!profiles?.length) return res.status(200).json({ message: 'No athletes connected', ...results })
+
+    // Tokens live in strava_credentials (migration 0008, 2026-11-06) —
+    // a locked-down table no signed-in account can read; profiles no
+    // longer carries them. Merge each athlete's tokens in here; an
+    // athlete with no credentials row (or no refresh token) is not
+    // connected, exactly what the old profiles-side filter expressed.
+    const { data: credRows, error: credErr } = await supabase
+      .from('strava_credentials')
+      .select('athlete_id, access_token, refresh_token, expires_at')
+      .in('athlete_id', profiles.map(p => p.id))
+      .not('refresh_token', 'is', null)
+
+    if (credErr) throw new Error(`Failed to fetch Strava credentials: ${credErr.message}`)
+
+    const credByAthlete = new Map((credRows || []).map(c => [c.athlete_id, c]))
+    const athletes = profiles
+      .filter(p => credByAthlete.has(p.id))
+      .map(p => ({ ...p, ...credByAthlete.get(p.id) }))
+
+    if (!athletes.length) return res.status(200).json({ message: 'No athletes connected', ...results })
 
     // Process in batches of 3 to avoid hammering Strava rate limits
     const CONCURRENCY = 3
@@ -638,8 +657,8 @@ async function incrementTotals(profile, delta) {
 
 async function getValidToken(profile) {
   const now = Math.floor(Date.now() / 1000)
-  // strava_token_expires_at is a bigint unix timestamp — matches schema
-  if (profile.strava_token_expires_at > now + 60) return profile.strava_access_token
+  // expires_at is a bigint unix timestamp on strava_credentials (0008)
+  if (profile.expires_at > now + 60) return profile.access_token
 
   const res = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
@@ -647,17 +666,18 @@ async function getValidToken(profile) {
     body: JSON.stringify({
       client_id:     process.env.STRAVA_CLIENT_ID,
       client_secret: process.env.STRAVA_CLIENT_SECRET,
-      refresh_token: profile.strava_refresh_token,
+      refresh_token: profile.refresh_token,
       grant_type:    'refresh_token',
     }),
   })
   if (!res.ok) return null
   const data = await res.json()
-  await supabase.from('profiles').update({
-    strava_access_token:     data.access_token,
-    strava_refresh_token:    data.refresh_token,
-    strava_token_expires_at: data.expires_at,
-  }).eq('id', profile.id)
+  await supabase.from('strava_credentials').update({
+    access_token:  data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at:    data.expires_at,
+    updated_at:    new Date().toISOString(),
+  }).eq('athlete_id', profile.id)
   return data.access_token
 }
 

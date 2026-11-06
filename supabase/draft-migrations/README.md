@@ -24,6 +24,7 @@ Confidence tags per table in the SQL: **CONFIRMED** (source 1 or 2 states it), *
 - `0005_race_reconciliation_draft.sql` adds `races.last_seen_at` + `races.is_active` for scraper Phase B2 (stamping + 14-run retirement). Draft only; the scraper-side code ships only after this lands.
 - `0006_profile_refresh_draft.sql` also exists (profile refresh: `member_class`, bio/home city/achievement/pinned badge, race finish flags, badge-catalog seed). It was **not** part of the 2026-11-01 reconciliation pass over 0002–0005 — see open question Q2 for its overlap with 0002.
 - `0007_analytics_events_draft.sql` adds `analytics_events`, the reporting suite's event store (insert-only RLS; the app's tracker + `/api/events` collector already ship against it and drop events quietly until this lands). Independent of all other drafts; apply any time to start capture.
+- `0008_strava_credentials.sql` — **APPLIED 2026-11-06** (Zack-approved token lockdown): moves Strava OAuth tokens off the member-readable `profiles` row into `strava_credentials` (RLS on, no policies — service-role only) and drops the three token columns from `profiles`. Applied in two parts around the code switch in `frontend/api/strava/`; see the file header and run 58 in the progress log.
 
 **Apply order (draft intent):** 0001 → 0002 → 0003 → 0004; 0005 is independent of 0002–0004 (races only) but must land before any Phase B2 scraper code; 0006 depends on 0001 (`badges`) and interacts with 0002 (see Q2).
 

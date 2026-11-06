@@ -18,14 +18,22 @@ export default async function handler(req, res) {
 
   const { error } = await supabase.from('profiles').update({
     strava_athlete_id: null,
-    strava_access_token: null,
-    strava_refresh_token: null,
-    strava_token_expires_at: null,
   }).eq('id', userId)
 
   if (error) {
     console.error('[Strava] Disconnect failed:', error.message)
     return res.status(500).json({ error: error.message })
+  }
+
+  // Tokens live in strava_credentials (migration 0008, 2026-11-06);
+  // disconnect deletes the row outright.
+  const { error: credError } = await supabase.from('strava_credentials')
+    .delete()
+    .eq('athlete_id', userId)
+
+  if (credError) {
+    console.error('[Strava] Disconnect failed to clear credentials:', credError.message)
+    return res.status(500).json({ error: credError.message })
   }
 
   return res.status(200).json({ success: true })

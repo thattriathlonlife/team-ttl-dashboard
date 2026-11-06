@@ -9,8 +9,8 @@ const STRAVA_API = 'https://www.strava.com/api/v3'
 
 async function getValidToken(profile) {
   const now = Math.floor(Date.now() / 1000)
-  if (profile.strava_token_expires_at > now + 60) {
-    return profile.strava_access_token
+  if (profile.expires_at > now + 60) {
+    return profile.access_token
   }
   const res = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
@@ -18,7 +18,7 @@ async function getValidToken(profile) {
     body: JSON.stringify({
       client_id: process.env.STRAVA_CLIENT_ID,
       client_secret: process.env.STRAVA_CLIENT_SECRET,
-      refresh_token: profile.strava_refresh_token,
+      refresh_token: profile.refresh_token,
       grant_type: 'refresh_token',
     }),
   })
@@ -27,11 +27,12 @@ async function getValidToken(profile) {
     return null
   }
   const data = await res.json()
-  await supabase.from('profiles').update({
-    strava_access_token: data.access_token,
-    strava_refresh_token: data.refresh_token,
-    strava_token_expires_at: data.expires_at,
-  }).eq('id', profile.id)
+  await supabase.from('strava_credentials').update({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: data.expires_at,
+    updated_at: new Date().toISOString(),
+  }).eq('athlete_id', profile.id)
   return data.access_token
 }
 
@@ -70,18 +71,29 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   try {
-    const { data: profiles, error: profileError } = await supabase
+    const { data: rawProfiles, error: profileError } = await supabase
       .from('profiles')
-      .select('id, full_name, avatar_color, avatar_url, strava_athlete_id, strava_access_token, strava_refresh_token, strava_token_expires_at')
+      .select('id, full_name, avatar_color, avatar_url, strava_athlete_id')
       .not('strava_athlete_id', 'is', null)
 
     if (profileError) {
       return res.status(500).json({ error: 'Failed to load profiles' })
     }
 
-    if (!profiles?.length) {
+    if (!rawProfiles?.length) {
       return res.status(200).json({ activities: [], connectedCount: 0 })
     }
+
+    // Tokens live in strava_credentials (migration 0008, 2026-11-06),
+    // never on profiles. Merge them in server-side; profiles without a
+    // credentials row simply get no token below and are skipped.
+    const { data: credRows } = await supabase
+      .from('strava_credentials')
+      .select('athlete_id, access_token, refresh_token, expires_at')
+      .in('athlete_id', rawProfiles.map(p => p.id))
+
+    const credByAthlete = new Map((credRows || []).map(c => [c.athlete_id, c]))
+    const profiles = rawProfiles.map(p => ({ ...p, ...(credByAthlete.get(p.id) || {}) }))
 
     const days = parseInt(req.query.days) || 90
     const after = Math.floor((Date.now() - days * 24 * 60 * 60 * 1000) / 1000)

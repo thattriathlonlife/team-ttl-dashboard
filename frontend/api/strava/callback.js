@@ -37,12 +37,26 @@ export default async function handler(req, res) {
 
     const tokenData = await tokenRes.json()
 
-    const { error: dbError } = await supabase.from('profiles').update({
+    const { error: profileError } = await supabase.from('profiles').update({
       strava_athlete_id: tokenData.athlete.id,
-      strava_access_token: tokenData.access_token,
-      strava_refresh_token: tokenData.refresh_token,
-      strava_token_expires_at: tokenData.expires_at,
     }).eq('id', userId)
+
+    if (profileError) {
+      console.error('[Strava OAuth] Failed to store athlete id:', profileError.message)
+      return res.redirect('/training?error=db')
+    }
+
+    // Tokens live in strava_credentials (migration 0008, 2026-11-06) —
+    // a locked-down table no signed-in account can read, never on the
+    // member-readable profiles row.
+    const { error: dbError } = await supabase.from('strava_credentials').upsert({
+      athlete_id: userId,
+      strava_athlete_id: tokenData.athlete.id,
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_at: tokenData.expires_at,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'athlete_id' })
 
     if (dbError) {
       console.error('[Strava OAuth] Failed to store tokens:', dbError.message)
