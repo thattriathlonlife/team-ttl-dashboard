@@ -74,3 +74,6 @@ select option { background: var(--surface2); }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* Voice-note recording indicator (M3) */
+@keyframes ttl-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }

@@ -2,9 +2,10 @@
 //
 // Text sends that fail (offline, tunnel, dead zone) are kept in a
 // localStorage-backed outbox instead of vanishing, and retried when
-// the app comes back online or the user taps retry. Image sends are
-// retried only within the session (a File can't persist in
-// localStorage), so only text payloads enter the durable queue.
+// the app comes back online or the user taps retry. Media sends
+// (M3) enter the queue too: the file is uploaded to the private
+// message-media bucket BEFORE the insert, so the queued payload
+// only needs the durable media_path — no File has to persist.
 //
 // The queue operations are pure (unit-tested); the storage wrappers
 // are thin. Key: ttl-outbox-v1.

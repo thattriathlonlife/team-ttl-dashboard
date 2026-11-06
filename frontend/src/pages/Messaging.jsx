@@ -14,6 +14,7 @@ import { readsMap, dmTickState, seenByProfiles } from '../lib/receipts'
 import { getDraft, setDraft, clearDraft } from '../lib/drafts'
 import { subscribeOnline, getOnline } from '../lib/presence'
 import { outboxAdd, outboxRemove, outboxBump, outboxForChannel } from '../lib/outbox'
+import { extractFirstUrl, formatDuration, mediaPathFor, audioExtForMime, pickAudioMime, compressImageFile, AUDIO_MIME_CANDIDATES, VOICE_NOTE_MAX_S } from '../lib/media'
 
 const MENU_ROW_STYLE = { display: 'flex', width: '100%', padding: '13px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Barlow, sans-serif', fontSize: '15px', color: '#eee' }
 
@@ -43,29 +44,133 @@ function Avatar({ profile, size = 32, idx = 0 }) {
   return <div style={{ width: size, height: size, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow Condensed, sans-serif', fontSize: size * 0.38, fontWeight: 700, color: '#000', flexShrink: 0 }}>{initials}</div>
 }
 
-// Render message content with @mentions highlighted
+// Render message content with @mentions highlighted and URLs as
+// links (M3 — links pair with the LinkPreview card under the bubble).
 function MessageContent({ content, currentUserId, profiles }) {
   if (!content) return null
-  const parts = content.split(/(@\w[\w\s]*)/g)
+  const urlParts = content.split(/(https?:\/\/[^\s<>"')\]]+)/g)
   return (
     <span>
-      {parts.map((part, i) => {
-        if (part.startsWith('@')) {
-          const name = part.slice(1).trim()
-          const mentioned = profiles?.find(p => p.full_name?.toLowerCase() === name.toLowerCase())
-          const isMe = mentioned?.id === currentUserId
+      {urlParts.map((part, i) => {
+        if (/^https?:\/\//.test(part)) {
+          const href = part.replace(/[.,!?;:]+$/, '')
+          const trail = part.slice(href.length)
           return (
-            <span key={i} style={{
-              background: isMe ? 'rgba(var(--accent-rgb),0.2)' : 'rgba(var(--brand-rgb),0.15)',
-              color: isMe ? 'var(--accent)' : 'var(--brand)',
-              borderRadius: '3px', padding: '0 3px',
-              fontWeight: 600,
-            }}>{part}</span>
+            <span key={i}>
+              <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--brand)', textDecoration: 'underline', wordBreak: 'break-all' }}>{href}</a>
+              {trail}
+            </span>
           )
         }
-        return <span key={i}>{part}</span>
+        const parts = part.split(/(@\w[\w\s]*)/g)
+        return (
+          <span key={i}>
+            {parts.map((sub, j) => {
+              if (sub.startsWith('@')) {
+                const name = sub.slice(1).trim()
+                const mentioned = profiles?.find(p => p.full_name?.toLowerCase() === name.toLowerCase())
+                const isMe = mentioned?.id === currentUserId
+                return (
+                  <span key={j} style={{
+                    background: isMe ? 'rgba(var(--accent-rgb),0.2)' : 'rgba(var(--brand-rgb),0.15)',
+                    color: isMe ? 'var(--accent)' : 'var(--brand)',
+                    borderRadius: '3px', padding: '0 3px',
+                    fontWeight: 600,
+                  }}>{sub}</span>
+                )
+              }
+              return <span key={j}>{sub}</span>
+            })}
+          </span>
+        )
       })}
     </span>
+  )
+}
+
+// ─── LinkPreview — Open Graph card for the first URL in a message ────
+// Fetched via /api/unfurl (server-side; browsers hit CORS). Cached per
+// URL for the session; renders nothing until a real card comes back.
+const linkPreviewCache = new Map()
+function LinkPreview({ text }) {
+  const url = extractFirstUrl(text)
+  const [data, setData] = useState(() => (url ? linkPreviewCache.get(url) : null) || null)
+  useEffect(() => {
+    if (!url) return
+    if (linkPreviewCache.has(url)) { setData(linkPreviewCache.get(url)); return }
+    let cancelled = false
+    fetch(`/api/unfurl?url=${encodeURIComponent(url)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => {
+        if (cancelled) return
+        const d = j && (j.title || j.image) ? j : null
+        linkPreviewCache.set(url, d)
+        setData(d)
+      })
+      .catch(() => { linkPreviewCache.set(url, null) })
+    return () => { cancelled = true }
+  }, [url])
+  if (!url || !data) return null
+  let host = ''
+  try { host = new URL(data.url || url).hostname.replace(/^www\./, '') } catch { host = '' }
+  return (
+    <a href={url} target="_blank" rel="noreferrer" style={{ display: 'flex', gap: '10px', marginTop: '6px', background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.09)', borderLeft: '3px solid var(--brand)', borderRadius: '8px', padding: '8px', textDecoration: 'none', maxWidth: '320px' }}>
+      {data.image && <img src={data.image} alt="" style={{ width: '52px', height: '52px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }} onError={e => { e.currentTarget.style.display = 'none' }} />}
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#eee', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.title || host}</span>
+        {data.description && <span style={{ fontSize: '12px', color: '#999', lineHeight: 1.4, marginTop: '2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{data.description}</span>}
+        <span style={{ display: 'block', fontSize: '10.5px', color: '#666', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{data.siteName || host}</span>
+      </span>
+    </a>
+  )
+}
+
+// ─── VoiceNotePlayer — waveform-lite player for audio messages ───────
+// Deterministic bar pattern (seeded by duration) with a progress fill;
+// tap the bars to seek. The audio element stays mounted per bubble.
+const VOICE_BARS = Array.from({ length: 30 }, (_, i) => 0.35 + 0.65 * Math.abs(Math.sin(i * 1.7) * 0.7 + Math.sin(i * 0.6) * 0.3))
+function VoiceNotePlayer({ src, durationS, own }) {
+  const audioRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [dur, setDur] = useState(durationS || 0)
+
+  function toggle() {
+    const a = audioRef.current
+    if (!a || !src) return
+    if (playing) a.pause()
+    else a.play().catch(() => {})
+  }
+
+  function seek(e) {
+    const a = audioRef.current
+    if (!a || !dur) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    a.currentTime = ratio * dur
+    setProgress(ratio)
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', minWidth: '210px', maxWidth: '280px' }}>
+      <audio ref={audioRef} src={src || undefined} preload="metadata"
+        onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+        onEnded={() => { setPlaying(false); setProgress(0) }}
+        onTimeUpdate={() => { const a = audioRef.current; if (a && a.duration) setProgress(a.currentTime / a.duration) }}
+        onLoadedMetadata={() => { const a = audioRef.current; if (a && a.duration && isFinite(a.duration)) setDur(a.duration) }} />
+      <button onClick={toggle} disabled={!src} aria-label={playing ? 'Pause voice note' : 'Play voice note'}
+        style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', flexShrink: 0, cursor: src ? 'pointer' : 'default', background: own ? '#03292b' : 'var(--brand)', color: own ? 'var(--brand)' : '#03292b', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: src ? 1 : 0.5 }}>
+        {playing ? '⏸' : '▶'}
+      </button>
+      <div onClick={seek} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '2px', height: '30px', cursor: dur ? 'pointer' : 'default' }}>
+        {VOICE_BARS.map((h, i) => (
+          <div key={i} style={{ flex: 1, height: `${Math.round(h * 100)}%`, minHeight: '4px', borderRadius: '2px', background: (i / VOICE_BARS.length) <= progress ? 'var(--brand)' : 'rgba(255,255,255,0.28)' }} />
+        ))}
+      </div>
+      <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontFamily: 'Barlow Condensed, sans-serif', minWidth: '30px' }}>
+        {src ? formatDuration(progress > 0 && dur ? progress * dur : dur) : '…'}
+      </span>
+    </div>
   )
 }
 
@@ -145,7 +250,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
       supabase.from('channel_reads').select('*').eq('athlete_id', userId),
       supabase.from('message_mentions').select('*', { count: 'exact', head: true }).eq('mentioned_user_id', userId).is('seen_at', null),
       // Fetch last message per channel in one query using a recent window
-      supabase.from('messages').select('channel_id, content, image_url, created_at, athlete_id, profiles(full_name)').order('created_at', { ascending: false }).limit(300),
+      supabase.from('messages').select('channel_id, content, image_url, media_kind, created_at, athlete_id, profiles(full_name)').order('created_at', { ascending: false }).limit(300),
       // Fetch this user's DM channel memberships + the other member's profile
       supabase.from('channel_members').select('channel_id, channels!inner(id, type, created_at), athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)').eq('athlete_id', userId),
       supabase.from('channel_user_state').select('*').eq('athlete_id', userId),
@@ -239,13 +344,13 @@ export default function Messaging({ session, profile, onReadChannel }) {
     const sub = supabase.channel('global-message-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
-          const { channel_id, athlete_id, content, image_url, created_at } = payload.new
+          const { channel_id, athlete_id, content, image_url, media_kind, created_at } = payload.new
           // Ignore own messages — sender already marked read in sendMessage
           if (athlete_id === userId) return
           // Update last message preview for sidebar regardless of which channel is open
           setLastMessages(prev => ({
             ...prev,
-            [channel_id]: { content, image_url, created_at }
+            [channel_id]: { content, image_url, media_kind, created_at }
           }))
           // Ignore if user currently has this channel open — they're reading it
           if (selectedChannelRef.current?.id === channel_id) return
@@ -895,7 +1000,7 @@ function ChannelGroup({ label, channels, selected, unread, lastMessages, onSelec
         const unreadCount = locked ? 0 : (unread[ch.id] || 0)
         const last = locked ? null : lastMessages?.[ch.id]
         const displayName = channelDisplayName(ch)
-        const preview = last ? (last.content || (last.image_url ? '📎 Image' : '')) : ''
+        const preview = last ? (last.content || (last.media_kind === 'audio' ? '🎤 Voice message' : (last.media_kind === 'image' || last.image_url) ? '📷 Photo' : '')) : ''
         const senderName = last?.profiles?.full_name?.split(' ')[0]
         const previewText = locked
           ? 'Team only — tap for details'
@@ -1046,7 +1151,7 @@ function StarredView({ session, channels, dmChannels, isMobile, onBack, onJump }
       .eq('athlete_id', userId).order('created_at', { ascending: false }).limit(100)
     if (!stars?.length) { setRows([]); setLoading(false); return }
     const { data: msgs } = await supabase.from('messages')
-      .select('id, channel_id, content, image_url, created_at, athlete_id, deleted_at, profiles(full_name, avatar_color, avatar_url)')
+      .select('id, channel_id, content, image_url, media_kind, created_at, athlete_id, deleted_at, profiles(full_name, avatar_color, avatar_url)')
       .in('id', stars.map(s => s.message_id))
     const byId = {}
     ;(msgs || []).forEach(m => { byId[m.id] = m })
@@ -1096,7 +1201,7 @@ function StarredView({ session, channels, dmChannels, isMobile, onBack, onJump }
               style={{ background: 'none', border: 'none', color: 'var(--highlight)', fontSize: '15px', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>★</button>
           </div>
           <div style={{ fontSize: '13px', color: '#bbb', lineHeight: 1.5 }}>
-            {msg.deleted_at ? <span style={{ fontStyle: 'italic', color: '#777' }}>This message was deleted</span> : (msg.content || (msg.image_url ? '📷 Photo' : ''))}
+            {msg.deleted_at ? <span style={{ fontStyle: 'italic', color: '#777' }}>This message was deleted</span> : (msg.content || (msg.media_kind === 'audio' ? '🎤 Voice message' : (msg.media_kind === 'image' || msg.image_url) ? '📷 Photo' : ''))}
           </div>
         </div>
       ))}
@@ -1140,6 +1245,39 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   const [flashId, setFlashId] = useState(null)
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false)
   const suppressScrollRef = useRef(false)
+  // M3 — private media (signed URLs) + voice-note recording
+  const [mediaUrls, setMediaUrls] = useState({})
+  const [recState, setRecState] = useState('idle') // idle | recording | preview
+  const [recElapsed, setRecElapsed] = useState(0)
+  const [recPreview, setRecPreview] = useState(null) // { blob, url, duration, mime }
+  const mediaRecorderRef = useRef(null)
+  const recStreamRef = useRef(null)
+  const recChunksRef = useRef([])
+  const recStartRef = useRef(0)
+  const recTimerRef = useRef(null)
+  const recDiscardRef = useRef(false)
+
+  // Resolve signed URLs for any message media on screen (private
+  // message-media bucket, 1h URLs — re-signed on thread mount).
+  useEffect(() => {
+    const paths = [...new Set(messages.map(m => m.media_path).filter(Boolean))]
+    const missing = paths.filter(p => !mediaUrls[p])
+    if (!missing.length) return
+    let cancelled = false
+    supabase.storage.from('message-media').createSignedUrls(missing, 3600).then(({ data }) => {
+      if (cancelled || !data) return
+      const add = {}
+      data.forEach(d => { if (d.signedUrl && d.path) add[d.path] = d.signedUrl })
+      if (Object.keys(add).length) setMediaUrls(prev => ({ ...prev, ...add }))
+    })
+    return () => { cancelled = true }
+  }, [messages, mediaUrls])
+
+  // Stop the microphone if the thread unmounts mid-recording.
+  useEffect(() => () => {
+    if (recTimerRef.current) clearInterval(recTimerRef.current)
+    recStreamRef.current?.getTracks().forEach(t => t.stop())
+  }, [])
   const scrollRef = useRef()
   const pinnedRef = useRef(true)
   const prependRef = useRef(null)
@@ -1272,7 +1410,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     function onOnline() {
       setIsOffline(false)
       outboxForChannel(channel.id).forEach(q => {
-        retrySend({ id: q.localId, content: q.content, image_url: q.image_url, reply_to: q.reply_to })
+        retrySend({ id: q.localId, content: q.content, image_url: q.image_url, media_path: q.media_path, media_kind: q.media_kind, audio_duration_s: q.audio_duration_s, reply_to: q.reply_to })
       })
     }
     function onOffline() { setIsOffline(true) }
@@ -1359,6 +1497,8 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       const queued = outboxForChannel(channel.id).map(q => ({
         id: q.localId, channel_id: channel.id, athlete_id: userId,
         content: q.content, image_url: q.image_url || null,
+        media_path: q.media_path || null, media_kind: q.media_kind || null,
+        audio_duration_s: q.audio_duration_s || null,
         reply_to: q.reply_to || null, reply_msg: null,
         created_at: q.queued_at || new Date().toISOString(),
         profiles: profile, failed: true,
@@ -1529,6 +1669,8 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     const payload = {
       channel_id: channel.id, athlete_id: userId,
       content: msg.content || null, image_url: msg.image_url || null,
+      media_path: msg.media_path || null, media_kind: msg.media_kind || null,
+      audio_duration_s: msg.audio_duration_s || null,
       reply_to: msg.reply_to || null,
     }
     const ok = await attemptSend(payload, msg.id)
@@ -1556,22 +1698,146 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     if (!error) setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, deleted_at: now } : m))
   }
 
+  // M3 — media sends ride the same optimistic + attemptSend path as
+  // text. The upload happens BEFORE the insert, so a failed insert
+  // leaves a durable outbox entry keyed by media_path (no re-upload
+  // needed on retry) — media sends now survive offline too.
+  async function sendMediaMessage(media, localPreviewUrl = null) {
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const optimisticMsg = {
+      id: optimisticId, channel_id: channel.id, athlete_id: userId,
+      content: null, image_url: null, ...media,
+      reply_to: replyTo?.id || null,
+      reply_msg: replyTo ? { id: replyTo.id, content: replyTo.content, profiles: replyTo.profiles } : null,
+      created_at: new Date().toISOString(), profiles: profile, optimistic: true,
+      local_preview: localPreviewUrl,
+    }
+    pinnedRef.current = true
+    setMessages(prev => [...prev, optimisticMsg])
+    const replyId = replyTo?.id || null
+    setReplyTo(null)
+    const payload = {
+      channel_id: channel.id, athlete_id: userId,
+      content: null, image_url: null, reply_to: replyId, ...media,
+    }
+    const ok = await attemptSend(payload, optimisticId)
+    if (!ok) {
+      setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, optimistic: false, failed: true } : m))
+      outboxAdd({ localId: optimisticId, channel_id: channel.id, content: null, image_url: null, reply_to: replyId, ...media })
+    }
+  }
+
+  // M3 — images: compressed client-side, multi-select, uploaded to
+  // the PRIVATE message-media bucket (the public avatars bucket is
+  // retired for message media; avatars themselves stay there).
   async function handleImageUpload(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5MB'); return }
+    const files = [...(e.target.files || [])]
+    e.target.value = ''
+    if (!files.length) return
     setUploading(true)
-    const ext = file.name.split('.').pop()
-    const path = `messages/${channel.id}/${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('avatars').upload(path, file)
-    if (!error) {
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
-      await sendMessage(publicUrl)
-    } else {
-      setModNotice('Image upload failed — check your connection and try again.')
+    for (const file of files) {
+      if (file.size > 25 * 1024 * 1024) {
+        setModNotice('That image is over 25 MB and was skipped.')
+        continue
+      }
+      try {
+        const { blob, ext } = await compressImageFile(file)
+        const path = mediaPathFor(channel.id, userId, ext)
+        const { error } = await supabase.storage.from('message-media')
+          .upload(path, blob, { contentType: blob.type || 'image/jpeg' })
+        if (error) {
+          setModNotice('Image upload failed — check your connection and try again.')
+          continue
+        }
+        await sendMediaMessage({ media_path: path, media_kind: 'image', audio_duration_s: null })
+      } catch {
+        setModNotice('Image upload failed — check your connection and try again.')
+      }
     }
     setUploading(false)
-    e.target.value = ''
+  }
+
+  // ─── Voice notes (M3) — MediaRecorder, 5-minute cap ───────────────
+  async function startRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setModNotice('Voice notes are not supported in this browser.')
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      recStreamRef.current = stream
+      const mime = pickAudioMime(AUDIO_MIME_CANDIDATES, m => MediaRecorder.isTypeSupported(m))
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      recChunksRef.current = []
+      recDiscardRef.current = false
+      rec.ondataavailable = ev => { if (ev.data && ev.data.size) recChunksRef.current.push(ev.data) }
+      rec.onstop = handleRecStop
+      mediaRecorderRef.current = rec
+      recStartRef.current = Date.now()
+      setRecElapsed(0)
+      setRecState('recording')
+      recTimerRef.current = setInterval(() => {
+        const s = Math.floor((Date.now() - recStartRef.current) / 1000)
+        setRecElapsed(s)
+        if (s >= VOICE_NOTE_MAX_S) stopRecording()
+      }, 250)
+      rec.start(250)
+    } catch {
+      setModNotice('Microphone access was blocked — allow mic access to send a voice note.')
+    }
+  }
+
+  function handleRecStop() {
+    if (recTimerRef.current) clearInterval(recTimerRef.current)
+    recStreamRef.current?.getTracks().forEach(t => t.stop())
+    recStreamRef.current = null
+    if (recDiscardRef.current) {
+      recDiscardRef.current = false
+      setRecState('idle')
+      return
+    }
+    const mime = mediaRecorderRef.current?.mimeType || 'audio/webm'
+    const blob = new Blob(recChunksRef.current, { type: mime })
+    const duration = Math.max(1, Math.round((Date.now() - recStartRef.current) / 1000))
+    if (!blob.size) { setRecState('idle'); return }
+    setRecPreview({ blob, url: URL.createObjectURL(blob), duration, mime })
+    setRecState('preview')
+  }
+
+  function stopRecording() {
+    try { mediaRecorderRef.current?.stop() } catch { /* already stopped */ }
+  }
+
+  function cancelRecording() {
+    recDiscardRef.current = true
+    stopRecording()
+  }
+
+  function discardPreview() {
+    if (recPreview?.url) URL.revokeObjectURL(recPreview.url)
+    setRecPreview(null)
+    setRecState('idle')
+  }
+
+  async function sendRecording() {
+    const p = recPreview
+    if (!p) return
+    const path = mediaPathFor(channel.id, userId, audioExtForMime(p.mime))
+    setUploading(true)
+    const { error } = await supabase.storage.from('message-media')
+      .upload(path, p.blob, { contentType: p.mime })
+    setUploading(false)
+    if (error) {
+      setModNotice('Voice note upload failed — check your connection and try sending again.')
+      return
+    }
+    const previewUrl = p.url
+    setRecPreview(null)
+    setRecState('idle')
+    await sendMediaMessage(
+      { media_path: path, media_kind: 'audio', audio_duration_s: p.duration },
+      previewUrl
+    )
   }
 
   async function toggleReaction(messageId, emoji) {
@@ -1807,8 +2073,19 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                     )}
                   </div>
                 )}
+                {msg.content && !msg.deleted_at && <LinkPreview text={msg.content} />}
                 {msg.image_url && (
                   <img src={msg.image_url} alt="shared" style={{ maxWidth: '280px', maxHeight: '300px', borderRadius: '8px', marginTop: '4px', display: 'block', cursor: 'pointer', objectFit: 'cover', opacity: msg.optimistic ? 0.5 : 1, transition: 'opacity 0.2s' }} onClick={() => setLightbox(msg.image_url)} />
+                )}
+                {msg.media_kind === 'image' && msg.media_path && (
+                  (mediaUrls[msg.media_path] || msg.local_preview) ? (
+                    <img src={mediaUrls[msg.media_path] || msg.local_preview} alt="shared" style={{ maxWidth: '280px', maxHeight: '300px', borderRadius: '8px', marginTop: '4px', display: 'block', cursor: 'pointer', objectFit: 'cover', opacity: msg.optimistic ? 0.5 : 1, transition: 'opacity 0.2s' }} onClick={() => setLightbox(mediaUrls[msg.media_path] || msg.local_preview)} />
+                  ) : (
+                    <div style={{ width: '200px', height: '140px', borderRadius: '8px', marginTop: '4px', background: '#1c1c1c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', opacity: 0.6 }}>🖼️</div>
+                  )
+                )}
+                {msg.media_kind === 'audio' && msg.media_path && (
+                  <VoiceNotePlayer src={mediaUrls[msg.media_path] || msg.local_preview || null} durationS={msg.audio_duration_s} own={isOwn} />
                 )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '3px' }}>
                       {msg.failed ? (
@@ -1915,7 +2192,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               <button onClick={() => setInfoMsg(null)} aria-label="Close message info" style={{ background: 'none', border: 'none', color: '#999', fontSize: '18px', cursor: 'pointer', padding: 0 }}>✕</button>
             </div>
             <div style={{ fontSize: '13.5px', color: '#bbb', background: 'rgba(var(--brand-rgb),0.14)', borderRadius: '10px', padding: '8px 12px', marginBottom: '14px', wordBreak: 'break-word' }}>
-              {infoMsg.content ? infoMsg.content.slice(0, 140) : '📷 Photo'}
+              {infoMsg.content ? infoMsg.content.slice(0, 140) : infoMsg.media_kind === 'audio' ? '🎤 Voice message' : '📷 Photo'}
               <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{waClock(infoMsg.created_at)}</div>
             </div>
             <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#888', marginBottom: '8px' }}>
@@ -1959,6 +2236,24 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           </div>
         )}
 
+        {/* Voice-note recording / preview bars (M3) */}
+        {recState === 'recording' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,90,80,0.08)', border: '1px solid rgba(255,90,80,0.35)', borderRadius: '10px', padding: '8px 12px', marginBottom: '6px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ff5a50', animation: 'ttl-pulse 1s ease-in-out infinite', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '13px', color: '#ffb4a6' }}>Recording… {formatDuration(recElapsed)} / {formatDuration(VOICE_NOTE_MAX_S)}</span>
+            <button onClick={cancelRecording} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#ccc', fontSize: '12px', padding: '5px 10px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            <button onClick={stopRecording} style={{ background: 'var(--brand)', border: 'none', borderRadius: '6px', color: '#03292b', fontSize: '12px', fontWeight: 700, padding: '5px 12px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Done</button>
+          </div>
+        )}
+        {recState === 'preview' && recPreview && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '8px 12px', marginBottom: '6px' }}>
+            <audio controls src={recPreview.url} style={{ flex: 1, height: '34px', minWidth: 0 }} />
+            <span style={{ fontSize: '12px', color: '#888', fontFamily: 'Barlow Condensed, sans-serif' }}>{formatDuration(recPreview.duration)}</span>
+            <button onClick={discardPreview} aria-label="Delete voice note" style={{ background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#ff8a7a', fontSize: '12px', padding: '5px 10px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Delete</button>
+            <button onClick={sendRecording} disabled={uploading} style={{ background: 'var(--brand)', border: 'none', borderRadius: '6px', color: '#03292b', fontSize: '12px', fontWeight: 700, padding: '5px 12px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>{uploading ? 'Sending…' : 'Send'}</button>
+          </div>
+        )}
+
         {/* Auto-moderation notice */}
         {lightbox && (
           <div
@@ -1991,7 +2286,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         )}
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.09)', borderRadius: replyTo ? '0 0 24px 24px' : '24px', padding: '6px 8px 6px 14px' }}>
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+          <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleImageUpload} />
           <button onClick={() => fileRef.current.click()} style={{ background: 'none', border: 'none', color: '#555', fontSize: '20px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>📎</button>
           <textarea
             ref={textareaRef}
@@ -2012,12 +2307,17 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               </div>
             )}
           </div>
-          {(text.trim() || uploading) && (
+          {(text.trim() || uploading) ? (
             <button onClick={() => sendMessage()} disabled={sending || uploading} aria-label="Send message"
               style={{ background: 'var(--brand)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', color: '#03292b', fontSize: '16px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(var(--brand-rgb),0.35)' }}>
               {uploading || sending ? '…' : '➤'}
             </button>
-          )}
+          ) : recState === 'idle' ? (
+            <button onClick={startRecording} aria-label="Record a voice note"
+              style={{ background: 'var(--brand)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', color: '#03292b', fontSize: '16px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(var(--brand-rgb),0.35)' }}>
+              🎤
+            </button>
+          ) : null}
         </div>
       </div>
       )}
@@ -2048,7 +2348,7 @@ function DMGroup({ dmChannels, selected, unread, lastMessages, userId, onSelect,
             const isSelected = selected?.id === ch.id
             const unreadCount = unread[ch.id] || 0
             const last = lastMessages?.[ch.id]
-            const preview = last ? (last.content || (last.image_url ? '📎 Image' : '')) : ''
+            const preview = last ? (last.content || (last.media_kind === 'audio' ? '🎤 Voice message' : (last.media_kind === 'image' || last.image_url) ? '📷 Photo' : '')) : ''
 
             return (
               <button
