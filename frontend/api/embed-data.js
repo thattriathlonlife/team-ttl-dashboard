@@ -83,9 +83,14 @@ export default async function handler(req, res) {
         .from('race_entries')
         .select('race_id, athlete_id')
         .in('race_id', raceIds)),
+      // select('*'), never a named team_entitled column: that column
+      // is a draft-migration field that does not exist in the live
+      // schema yet, and naming it errors the whole query (the in-app
+      // map reads it the same tolerant way — absent means "not false",
+      // i.e. team, exactly the classification below).
       fetchAll(() => supabase
         .from('profiles')
-        .select('id, team_entitled')),
+        .select('*')),
     ])
 
     // Same classification as the in-app map (Dashboard.jsx): a profile
