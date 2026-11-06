@@ -1661,7 +1661,21 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       if (mentionError) console.error('[Mentions] insert error:', mentionError.message)
       if (!mentionedIds.includes(userId)) onMention?.()
     }
+    // M4 — Web Push fan-out, fire-and-forget: the endpoint re-verifies
+    // sender + message server-side and applies visibility/mute rules.
+    // Plain group messages skip the call entirely (no fan-out).
+    if (channel.type === 'dm' || channel.is_readonly || mentionedIds.length > 0) {
+      notifyPush(data.id)
+    }
     return true
+  }
+
+  function notifyPush(messageId) {
+    fetch('/api/push-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ channel_id: channel.id, message_id: messageId }),
+    }).catch(() => { /* push is best-effort; the message already landed */ })
   }
 
   async function retrySend(msg) {

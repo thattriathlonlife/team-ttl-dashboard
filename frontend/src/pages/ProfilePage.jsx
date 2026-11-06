@@ -3,6 +3,7 @@ import MemberChips from '../components/MemberChips'
 import { BRAND_THEME, TEAM_THEME } from '../lib/theme'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { getPushState, enablePush, disablePush } from '../lib/push'
 
 // Avatar paint choices are stored data (profiles.avatar_color), so they
 // stay literal colours and never become theme variables.
@@ -110,8 +111,27 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
   const fileRef = useRef()
   const userId = session.user.id
   const email = session.user.email
+  // Web Push (M4): notifications state mirrors lib/push.
+  const [pushState, setPushState] = useState('off') // unsupported | denied | off | on
+  const [pushBusy, setPushBusy] = useState(false)
 
   useEffect(() => { loadMyRaces(); loadBadges() }, [])
+  useEffect(() => { getPushState().then(setPushState).catch(() => {}) }, [])
+
+  async function togglePush() {
+    setPushBusy(true)
+    if (pushState === 'on') {
+      await disablePush(userId)
+      setPushState(await getPushState())
+    } else {
+      const r = await enablePush(userId)
+      if (!r.ok) setError(r.reason === 'denied'
+        ? 'Notifications are blocked for this site in your browser settings. Allow them there, then try again.'
+        : 'Push notifications are not supported in this browser.')
+      setPushState(await getPushState())
+    }
+    setPushBusy(false)
+  }
 
   async function loadMyRaces() {
     const { data } = await supabase.from('race_entries').select('*, races(*)').eq('athlete_id', userId)
@@ -355,6 +375,20 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
         )}
         {geoSetting === 'denied' && <div style={{ fontSize: 12.5, color: '#999' }}>Location is blocked for this site in your browser settings. Allow it there, then come back and enable it here.</div>}
         {geoSetting === 'unsupported' && <div style={{ fontSize: 12.5, color: '#999' }}>This browser doesn't support location.</div>}
+      </div>
+      <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Notifications</div>
+        <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#888', marginBottom: 10 }}>
+          Get a push for direct messages, @mentions and announcements — even when the app is closed. Muted chats stay silent. On iPhone, add the app to your Home Screen first (Share → Add to Home Screen), then enable here.
+        </div>
+        {pushState === 'unsupported' && <div style={{ fontSize: 12.5, color: '#999' }}>Push isn't supported in this browser. On iPhone, open the app from your Home Screen icon instead of Safari.</div>}
+        {pushState === 'denied' && <div style={{ fontSize: 12.5, color: '#999' }}>Notifications are blocked for this site in your browser settings. Allow them there, then come back and enable them here.</div>}
+        {(pushState === 'off' || pushState === 'on') && (
+          <button onClick={togglePush} disabled={pushBusy} style={{ width: '100%', background: pushState === 'on' ? '#1f1f1f' : 'var(--brand)', color: pushState === 'on' ? '#ccc' : '#06282a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '9px 4px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', cursor: 'pointer' }}>
+            {pushBusy ? 'Working…' : pushState === 'on' ? 'Turn off notifications' : 'Enable notifications'}
+          </button>
+        )}
+        {pushState === 'on' && <div style={{ fontSize: 12, color: '#7ac74f', marginTop: 8 }}>🔔 On for this device — each phone or computer you use enables separately.</div>}
       </div>
       <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Demo view (proof of concept)</div>
