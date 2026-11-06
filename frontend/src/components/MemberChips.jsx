@@ -10,9 +10,11 @@
 //   3. Otherwise TEAM TTL — POC default: a profile in the members table
 //      is a team member until entitlements say otherwise.
 // role === 'admin' always adds the ADMIN chip (admin is an overlay; a
-// pro can also be an admin). The author joins must carry `role` today;
-// add `member_class, team_entitled` to those joins only AFTER migration
-// 0006 is applied — PostgREST fails whole queries on missing columns.
+// pro can also be an admin). Migration 0006 was applied 2026-11-02, and
+// since run 57 (2026-11-06) the author joins carry `member_class`, so
+// resolution step 1 is the live path; steps 2–3 remain only for
+// synthetic/demo rows. member_class is also the source of truth for
+// team entitlement itself (Zack, 2026-11-06 — see lib/tier.js).
 
 const CHIP = {
   pro: { label: 'PRO', style: { color: '#E8B84B', borderColor: 'rgba(232,184,75,0.55)', background: 'rgba(232,184,75,0.07)' } },

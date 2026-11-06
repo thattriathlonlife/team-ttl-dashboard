@@ -285,7 +285,7 @@ async function loadFeedPosts(team, userId) {
   let cursor = null
   for (let page = 0; page < 3; page++) {
     let q = supabase.from('messages')
-      .select('id, content, image_url, created_at, athlete_id, channel_id, profiles(full_name, avatar_color, avatar_url, role)')
+      .select('id, content, image_url, created_at, athlete_id, channel_id, profiles(full_name, avatar_color, avatar_url, role, member_class)')
       .in('channel_id', allowed)
       .order('created_at', { ascending: false })
       .limit(40)

@@ -2,8 +2,11 @@
 -- Phase 0, 2026-10-31. DO NOT RUN against production until the live RLS
 -- policies and channel constraints have been exported and reviewed.
 --
--- APPLY ORDER: after 0002 (the RLS helper in §2 reads
--- profiles.team_entitled). RECONCILED 2026-11-01 against 0001 + CLAUDE.md
+-- APPLY ORDER: after 0002 and 0006 (the RLS helper in §2 reads
+-- profiles.member_class from 0006 — member_class is the source of
+-- truth for entitlement since Zack's 2026-11-06 Q2 decision; the
+-- team_entitled column this file once pointed at was dropped from
+-- 0002). RECONCILED 2026-11-01 against 0001 + CLAUDE.md
 -- — changes in this pass are marked [reconciled 2026-11-01]; see README.md.
 -- Vocabulary: "Staff" in §2 means profiles.role = 'admin' — 0001 defines
 -- only role in ('athlete','admin'); there is no separate staff role.
@@ -109,9 +112,11 @@ create index if not exists channels_race_audience_idx
 -- The live policy set is not in the repo, so the policies below are stated as
 -- the acceptance target rather than blindly dropped/created here:
 --
--- Helper (depends on the team_entitled column drafted in 0002):
+-- Helper (reads profiles.member_class from 0006 — the entitlement
+-- source of truth since the 2026-11-06 Q2 decision):
 --   public.is_team_entitled(user_id uuid) -> boolean
---   true when profiles.team_entitled is true or profiles.role = 'admin'.
+--   true when profiles.member_class is 'team', 'racing_division' or
+--   'pro', or profiles.role = 'admin'.
 --
 -- channels SELECT:
 --   - audience = 'public': any authenticated user.

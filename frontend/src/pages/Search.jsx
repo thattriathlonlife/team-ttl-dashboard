@@ -70,7 +70,7 @@ export default function Search({ profile }) {
     ;(async () => {
       const [racesRes, profilesRes, channelsRes, entriesRes] = await Promise.all([
         supabase.from('races').select('id, name, race_date, location').order('race_date'),
-        supabase.from('profiles').select('id, full_name, avatar_color, role'),
+        supabase.from('profiles').select('id, full_name, avatar_color, role, member_class'),
         supabase.from('channels').select('id, name, type, category, audience').neq('type', 'dm'),
         supabase.from('race_entries').select('race_id'),
       ])

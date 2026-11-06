@@ -38,7 +38,7 @@ function MemberProfile({ memberId, onClose }) {
     ;(async () => {
       const today = new Date().toISOString().slice(0, 10)
       const [profileRes, entriesRes, badgesRes] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, avatar_color, avatar_url, role').eq('id', memberId).single(),
+        supabase.from('profiles').select('id, full_name, avatar_color, avatar_url, role, member_class').eq('id', memberId).single(),
         supabase.from('race_entries').select('id, races(name, race_date, type)').eq('athlete_id', memberId),
         supabase.from('profile_badges').select('badge_key, earned_at, badges(name, icon, tier)').eq('athlete_id', memberId),
       ])

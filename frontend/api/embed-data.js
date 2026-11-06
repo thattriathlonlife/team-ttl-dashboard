@@ -9,8 +9,9 @@
  * athlete ids, no profile fields. The response carries race fields and
  * three counts per race (total / team / community entrants), computed
  * server-side. Athlete ids are read here only to classify an entry as
- * team vs community (the same rule the app uses: a profile counts as
- * team unless team_entitled === false) and are never serialised.
+ * team vs community (the same rule the app uses: member_class is the
+ * source of truth — team / racing_division / pro count as team) and
+ * are never serialised.
  *
  * Why the service key: `race_entries` is not readable with the
  * publishable (anon) key — RLS returns zero rows silently, which would
@@ -83,20 +84,23 @@ export default async function handler(req, res) {
         .from('race_entries')
         .select('race_id, athlete_id')
         .in('race_id', raceIds)),
-      // select('*'), never a named team_entitled column: that column
-      // is a draft-migration field that does not exist in the live
-      // schema yet, and naming it errors the whole query (the in-app
-      // map reads it the same tolerant way — absent means "not false",
-      // i.e. team, exactly the classification below).
+      // select('*') and classify in code: profiles carry member_class
+      // (migration 0006, live since 2026-11-02), the source of truth
+      // for team entitlement since Zack's 2026-11-06 decision.
       fetchAll(() => supabase
         .from('profiles')
         .select('*')),
     ])
 
-    // Same classification as the in-app map (Dashboard.jsx): a profile
-    // counts as team unless team_entitled === false.
+    // Same classification as the in-app map (Dashboard.jsx, via
+    // lib/tier.js profileEntitled): team / racing_division / pro count
+    // as team, community does not; a profile with no class information
+    // keeps the POC default (team), exactly as the app treats it.
+    const TEAM_CLASSES = new Set(['team', 'racing_division', 'pro'])
     const teamIds = new Set(
-      (profiles || []).filter(p => p.team_entitled !== false).map(p => p.id)
+      (profiles || [])
+        .filter(p => (p.member_class ? TEAM_CLASSES.has(p.member_class) : p.team_entitled !== false))
+        .map(p => p.id)
     )
 
     const counts = new Map()

@@ -823,7 +823,7 @@ function MentionsView({ session, profile, isMobile, channels, teamView, onBack, 
     const messageIds = mentionData.map(m => m.message_id).filter(Boolean)
     const { data: messageData, error: messageError } = await supabase
       .from('messages')
-      .select('id, content, created_at, athlete_id, profiles(full_name, avatar_color, avatar_url, role)')
+      .select('id, content, created_at, athlete_id, profiles(full_name, avatar_color, avatar_url, role, member_class)')
       .in('id', messageIds)
 
     if (messageError) console.error('[Mentions] message query error:', messageError.message)
@@ -923,7 +923,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         async (payload) => {
           setMessages(prev => {
             if (prev.some(m => m.id === payload.new.id)) return prev
-            supabase.from('messages').select('*, profiles(full_name, avatar_color, avatar_url, role), reply_msg:reply_to(id, content, profiles(full_name))').eq('id', payload.new.id).single()
+            supabase.from('messages').select('*, profiles(full_name, avatar_color, avatar_url, role, member_class), reply_msg:reply_to(id, content, profiles(full_name))').eq('id', payload.new.id).single()
               .then(({ data }) => {
                 if (data) {
                   setMessages(p => p.some(m => m.id === data.id) ? p : [...p, data])
@@ -954,7 +954,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   }
 
   const MSG_PAGE = 100
-  const MSG_SELECT = '*, profiles(full_name, avatar_color, avatar_url, role), reply_msg:reply_to(id, content, profiles(full_name))'
+  const MSG_SELECT = '*, profiles(full_name, avatar_color, avatar_url, role, member_class), reply_msg:reply_to(id, content, profiles(full_name))'
 
   async function mergeReactions(messageIds) {
     if (!messageIds.length) return
@@ -1054,7 +1054,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       channel_id: channel.id, athlete_id: userId,
       content: content || null, image_url: imageUrl || null,
       reply_to: replyTo?.id || null,
-    }).select('*, profiles(full_name, avatar_color, avatar_url, role), reply_msg:reply_to(id, content, profiles(full_name))').single()
+    }).select('*, profiles(full_name, avatar_color, avatar_url, role, member_class), reply_msg:reply_to(id, content, profiles(full_name))').single()
 
     if (!error && data) {
       setMessages(prev => prev.map(m => m.id === optimisticId ? data : m))

@@ -1,11 +1,13 @@
 -- Team TTL — auth amendment additions (DRAFT, Phase 0, 2026-10-31)
 -- DO NOT RUN against production. Companion to 0001_reconstructed_schema.sql.
 -- Implements the identity model from AUTH-AMENDMENT.md: stable internal
--- profile id, linkable external identities (Shopify first), public handle
--- separate from credentials, and a server-side team entitlement record.
+-- profile id, linkable external identities (Shopify first), and a public
+-- handle separate from credentials. Team entitlement is NOT recorded
+-- here — it lives in profiles.member_class (0006) per the Q2 decision
+-- recorded below and in README.md.
 --
--- APPLY ORDER: after 0001; before 0003 (its RLS helper reads
--- profiles.team_entitled from this file) and before 0004.
+-- APPLY ORDER: after 0001 and 0006; before 0003 (its RLS helper reads
+-- profiles.member_class, which 0006 provides) and before 0004.
 -- RECONCILED 2026-11-01 against 0001 + CLAUDE.md — see README.md in this
 -- folder for the fix list and open questions. Changes in this pass are
 -- marked [reconciled 2026-11-01].
@@ -19,35 +21,18 @@
 -- NULL handles are allowed (unique permits multiple NULLs) until then.
 alter table profiles add column if not exists handle text unique;
 
--- Team entitlement: authentication (who you are) is separate from
--- authorization (whether you are Team TTL). This is the record RLS checks.
-alter table profiles add column if not exists team_entitled boolean default false;
-alter table profiles add column if not exists entitled_via text; -- 'shopify_tag' | 'roster' | 'manual'
+-- Team entitlement is NOT in this file. [decided 2026-11-06, README Q2]
+-- Zack decided profiles.member_class (0006, live since 2026-11-02) is
+-- the single source of truth for team entitlement: team /
+-- racing_division / pro are entitled, community is not. The
+-- team_entitled / entitled_via columns drafted here earlier (with
+-- their backfill and CHECK) were removed so there is never a second
+-- switch that can disagree with the class; 0003's RLS helper reads
+-- member_class (+ role = 'admin'). Authentication (who you are) stays
+-- separate from authorization (whether you are Team TTL) — the class
+-- is simply where the authorization answer lives, assigned from the
+-- Shopify tag / roster / manual source when an identity is linked.
 alter table profiles add column if not exists shopify_customer_id text unique;
-
--- [reconciled 2026-11-01] Backfill + NOT NULL for team_entitled.
--- As originally drafted this was default false with no backfill: every
--- existing profile — all invite-only team members by construction (see
--- 0001 invites + 0006's identical reasoning for member_class) — would have
--- read as NOT entitled, and 0003's RLS helper would have locked the whole
--- existing team out (admins excepted). Backfill first, then enforce.
-update profiles set team_entitled = true, entitled_via = coalesce(entitled_via, 'roster')
-  where team_entitled is distinct from true;
-alter table profiles alter column team_entitled set default false;
-alter table profiles alter column team_entitled set not null;
-
--- [reconciled 2026-11-01] entitled_via was free text with the value list
--- only in a comment; 0001/0004/0006 use CHECKs for enums like this. Add one.
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'profiles_entitled_via_check'
-  ) then
-    alter table profiles
-      add constraint profiles_entitled_via_check
-      check (entitled_via is null or entitled_via in ('shopify_tag', 'roster', 'manual'));
-  end if;
-end $$;
 
 -- [reconciled 2026-11-01] shopify_customer_id vs linked_identities:
 -- this column duplicates linked_identities(provider='shopify',

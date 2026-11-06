@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { raceChannelKind, isRaceChannel, isTeamOnlyChannel, raceChannelType, raceChannelAudience, shortRaceName, channelDisplayName, channelAccessLabel } from '../src/lib/channels.js'
 import { normalizeText, findSevereTerm, shouldHide, moderateOutgoing } from '../src/lib/moderation.js'
-import { isTeamTier } from '../src/lib/tier.js'
+import { isTeamTier, isEntitledClass, profileEntitled } from '../src/lib/tier.js'
 
 // ── channels.js ──
 test('canonical types classify', () => {
@@ -68,4 +68,24 @@ test('findSevereTerm returns the term', () => assert.equal(findSevereTerm('what 
 // ── tier.js ──
 test('entitled profile is team tier', () => assert.equal(isTeamTier({ team_entitled: true }), true))
 test('no profile falls back to demo tier default (team in node, no localStorage)', () => assert.equal(isTeamTier(null), true))
-test('non-entitled profile uses demo tier default', () => assert.equal(isTeamTier({ team_entitled: false }), true))
+test('legacy non-entitled profile is not team tier', () => assert.equal(isTeamTier({ team_entitled: false }), false))
+test('entitled classes are team, racing_division, pro — not community', () => {
+  assert.equal(isEntitledClass('team'), true)
+  assert.equal(isEntitledClass('racing_division'), true)
+  assert.equal(isEntitledClass('pro'), true)
+  assert.equal(isEntitledClass('community'), false)
+  assert.equal(isEntitledClass(undefined), false)
+})
+test('member_class decides team tier (source of truth, decided 2026-11-06)', () => {
+  assert.equal(isTeamTier({ member_class: 'team' }), true)
+  assert.equal(isTeamTier({ member_class: 'racing_division' }), true)
+  assert.equal(isTeamTier({ member_class: 'pro' }), true)
+  assert.equal(isTeamTier({ member_class: 'community' }), false)
+})
+test('profileEntitled: class wins over legacy boolean, neither is null', () => {
+  assert.equal(profileEntitled({ member_class: 'community', team_entitled: true }), false)
+  assert.equal(profileEntitled({ member_class: 'pro', team_entitled: false }), true)
+  assert.equal(profileEntitled({ team_entitled: false }), false)
+  assert.equal(profileEntitled({}), null)
+  assert.equal(profileEntitled(null), null)
+})

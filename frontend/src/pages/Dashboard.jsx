@@ -6,6 +6,7 @@ import AddRaceModal from '../components/AddRaceModal'
 import RaceMap from '../components/RaceMap'
 import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 import { track } from '../lib/track'
+import { profileEntitled } from '../lib/tier'
 
 const S = {
   page: { maxWidth: '1100px', margin: '0 auto', padding: '1.5rem' },
@@ -135,7 +136,11 @@ export default function Dashboard({ session }) {
   // the full calendar; the map never follows the list's filter.
   const enteredRaceIds = new Set(allEntries.map(e => e.race_id))
   const mapRaces = races.filter(r => enteredRaceIds.has(r.id) && r.latitude && r.longitude)
-  const teamIds = profiles.filter(p => p.team_entitled !== false).map(p => p.id)
+  // Classification follows member_class, the source of truth for team
+  // entitlement (Zack, 2026-11-06): team / racing_division / pro count
+  // as team; community does not. Profiles with no class information
+  // keep the POC default (counted as team), as before.
+  const teamIds = profiles.filter(p => profileEntitled(p) !== false).map(p => p.id)
 
   const myRaceCount = myEntries.length
   const nextRace = races.find(r => myEntries.includes(r.id))
