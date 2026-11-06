@@ -196,6 +196,10 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const [menuFor, setMenuFor] = useState(null)
   const [showArchived, setShowArchived] = useState(false)
   const [showStarred, setShowStarred] = useState(false)
+  // M5 — blocks, admin reports queue
+  const [myBlocks, setMyBlocks] = useState(() => new Set())
+  const [showReports, setShowReports] = useState(false)
+  const [reportCount, setReportCount] = useState(0)
   const [highlightFor, setHighlightFor] = useState(null)
   const [lockedChannel, setLockedChannel] = useState(null)
   const [loading, setLoading] = useState(() => !cachedMsg)
@@ -245,15 +249,17 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
   async function loadChannels() {
     // 3 parallel queries instead of N+1
-    const [channelsRes, readsRes, mentionsRes, msgsRes, dmMembersRes, stateRes] = await Promise.all([
+    const [channelsRes, readsRes, mentionsRes, msgsRes, dmMembersRes, stateRes, blocksRes, reportsRes] = await Promise.all([
       supabase.from('channels').select('*, races(name)').neq('type', 'dm').order('sort_order').order('name'),
       supabase.from('channel_reads').select('*').eq('athlete_id', userId),
       supabase.from('message_mentions').select('*', { count: 'exact', head: true }).eq('mentioned_user_id', userId).is('seen_at', null),
       // Fetch last message per channel in one query using a recent window
       supabase.from('messages').select('channel_id, content, image_url, media_kind, created_at, athlete_id, profiles(full_name)').order('created_at', { ascending: false }).limit(300),
       // Fetch this user's DM channel memberships + the other member's profile
-      supabase.from('channel_members').select('channel_id, channels!inner(id, type, created_at), athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)').eq('athlete_id', userId),
+      supabase.from('channel_members').select('channel_id, channels!inner(id, type, created_at, display_name, status, created_by), athlete:profiles!athlete_id(id, full_name, avatar_color, avatar_url)').eq('athlete_id', userId),
       supabase.from('channel_user_state').select('*').eq('athlete_id', userId),
+      supabase.from('user_blocks').select('blocked_id').eq('blocker_id', userId),
+      supabase.from('message_reports').select('*', { count: 'exact', head: true }).eq('status', 'open'),
     ])
 
     setMentionCount(mentionsRes.count || 0)
@@ -262,6 +268,8 @@ export default function Messaging({ session, profile, onReadChannel }) {
       stateRes.data.forEach(r => { map[r.channel_id] = r })
       setChannelState(map)
     }
+    if (blocksRes.data) setMyBlocks(new Set(blocksRes.data.map(b => b.blocked_id)))
+    if (isAdmin) setReportCount(reportsRes.count || 0)
 
     // Build DM channels: for each DM the user belongs to, fetch the other member
     if (dmMembersRes.data) {
@@ -277,8 +285,13 @@ export default function Messaging({ session, profile, onReadChannel }) {
           if (!membersByChannel[m.channel_id]) membersByChannel[m.channel_id] = []
           membersByChannel[m.channel_id].push({ id: m.id, full_name: m.full_name, avatar_color: m.avatar_color, avatar_url: m.avatar_url })
         })
+        const chMeta = {}
+        dmMembersRes.data.forEach(m => { if (m.channels) chMeta[m.channel_id] = m.channels })
         const builtDms = uniqueChannelIds.map(chId => ({
           id: chId, type: 'dm',
+          display_name: chMeta[chId]?.display_name || null,
+          status: chMeta[chId]?.status || 'active',
+          created_by: chMeta[chId]?.created_by || null,
           dm_members: (membersByChannel[chId] || []).filter(Boolean),
         }))
         setDmChannels(builtDms)
@@ -371,6 +384,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
       setLockedChannel(channel)
       setShowMentions(false)
       setShowStarred(false)
+      setShowReports(false)
       if (isMobile) setShowSidebar(false)
       return
     }
@@ -379,6 +393,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
     setSelectedChannel(channel)
     setShowMentions(false)
     setShowStarred(false)
+    setShowReports(false)
     if (isMobile) setShowSidebar(false)
     await supabase.from('channel_reads').upsert(
       { channel_id: channel.id, athlete_id: userId, last_read_at: new Date(Date.now() + 1000).toISOString() },
@@ -407,15 +422,51 @@ export default function Messaging({ session, profile, onReadChannel }) {
   function openStarred() {
     setShowStarred(true)
     setShowMentions(false)
+    setShowReports(false)
     setLockedChannel(null)
     setSelectedChannel(null)
     selectedChannelRef.current = null
     if (isMobile) setShowSidebar(false)
   }
 
+  function openReports() {
+    setShowReports(true)
+    setShowStarred(false)
+    setShowMentions(false)
+    setLockedChannel(null)
+    setSelectedChannel(null)
+    selectedChannelRef.current = null
+    if (isMobile) setShowSidebar(false)
+  }
+
+  // M5 — blocking is DM-level: hides the 1:1 from the list, disables
+  // its composer, and excludes the person from the DM picker.
+  async function toggleBlock(athleteId) {
+    if (myBlocks.has(athleteId)) {
+      const { error } = await supabase.from('user_blocks').delete().eq('blocker_id', userId).eq('blocked_id', athleteId)
+      if (!error) setMyBlocks(prev => { const next = new Set(prev); next.delete(athleteId); return next })
+    } else {
+      const { error } = await supabase.from('user_blocks').insert({ blocker_id: userId, blocked_id: athleteId })
+      if (!error) setMyBlocks(prev => new Set(prev).add(athleteId))
+    }
+    setMenuFor(null)
+  }
+
+  // M5 — member-channel approvals (admin).
+  async function approveChannel(ch) {
+    const { error } = await supabase.from('channels').update({ status: 'active' }).eq('id', ch.id)
+    if (!error) setChannels(prev => prev.map(c => c.id === ch.id ? { ...c, status: 'active' } : c))
+  }
+  async function rejectChannel(ch) {
+    if (!window.confirm(`Reject and delete the proposed channel "${ch.display_name || prettyName(ch.name)}"?`)) return
+    const { error } = await supabase.from('channels').delete().eq('id', ch.id)
+    if (!error) setChannels(prev => prev.filter(c => c.id !== ch.id))
+  }
+
   async function openMentions() {
     setShowMentions(true)
     setShowStarred(false)
+    setShowReports(false)
     setLockedChannel(null)
     setSelectedChannel(null)
     if (isMobile) setShowSidebar(false)
@@ -448,11 +499,20 @@ export default function Messaging({ session, profile, onReadChannel }) {
   const isAnnouncementCh = (c) => c.is_readonly || c.category === 'announcements'
   const tsOf = (id) => { const t = lastMessages?.[id]?.created_at; return t ? new Date(t).getTime() : 0 }
   const sections = (() => {
-    const allChans = channels.filter(c => !isAnnouncementCh(c) && !channelState[c.id]?.archived)
+    // Pending member channels (M5) show only to their creator/admins.
+    const allChans = channels.filter(c => !isAnnouncementCh(c) && !channelState[c.id]?.archived
+      && (c.status !== 'pending' || c.created_by === userId || isAdmin))
     const byKind = (k) => allChans.filter(c => raceChannelKind(c) === k)
     const byCats = (cats) => allChans.filter(c => cats.includes(c.category) && !raceChannelKind(c))
+    // Blocked 1:1 DMs leave the list entirely (M5); the thread itself
+    // carries the unblock path if it's already open.
+    const dmVisible = (ch) => {
+      if ((ch.dm_members?.length || 0) !== 2) return true
+      const other = ch.dm_members.find(m => m.id !== userId)
+      return !other || !myBlocks.has(other.id)
+    }
     const dmItems = teamView
-      ? dmChannels.filter(ch => !channelState[ch.id]?.archived).map(ch => ({ kind: 'dm', ch }))
+      ? dmChannels.filter(ch => !channelState[ch.id]?.archived && dmVisible(ch)).map(ch => ({ kind: 'dm', ch }))
       : [{ kind: 'lockedDm', ch: { id: 'locked-dms', type: 'dm', name: 'Direct Messages' } }]
     let groups = []
     let team = []
@@ -472,7 +532,9 @@ export default function Messaging({ session, profile, onReadChannel }) {
       dms = dmItems
     }
     const nameOf = (it) => it.kind === 'dm'
-      ? (dmOtherProfile(it.ch, userId)?.full_name || 'DM')
+      ? ((it.ch.dm_members?.length || 0) > 2
+        ? (it.ch.display_name || 'Group chat')
+        : (dmOtherProfile(it.ch, userId)?.full_name || 'DM'))
       : (raceChannelKind(it.ch) ? channelDisplayName(it.ch) : prettyName(it.ch.name))
     const sortItems = (arr) => arr.sort((a, b) =>
       ((channelState[b.ch.id]?.pinned ? 1 : 0) - (channelState[a.ch.id]?.pinned ? 1 : 0)) ||
@@ -512,13 +574,16 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
             if (item.kind === 'dm') {
               const other = dmOtherProfile(ch, userId)
+              const isGroupDm = (ch.dm_members?.length || 0) > 2
               const senderPrefix = last ? (last.athlete_id === userId ? 'You: ' : '') : ''
               const draftText = getDraft(ch.id)
               return (
                 <ChatRow
                   key={ch.id}
-                  avatar={<Avatar profile={other} size={52} />}
-                  name={other?.full_name || 'Direct message'}
+                  avatar={isGroupDm
+                    ? <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#232323', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>👥</div>
+                    : <Avatar profile={other} size={52} />}
+                  name={isGroupDm ? (ch.display_name || 'Group chat') : (other?.full_name || 'Direct message')}
                   preview={draftText.trim() ? `Draft: ${draftText}` : last ? `${senderPrefix}${last.content || '📷 Photo'}` : 'No messages yet'}
                   time={waListTime(last?.created_at)}
                   unread={unread}
@@ -537,7 +602,9 @@ export default function Messaging({ session, profile, onReadChannel }) {
             const kind = raceChannelKind(ch)
             const draftText = locked ? '' : getDraft(ch.id)
             const sender = last ? (last.athlete_id === userId ? 'You' : last.profiles?.full_name?.split(' ')[0]) : null
-            const badge = kind === 'discussion'
+            const badge = ch.status === 'pending'
+              ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(255,180,84,0.15)', color: '#ffb454', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Pending approval</span>
+              : kind === 'discussion'
               ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--highlight-rgb),0.13)', color: 'var(--highlight)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Public</span>
               : kind === 'logistics'
                 ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--brand-rgb),0.13)', color: 'var(--brand)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Team</span>
@@ -642,6 +709,28 @@ export default function Messaging({ session, profile, onReadChannel }) {
               preview={`${archivedItems.length} chat${archivedItems.length > 1 ? 's' : ''}`}
               onClick={() => setShowArchived(true)}
             />}
+            {sideFilter === 'all' && !showArchived && isAdmin && <ChatRow
+              avatar={<div style={{ width: 52, height: 52, borderRadius: '50%', background: '#232323', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>🛡️</div>}
+              name="Reports"
+              preview={reportCount ? `${reportCount} open report${reportCount > 1 ? 's' : ''}` : 'Moderation queue'}
+              unread={reportCount}
+              selected={showReports}
+              onClick={openReports}
+            />}
+
+            {/* Pending channel approvals (M5, admin) */}
+            {isAdmin && !showArchived && channels.filter(c => c.status === 'pending').length > 0 && (
+              <div style={{ margin: '10px 12px 2px', background: 'rgba(255,180,84,0.07)', border: '1px solid rgba(255,180,84,0.3)', borderRadius: '10px', padding: '10px 12px' }}>
+                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#ffb454', marginBottom: '6px' }}>⏳ Channel proposals</div>
+                {channels.filter(c => c.status === 'pending').map(ch => (
+                  <div key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0' }}>
+                    <span style={{ flex: 1, fontSize: '13.5px', color: '#eee', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>#{prettyName(ch.name)}</span>
+                    <button onClick={() => approveChannel(ch)} style={{ background: 'var(--brand)', border: 'none', borderRadius: '5px', color: '#03292b', fontSize: '11.5px', fontWeight: 700, padding: '4px 10px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Approve</button>
+                    <button onClick={() => rejectChannel(ch)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px', color: '#ff8a7a', fontSize: '11.5px', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Reject</button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Archived mode: the sidebar swaps to the archived list */}
             {showArchived && (
@@ -691,10 +780,10 @@ export default function Messaging({ session, profile, onReadChannel }) {
                     background: '#1d1d1d', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '14px',
                     boxShadow: '0 18px 44px rgba(0,0,0,0.55)', overflow: 'hidden', minWidth: '212px',
                   }}>
-                    {isAdmin && (
+                    {teamView && (
                       <button onClick={() => { setShowAddMenu(false); setShowNewChannel(true) }} style={{ display: 'flex', alignItems: 'center', gap: '11px', width: '100%', padding: '13px 16px', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', textAlign: 'left' }}>
                         <span style={{ fontSize: '16px' }}>＋</span>
-                        <span style={{ fontFamily: 'Barlow, sans-serif', fontSize: '14.5px', fontWeight: 600, color: '#fff' }}>New channel</span>
+                        <span style={{ fontFamily: 'Barlow, sans-serif', fontSize: '14.5px', fontWeight: 600, color: '#fff' }}>New channel{!isAdmin && <span style={{ color: '#888', fontWeight: 400 }}> — needs approval</span>}</span>
                       </button>
                     )}
                     {teamView && (
@@ -708,7 +797,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
               )}
               <button
                 onClick={() => {
-                  if (isAdmin && teamView) setShowAddMenu(m => !m)
+                  if (teamView) setShowAddMenu(m => !m)
                   else if (isAdmin) setShowNewChannel(true)
                   else setShowNewDm(true)
                 }}
@@ -745,7 +834,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
       )}
 
       {/* Message thread */}
-      {(!showSidebar || !isMobile) && selectedChannel && !showMentions && !showStarred && (
+      {(!showSidebar || !isMobile) && selectedChannel && !showMentions && !showStarred && !showReports && (
         <MessageThread
           key={selectedChannel.id}
           channel={selectedChannel}
@@ -753,6 +842,16 @@ export default function Messaging({ session, profile, onReadChannel }) {
           profile={profile}
           isMobile={isMobile}
           highlightId={highlightFor?.channelId === selectedChannel.id ? highlightFor.messageId : null}
+          forwardTargets={[...channels, ...dmChannels].filter(c => c.status !== 'pending')}
+          blockedPeer={(() => {
+            if (selectedChannel.type !== 'dm' || (selectedChannel.dm_members?.length || 0) !== 2) return null
+            const other = selectedChannel.dm_members.find(m => m.id !== userId)
+            return other && myBlocks.has(other.id) ? other : null
+          })()}
+          onUnblock={() => {
+            const other = selectedChannel.dm_members?.find(m => m.id !== userId)
+            if (other) toggleBlock(other.id)
+          }}
           onBack={() => { setShowSidebar(true); selectedChannelRef.current = null; setSelectedChannel(null) }}
           onMarkRead={() => { setUnreadCounts(prev => ({ ...prev, [selectedChannel.id]: 0 })); onReadChannel?.() }}
           onMention={() => setMentionCount(prev => prev + 1)}
@@ -771,6 +870,16 @@ export default function Messaging({ session, profile, onReadChannel }) {
         />
       )}
 
+      {/* Reports queue (M5, admin) */}
+      {(!showSidebar || !isMobile) && showReports && isAdmin && (
+        <ReportsView
+          session={session}
+          isMobile={isMobile}
+          onBack={() => { setShowSidebar(true); setShowReports(false) }}
+          onResolved={() => setReportCount(c => Math.max(0, c - 1))}
+        />
+      )}
+
       {/* Per-chat options sheet: pin / mute / archive (M2b) */}
       {menuFor && createPortal((
         <div onClick={() => setMenuFor(null)} style={{ position: 'fixed', inset: 0, zIndex: 240, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
@@ -786,6 +895,16 @@ export default function Messaging({ session, profile, onReadChannel }) {
                   <button onClick={() => updateChannelState(menuFor, { pinned: !st.pinned })} style={MENU_ROW_STYLE}>{st.pinned ? '📌 Unpin chat' : '📌 Pin chat'}</button>
                   <button onClick={() => updateChannelState(menuFor, { muted_until: mutedNow ? null : new Date(Date.now() + 100 * 365 * 24 * 3600 * 1000).toISOString() })} style={MENU_ROW_STYLE}>{mutedNow ? '🔔 Unmute notifications' : '🔕 Mute notifications'}</button>
                   <button onClick={() => updateChannelState(menuFor, { archived: !st.archived })} style={MENU_ROW_STYLE}>{st.archived ? '📤 Unarchive chat' : '🗄 Archive chat'}</button>
+                  {menuFor.type === 'dm' && (menuFor.dm_members?.length || 0) === 2 && (() => {
+                    const other = menuFor.dm_members.find(m => m.id !== userId)
+                    if (!other) return null
+                    const blocked = myBlocks.has(other.id)
+                    return (
+                      <button onClick={() => toggleBlock(other.id)} style={{ ...MENU_ROW_STYLE, color: blocked ? '#ccc' : '#ff8a7a' }}>
+                        {blocked ? `🚫 Unblock ${other.full_name || 'member'}` : `🚫 Block ${other.full_name || 'member'}`}
+                      </button>
+                    )
+                  })()}
                 </>
               )
             })()}
@@ -795,7 +914,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
       ), document.body)}
 
       {/* Empty state */}
-      {!isMobile && !selectedChannel && !showMentions && !lockedChannel && (
+      {!isMobile && !selectedChannel && !showMentions && !lockedChannel && !showReports && (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
           <div style={{ fontSize: '48px' }}>💬</div>
           <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', letterSpacing: '2px', textTransform: 'uppercase', color: '#555' }}>Select a channel to start chatting</div>
@@ -803,11 +922,12 @@ export default function Messaging({ session, profile, onReadChannel }) {
       )}
 
       {showNewChannel && (
-        <NewChannelModal session={session} onClose={() => setShowNewChannel(false)} onCreated={(ch) => { setChannels(prev => [...prev, ch]); setShowNewChannel(false); openChannel(ch) }} />
+        <NewChannelModal session={session} isAdmin={isAdmin} onClose={() => setShowNewChannel(false)} onCreated={(ch) => { setChannels(prev => [...prev, ch]); setShowNewChannel(false); openChannel(ch) }} />
       )}
       {showNewDm && (
         <NewDmModal
           userId={userId}
+          blockedIds={myBlocks}
           onClose={() => setShowNewDm(false)}
           onCreated={(dmChannel) => {
             setDmChannels(prev => {
@@ -1138,6 +1258,156 @@ function MentionsView({ session, profile, isMobile, channels, teamView, onBack, 
   )
 }
 
+// ─── PollView — options with live result bars (M5) ───────────────────
+function PollView({ pollData, userId, onVote }) {
+  const { options, votes } = pollData
+  const total = votes.length
+  const mine = votes.find(v => v.athlete_id === userId)
+  const counts = {}
+  votes.forEach(v => { counts[v.option_id] = (counts[v.option_id] || 0) + 1 })
+  return (
+    <div style={{ marginTop: '7px', minWidth: '220px', maxWidth: '300px' }}>
+      {[...options].sort((a, b) => a.sort - b.sort).map(opt => {
+        const c = counts[opt.id] || 0
+        const pct = total ? Math.round((c / total) * 100) : 0
+        const isMine = mine?.option_id === opt.id
+        return (
+          <button key={opt.id} onClick={() => onVote(opt)} aria-pressed={isMine}
+            style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', background: 'rgba(0,0,0,0.22)', border: `1px solid ${isMine ? 'var(--brand)' : 'rgba(255,255,255,0.12)'}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '5px', cursor: 'pointer', overflow: 'hidden' }}>
+            <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'rgba(var(--brand-rgb),0.18)', transition: 'width 0.3s' }} />
+            <span style={{ position: 'relative', fontSize: '13px', color: isMine ? 'var(--brand)' : '#ddd', flex: 1 }}>{isMine ? '●' : '○'} {opt.label}</span>
+            <span style={{ position: 'relative', fontSize: '11.5px', color: '#999', fontFamily: 'Barlow Condensed, sans-serif' }}>{total ? `${pct}% · ${c}` : ''}</span>
+          </button>
+        )
+      })}
+      <div style={{ fontSize: '11px', color: '#777' }}>
+        {total} vote{total !== 1 ? 's' : ''}{mine ? ' · tap your pick again to retract' : ' · tap an option to vote'}
+      </div>
+    </div>
+  )
+}
+
+// ─── PollComposer — question + 2–4 options, posted as a message ─────
+function PollComposer({ onClose, onCreate }) {
+  const [question, setQuestion] = useState('')
+  const [labels, setLabels] = useState(['', ''])
+  const [busy, setBusy] = useState(false)
+  const clean = labels.map(l => l.trim()).filter(Boolean)
+  const canCreate = question.trim().length > 0 && clean.length >= 2 && !busy
+  const inputStyle = { width: '100%', background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', padding: '10px 12px', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', boxSizing: 'border-box', marginBottom: '8px' }
+  return createPortal((
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid var(--brand)', borderRadius: '10px', padding: '1.5rem', width: '100%', maxWidth: '420px' }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '18px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--brand)', marginBottom: '1rem' }}>📊 New poll</div>
+        <input style={inputStyle} placeholder="Question" value={question} onChange={e => setQuestion(e.target.value)} maxLength={200} />
+        {labels.map((l, i) => (
+          <input key={i} style={inputStyle} placeholder={`Option ${i + 1}`} value={l}
+            onChange={e => setLabels(prev => prev.map((x, j) => j === i ? e.target.value : x))} maxLength={60} />
+        ))}
+        {labels.length < 4 && (
+          <button onClick={() => setLabels(prev => [...prev, ''])} style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: '13px', cursor: 'pointer', padding: '2px 0 10px', fontFamily: 'Barlow, sans-serif' }}>+ Add option</button>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+          <button onClick={onClose} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase', padding: '10px 20px', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '5px', color: '#999', cursor: 'pointer' }}>Cancel</button>
+          <button disabled={!canCreate} onClick={() => { setBusy(true); onCreate(question.trim(), clean) }}
+            style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: 'var(--brand)', border: 'none', borderRadius: '5px', color: '#000', cursor: canCreate ? 'pointer' : 'default', opacity: canCreate ? 1 : 0.45 }}>
+            {busy ? 'Posting…' : 'Post poll'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ), document.body)
+}
+
+// ─── ReportsView — the admin moderation queue (M5) ───────────────────
+function ReportsView({ session, isMobile, onBack, onResolved }) {
+  const userId = session.user.id
+  const [reports, setReports] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState(null)
+
+  useEffect(() => { load() }, [])
+  async function load() {
+    const { data } = await supabase.from('message_reports')
+      .select('*, messages(content, media_kind, athlete_id, profiles(full_name)), reporter:profiles!reporter_id(full_name)')
+      .eq('status', 'open').order('created_at')
+    setReports(data || [])
+    setLoading(false)
+  }
+
+  async function logEvent(report, action, rule) {
+    await supabase.from('moderation_events').insert({
+      channel_id: report.channel_id, message_id: report.message_id,
+      athlete_id: report.messages?.athlete_id || null,
+      source: 'admin', action, rule,
+      reviewed_by: userId, reviewed_at: new Date().toISOString(),
+    })
+  }
+
+  async function resolve(report, status) {
+    setBusyId(report.id)
+    const { error } = await supabase.from('message_reports')
+      .update({ status, resolved_by: userId, resolved_at: new Date().toISOString() })
+      .eq('id', report.id)
+    setBusyId(null)
+    if (!error) { setReports(prev => prev.filter(r => r.id !== report.id)); onResolved?.() }
+  }
+
+  async function hideMessage(report) {
+    setBusyId(report.id)
+    const { error } = await supabase.from('messages').update({ moderation_status: 'hidden' }).eq('id', report.message_id)
+    if (error) { setBusyId(null); return }
+    await logEvent(report, 'hide', 'user_report')
+    resolve(report, 'actioned')
+  }
+
+  async function muteAuthor(report) {
+    const authorId = report.messages?.athlete_id
+    if (!authorId) return
+    setBusyId(report.id)
+    const until = new Date(Date.now() + 24 * 3600 * 1000).toISOString()
+    const { error } = await supabase.from('profiles').update({ muted_until: until }).eq('id', authorId)
+    if (error) { setBusyId(null); return }
+    await logEvent(report, 'mute', 'user_report_24h')
+    resolve(report, 'actioned')
+  }
+
+  const btn = (danger) => ({ background: danger ? 'rgba(255,138,122,0.12)' : '#1f1f1f', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '6px', color: danger ? '#ff8a7a' : '#ddd', fontSize: '12px', fontWeight: 600, padding: '6px 12px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' })
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '10px', background: '#111', flexShrink: 0 }}>
+        {isMobile && <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '0' }}>←</button>}
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '17px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#fff' }}>🛡️ Reports</div>
+        <span style={{ fontSize: '12px', color: '#777' }}>{reports.length} open</span>
+      </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '14px 16px' }}>
+        {loading ? (
+          <div style={{ color: '#555', fontSize: '14px', textAlign: 'center', padding: '2rem' }}>Loading…</div>
+        ) : reports.length === 0 ? (
+          <div style={{ color: '#555', fontSize: '14px', textAlign: 'center', padding: '2rem' }}>No open reports. The team is behaving. 🎉</div>
+        ) : reports.map(r => (
+          <div key={r.id} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '10px', padding: '12px 14px', marginBottom: '10px', maxWidth: '640px' }}>
+            <div style={{ fontSize: '12px', color: '#888', marginBottom: '5px' }}>
+              <b style={{ color: '#ccc' }}>{r.messages?.profiles?.full_name || 'A member'}</b>
+              {' · reported by '}{r.reporter?.full_name || 'a member'}
+              {' · '}{new Date(r.created_at).toLocaleString()}
+            </div>
+            <div style={{ fontSize: '14px', color: '#eee', lineHeight: 1.5, wordBreak: 'break-word', marginBottom: '10px' }}>
+              {r.messages?.content || (r.messages?.media_kind === 'audio' ? '🎤 Voice message' : r.messages?.media_kind === 'image' ? '📷 Photo' : '(no text)')}
+            </div>
+            <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
+              <button disabled={busyId === r.id} onClick={() => hideMessage(r)} style={btn(false)}>🙈 Hide message</button>
+              <button disabled={busyId === r.id} onClick={() => muteAuthor(r)} style={btn(false)}>🔇 Mute author 24h</button>
+              <button disabled={busyId === r.id} onClick={() => resolve(r, 'dismissed')} style={btn(true)}>Dismiss</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── StarredView — the user's saved messages across chats (M2b) ──────
 function StarredView({ session, channels, dmChannels, isMobile, onBack, onJump }) {
   const [rows, setRows] = useState([])
@@ -1209,7 +1479,7 @@ function StarredView({ session, channels, dmChannels, isMobile, onBack, onJump }
   )
 }
 
-function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead, onMention, highlightId = null }) {
+function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead, onMention, highlightId = null, forwardTargets = [], blockedPeer = null, onUnblock = null }) {
   const [messages, setMessages] = useState([])
   const [profiles, setProfiles] = useState([])
   const [reactions, setReactions] = useState({})
@@ -1250,6 +1520,11 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   const [recState, setRecState] = useState('idle') // idle | recording | preview
   const [recElapsed, setRecElapsed] = useState(0)
   const [recPreview, setRecPreview] = useState(null) // { blob, url, duration, mime }
+  // M5 — polls, forward, announcement audience size
+  const [pollsByMsg, setPollsByMsg] = useState({})
+  const [showPollForm, setShowPollForm] = useState(false)
+  const [forwardMsg, setForwardMsg] = useState(null)
+  const [entitledCount, setEntitledCount] = useState(null)
   const mediaRecorderRef = useRef(null)
   const recStreamRef = useRef(null)
   const recChunksRef = useRef([])
@@ -1272,6 +1547,16 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     })
     return () => { cancelled = true }
   }, [messages, mediaUrls])
+
+  // M5 — announcement read counts need the entitled audience size
+  // ("Read by N of M") in the message-info sheet.
+  useEffect(() => {
+    if (!channel.is_readonly) return
+    supabase.from('profiles').select('id', { count: 'exact', head: true })
+      .or('member_class.in.(team,racing_division,pro),role.eq.admin')
+      .then(({ count }) => setEntitledCount(count ?? null))
+      .catch(() => {})
+  }, [])
 
   // Stop the microphone if the thread unmounts mid-recording.
   useEffect(() => () => {
@@ -1355,7 +1640,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         (payload) => {
           // Other people's edits (and soft deletes, M2b) land live.
           setMessages(prev => prev.map(m => m.id === payload.new.id
-            ? { ...m, content: payload.new.content, edited_at: payload.new.edited_at, deleted_at: payload.new.deleted_at }
+            ? { ...m, content: payload.new.content, edited_at: payload.new.edited_at, deleted_at: payload.new.deleted_at, moderation_status: payload.new.moderation_status }
             : m))
         })
       .subscribe()
@@ -1386,6 +1671,24 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               [row.message_id]: [...(prev[row.message_id] || []).filter(r => r.id !== row.id), row],
             }))
           }
+        })
+      .subscribe()
+    // Poll votes stream live (0012 put poll_votes in the publication;
+    // the table has no channel_id, so events are matched to polls
+    // already loaded in this thread).
+    const voteSub = supabase.channel(`pollvotes:${channel.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' },
+        (payload) => {
+          const row = payload.new?.poll_id ? payload.new : payload.old
+          if (!row?.poll_id) return
+          setPollsByMsg(prev => {
+            const msgId = Object.keys(prev).find(k => prev[k].poll.id === row.poll_id)
+            if (!msgId) return prev
+            const entry = prev[msgId]
+            let votes = entry.votes.filter(v => v.athlete_id !== row.athlete_id)
+            if (payload.eventType !== 'DELETE') votes = [...votes, payload.new]
+            return { ...prev, [msgId]: { ...entry, votes } }
+          })
         })
       .subscribe()
     // Typing + in-thread presence: one presence channel per thread.
@@ -1420,6 +1723,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       supabase.removeChannel(sub)
       supabase.removeChannel(readsSub)
       supabase.removeChannel(reactSub)
+      supabase.removeChannel(voteSub)
       supabase.removeChannel(presence)
       presenceRef.current = null
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
@@ -1507,6 +1811,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       setHasEarlier(data.length === MSG_PAGE)
       await mergeReactions(page.map(m => m.id))
       await mergeStars(page.map(m => m.id))
+      await mergePolls(page.map(m => m.id))
     }
     setTimeout(() => bottomRef.current?.scrollIntoView(), 100)
   }
@@ -1533,6 +1838,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     setHasEarlier((beforeRes.data || []).length === 50)
     await mergeReactions(win.map(m => m.id))
     await mergeStars(win.map(m => m.id))
+    await mergePolls(win.map(m => m.id))
     lastMsgIdRef.current = win[win.length - 1]?.id || null
     pinnedRef.current = false
     setTimeout(() => {
@@ -1560,6 +1866,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       setMessages(prev => [...page.filter(m => !prev.some(x => x.id === m.id)), ...prev])
       await mergeReactions(page.map(m => m.id))
       await mergeStars(page.map(m => m.id))
+      await mergePolls(page.map(m => m.id))
     }
     setLoadingEarlier(false)
   }
@@ -1661,13 +1968,32 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       if (mentionError) console.error('[Mentions] insert error:', mentionError.message)
       if (!mentionedIds.includes(userId)) onMention?.()
     }
+    // M5 — @channel: mention the whole audience. Membership-based
+    // channels use their member rows; entitlement channels fall back
+    // to every entitled profile. Capped at 100 rows.
+    const wantsChannelMention = (payload.content || '').includes('@channel') && channel.type !== 'dm'
+    if (wantsChannelMention) {
+      const { data: memberRows } = await supabase.from('channel_members').select('athlete_id').eq('channel_id', channel.id)
+      let audience = (memberRows || []).map(r => r.athlete_id)
+      if (!audience.length) {
+        const { data: entitled } = await supabase.from('profiles').select('id').or('member_class.in.(team,racing_division,pro),role.eq.admin')
+        audience = (entitled || []).map(p => p.id)
+      }
+      const extra = audience.filter(id => id !== userId && !mentionedIds.includes(id)).slice(0, 100)
+      if (extra.length) {
+        const { error: chErr } = await supabase.from('message_mentions').insert(extra.map(id => ({
+          message_id: data.id, mentioned_user_id: id, channel_id: channel.id,
+        })))
+        if (chErr) console.error('[Mentions] @channel insert error:', chErr.message)
+      }
+    }
     // M4 — Web Push fan-out, fire-and-forget: the endpoint re-verifies
     // sender + message server-side and applies visibility/mute rules.
     // Plain group messages skip the call entirely (no fan-out).
-    if (channel.type === 'dm' || channel.is_readonly || mentionedIds.length > 0) {
+    if (channel.type === 'dm' || channel.is_readonly || mentionedIds.length > 0 || wantsChannelMention) {
       notifyPush(data.id)
     }
-    return true
+    return data
   }
 
   function notifyPush(messageId) {
@@ -1700,6 +2026,138 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     } else {
       const { error } = await supabase.from('message_stars').insert({ athlete_id: userId, message_id: msg.id })
       if (!error) setStarredIds(prev => new Set(prev).add(msg.id))
+    }
+  }
+
+  // ─── M5: polls ────────────────────────────────────────────────────
+  async function mergePolls(messageIds) {
+    if (!messageIds.length) return
+    const { data: polls } = await supabase.from('polls').select('*').in('message_id', messageIds)
+    if (!polls?.length) return
+    const pollIds = polls.map(p => p.id)
+    const [{ data: options }, { data: votes }] = await Promise.all([
+      supabase.from('poll_options').select('*').in('poll_id', pollIds).order('sort'),
+      supabase.from('poll_votes').select('*').in('poll_id', pollIds),
+    ])
+    setPollsByMsg(prev => {
+      const next = { ...prev }
+      polls.forEach(p => {
+        next[p.message_id] = {
+          poll: p,
+          options: (options || []).filter(o => o.poll_id === p.id),
+          votes: (votes || []).filter(v => v.poll_id === p.id),
+        }
+      })
+      return next
+    })
+  }
+
+  async function votePoll(msgId, option) {
+    const entry = pollsByMsg[msgId]
+    if (!entry) return
+    const mine = entry.votes.find(v => v.athlete_id === userId)
+    if (mine?.option_id === option.id) {
+      // Tapping your own pick again retracts the vote.
+      const { error } = await supabase.from('poll_votes').delete()
+        .eq('poll_id', entry.poll.id).eq('athlete_id', userId)
+      if (!error) setPollsByMsg(prev => ({ ...prev, [msgId]: { ...entry, votes: entry.votes.filter(v => v.athlete_id !== userId) } }))
+    } else {
+      const { data, error } = await supabase.from('poll_votes')
+        .upsert({ poll_id: entry.poll.id, option_id: option.id, athlete_id: userId }, { onConflict: 'poll_id,athlete_id' })
+        .select().single()
+      if (!error && data) setPollsByMsg(prev => ({ ...prev, [msgId]: { ...entry, votes: [...entry.votes.filter(v => v.athlete_id !== userId), data] } }))
+    }
+  }
+
+  async function createPoll(question, labels) {
+    setShowPollForm(false)
+    const optimisticId = `optimistic-${Date.now()}-poll`
+    const optimisticMsg = {
+      id: optimisticId, channel_id: channel.id, athlete_id: userId,
+      content: question, image_url: null, reply_to: null, reply_msg: null,
+      created_at: new Date().toISOString(), profiles: profile, optimistic: true,
+    }
+    pinnedRef.current = true
+    setMessages(prev => [...prev, optimisticMsg])
+    const payload = { channel_id: channel.id, athlete_id: userId, content: question, image_url: null, reply_to: null }
+    const data = await attemptSend(payload, optimisticId)
+    if (!data) {
+      setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, optimistic: false, failed: true } : m))
+      outboxAdd({ localId: optimisticId, channel_id: channel.id, content: question, image_url: null, reply_to: null })
+      return
+    }
+    const { data: poll, error } = await supabase.from('polls')
+      .insert({ message_id: data.id, channel_id: channel.id, athlete_id: userId, question })
+      .select().single()
+    if (error || !poll) {
+      setModNotice('The poll could not be attached — your question went out as a plain message.')
+      return
+    }
+    const { data: opts } = await supabase.from('poll_options')
+      .insert(labels.map((label, i) => ({ poll_id: poll.id, label, sort: i }))).select()
+    setPollsByMsg(prev => ({ ...prev, [data.id]: { poll, options: opts || [], votes: [] } }))
+  }
+
+  // ─── M5: forward ──────────────────────────────────────────────────
+  async function forwardTo(target) {
+    const m = forwardMsg
+    setForwardMsg(null)
+    if (!m) return
+    let mediaPath = m.media_path || null
+    // Media lives under the SOURCE channel's folder and the storage
+    // policies key on channel visibility — copy the file into the
+    // target channel so its members can actually open it.
+    if (mediaPath && target.id !== channel.id) {
+      try {
+        const srcUrl = mediaUrls[mediaPath]
+        if (srcUrl) {
+          const blob = await (await fetch(srcUrl)).blob()
+          const ext = (mediaPath.split('.').pop() || 'bin').toLowerCase()
+          const newPath = mediaPathFor(target.id, userId, ext)
+          const { error: upErr } = await supabase.storage.from('message-media')
+            .upload(newPath, blob, { contentType: blob.type || undefined })
+          if (!upErr) mediaPath = newPath
+        }
+      } catch { /* fall back to the original path */ }
+    }
+    const { error } = await supabase.from('messages').insert({
+      channel_id: target.id, athlete_id: userId,
+      content: m.content || null, image_url: m.image_url || null,
+      media_path: mediaPath, media_kind: m.media_kind || null,
+      audio_duration_s: m.audio_duration_s || null, is_forwarded: true,
+    })
+    if (error) {
+      setModNotice('Forward failed — you may not be able to post there.')
+    } else {
+      setModNotice(`Forwarded to ${forwardTargetLabel(target)}`)
+      setTimeout(() => setModNotice(null), 3000)
+    }
+  }
+
+  function forwardTargetLabel(ch) {
+    if (ch.type === 'dm') return ch.display_name || dmOtherProfile(ch, userId)?.full_name || 'Direct message'
+    return raceChannelKind(ch) ? channelDisplayName(ch) : (ch.display_name || prettyName(ch.name))
+  }
+
+  // ─── M5: report + moderator unhide ────────────────────────────────
+  async function reportMessage(msg) {
+    if (!window.confirm('Report this message to the team admins?')) return
+    const { error } = await supabase.from('message_reports')
+      .insert({ reporter_id: userId, message_id: msg.id, channel_id: channel.id })
+    setModNotice(error ? 'Report failed — please try again.' : 'Reported — an admin will take a look.')
+    if (!error) setTimeout(() => setModNotice(null), 3500)
+  }
+
+  async function unhideMessage(msg) {
+    const { error } = await supabase.from('messages')
+      .update({ moderation_status: 'clean' }).eq('id', msg.id)
+    if (!error) {
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, moderation_status: 'clean' } : m))
+      await supabase.from('moderation_events').insert({
+        channel_id: channel.id, message_id: msg.id, athlete_id: msg.athlete_id,
+        source: 'admin', action: 'unhide', rule: 'manual_unhide',
+        reviewed_by: userId, reviewed_at: new Date().toISOString(),
+      })
     }
   }
 
@@ -1916,6 +2374,19 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     textareaRef.current?.focus()
   }
 
+  // M5 — @channel pseudo-mention (expanded to real mention rows in
+  // attemptSend, which is also what drives the push fan-out).
+  function insertChannelMention() {
+    if (!mentionQuery) return
+    const before = text.slice(0, mentionQuery.atIndex)
+    const after = text.slice(mentionQuery.atIndex + mentionQuery.query.length + 1)
+    const newText = `${before}@channel ${after}`
+    setText(newText)
+    setDraft(channel.id, newText)
+    setMentionQuery(null)
+    textareaRef.current?.focus()
+  }
+
   function handleKeyDown(e) {
     if (mentionQuery?.filtered?.length > 0) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, mentionQuery.filtered.length - 1)) }
@@ -1951,9 +2422,25 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, background: '#111' }}>
         {isMobile && <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', padding: '0', marginRight: '4px' }}>←</button>}
         {channel.type === 'dm' ? (
-          // DM header — show other person's avatar + name
+          // DM header — other person's avatar + name; group DMs (M5)
+          // show the group name and member count instead.
           (() => {
             const other = dmOtherProfile(channel, session.user.id)
+            const members = channel.dm_members || []
+            if (members.length > 2) {
+              const groupTitle = channel.display_name || members.filter(m => m.id !== userId).map(m => m.full_name?.split(' ')[0]).filter(Boolean).join(', ')
+              return (
+                <>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#232323', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0 }}>👥</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{groupTitle || 'Group chat'}</div>
+                    <div style={{ fontSize: '12px', color: typingUsers.length ? 'var(--brand)' : '#555' }}>
+                      {typingUsers.length ? `${typingUsers[0]} is typing…` : `${members.length} members`}
+                    </div>
+                  </div>
+                </>
+              )
+            }
             return (
               <>
                 <Avatar profile={other} size={32} />
@@ -2000,6 +2487,10 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
           const isHovered = hoveredMsg === msg.id
           const isOwn = msg.athlete_id === userId
           const modHidden = !msg.optimistic && shouldHide(msg.content) && !revealedHidden.has(msg.id)
+          // M5: a moderator-hidden message is a hard tombstone for
+          // everyone but its author and admins (who see it tagged).
+          const serverHidden = !msg.optimistic && msg.moderation_status === 'hidden'
+          const hardHidden = serverHidden && !isOwn && profile?.role !== 'admin'
 
           return (
             <div key={msg.id} id={`msg-${msg.id}`} style={{ marginTop: msg.showHeader ? '10px' : '2px', position: 'relative', background: flashId === msg.id ? 'rgba(var(--highlight-rgb),0.14)' : 'transparent', borderRadius: '12px', transition: 'background 0.6s' }}
@@ -2023,6 +2514,12 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                   >
                     🛡️ Hidden by auto-moderation · Show
                   </button>
+                </div>
+              ) : hardHidden ? (
+                <div style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start', padding: '1px 0' }}>
+                  <div style={{ background: '#181818', border: '1px dashed rgba(255,255,255,0.15)', color: '#777', fontStyle: 'italic', fontSize: '13px', borderRadius: '12px', padding: '7px 12px' }}>
+                    🛡️ Hidden by a moderator
+                  </div>
                 </div>
               ) : msg.deleted_at ? (
                 <div style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start', padding: '1px 0' }}>
@@ -2052,6 +2549,17 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '2px' }}>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: msg.profiles?.avatar_color || 'var(--brand)' }}>{msg.profiles?.full_name || 'Athlete'}</span>
                         <MemberChips profile={msg.profiles} />
+                      </div>
+                    )}
+                    {msg.is_forwarded && (
+                      <div style={{ fontSize: '11px', color: '#8a8a8a', fontStyle: 'italic', marginBottom: '2px' }}>↪ Forwarded</div>
+                    )}
+                    {serverHidden && (isOwn || profile?.role === 'admin') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#ffb4a6', marginBottom: '3px' }}>
+                        <span>🛡️ Hidden by a moderator</span>
+                        {profile?.role === 'admin' && (
+                          <button onClick={() => unhideMessage(msg)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: '#ccc', fontSize: '10.5px', padding: '1px 7px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Unhide</button>
+                        )}
                       </div>
                     )}
                     {msg.reply_msg && (
@@ -2101,6 +2609,9 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                 {msg.media_kind === 'audio' && msg.media_path && (
                   <VoiceNotePlayer src={mediaUrls[msg.media_path] || msg.local_preview || null} durationS={msg.audio_duration_s} own={isOwn} />
                 )}
+                {pollsByMsg[msg.id] && !msg.deleted_at && (
+                  <PollView pollData={pollsByMsg[msg.id]} userId={userId} onVote={(opt) => votePoll(msg.id, opt)} />
+                )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '3px' }}>
                       {msg.failed ? (
                         <button onClick={() => retrySend(msg)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#ff8a7a', padding: 0, fontFamily: 'Barlow, sans-serif' }}>
@@ -2141,7 +2652,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               </div>)}{/* /bubble row */}
 
               {/* Hover actions */}
-              {isHovered && !msg.optimistic && !modHidden && !msg.deleted_at && !msg.failed && (
+              {isHovered && !msg.optimistic && !modHidden && !hardHidden && !msg.deleted_at && !msg.failed && (
                 <div style={{ position: 'absolute', right: 0, top: '-8px', display: 'flex', gap: '2px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px 6px', zIndex: 5 }}>
                   {QUICK_EMOJIS.slice(0, 4).map(e => (
                     <button key={e} onClick={() => toggleReaction(msg.id, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '2px', lineHeight: 1 }}>{e}</button>
@@ -2161,6 +2672,14 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                     <>
                       <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
                       <button onClick={() => deleteMessage(msg)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', lineHeight: 1, color: '#ff8a7a', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>Delete</button>
+                    </>
+                  )}
+                  <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
+                  <button onClick={() => setForwardMsg(msg)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', lineHeight: 1, color: '#999', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>↪ Forward</button>
+                  {msg.athlete_id !== userId && (
+                    <>
+                      <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
+                      <button onClick={() => reportMessage(msg)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', lineHeight: 1, color: '#999', fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.5px' }}>⚑ Report</button>
                     </>
                   )}
                 </div>
@@ -2210,7 +2729,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{waClock(infoMsg.created_at)}</div>
             </div>
             <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#888', marginBottom: '8px' }}>
-              Read by {seenByProfiles(infoMsg, rMap, profilesById, userId).length}
+              Read by {seenByProfiles(infoMsg, rMap, profilesById, userId).length}{channel.is_readonly && entitledCount ? ` of ${entitledCount}` : ''}
             </div>
             {seenByProfiles(infoMsg, rMap, profilesById, userId).map(s => (
               <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0' }}>
@@ -2226,14 +2745,42 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         </div>
       ), document.body)}
 
+      {/* Poll composer (M5) */}
+      {showPollForm && <PollComposer onClose={() => setShowPollForm(false)} onCreate={createPoll} />}
+
+      {/* Forward target picker (M5) — portal to body like the
+          other sheets so it escapes the scrolling main. */}
+      {forwardMsg && createPortal((
+        <div onClick={() => setForwardMsg(null)} style={{ position: 'fixed', inset: 0, zIndex: 240, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '480px', maxHeight: '65vh', overflow: 'auto', padding: '10px 0 calc(10px + env(safe-area-inset-bottom, 0px))' }}>
+            <div style={{ padding: '10px 20px 6px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#fff' }}>↪ Forward to…</div>
+            {(forwardTargets || []).filter(t => t.id !== channel.id).map(t => (
+              <button key={t.id} onClick={() => forwardTo(t)} style={MENU_ROW_STYLE}>
+                <span style={{ marginRight: '10px' }}>{t.type === 'dm' ? '💬' : '#'}</span>{forwardTargetLabel(t)}
+              </button>
+            ))}
+            {(forwardTargets || []).filter(t => t.id !== channel.id).length === 0 && (
+              <div style={{ padding: '12px 20px', fontSize: '13.5px', color: '#666' }}>No other chats available.</div>
+            )}
+            <button onClick={() => setForwardMsg(null)} style={{ ...MENU_ROW_STYLE, color: '#999' }}>Cancel</button>
+          </div>
+        </div>
+      ), document.body)}
+
       {isOffline && (
         <div style={{ background: 'rgba(255,138,122,0.12)', borderTop: '1px solid rgba(255,138,122,0.3)', padding: '7px 16px', fontSize: '12.5px', color: '#ffb4a6', textAlign: 'center' }}>
           You're offline — messages will queue here and send when you reconnect.
         </div>
       )}
 
-      {/* Input area — hidden for readonly channels unless admin */}
-      {channel.is_readonly && profile?.role !== 'admin' ? (
+      {/* Input area — blocked peers (M5) and readonly channels get a
+          bar instead of the composer */}
+      {blockedPeer ? (
+        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#111', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', color: '#999' }}>You blocked {blockedPeer.full_name || 'this member'} — you can't message them.</span>
+          <button onClick={onUnblock} style={{ background: 'var(--brand)', border: 'none', borderRadius: '6px', color: '#03292b', fontSize: '12px', fontWeight: 700, padding: '6px 12px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Unblock</button>
+        </div>
+      ) : channel.is_readonly && profile?.role !== 'admin' ? (
         <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#111', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           <span style={{ fontSize: '16px' }}>📢</span>
           <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', color: '#555', textTransform: 'uppercase' }}>Announcements — admin posts only</span>
@@ -2287,8 +2834,16 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         )}
 
         {/* @mention dropdown */}
-        {mentionQuery?.filtered?.length > 0 && (
-          <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', marginBottom: '6px', overflow: 'hidden', maxHeight: '160px', overflowY: 'auto' }}>
+        {mentionQuery && (mentionQuery.filtered?.length > 0 || channel.type !== 'dm') && (
+          <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', marginBottom: '6px', overflow: 'hidden', maxHeight: '190px', overflowY: 'auto' }}>
+            {channel.type !== 'dm' && 'channel'.startsWith(mentionQuery.query) && (
+              <button onClick={insertChannelMention}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', background: 'rgba(var(--highlight-rgb),0.08)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--highlight)', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>@</span>
+                <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '14px', color: '#fff' }}>channel</span>
+                <span style={{ fontSize: '11.5px', color: '#888' }}>Notify everyone in this channel</span>
+              </button>
+            )}
             {mentionQuery.filtered.slice(0, 6).map((p, i) => (
               <button key={p.id} onClick={() => insertMention(p)}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', background: i === mentionIndex ? 'rgba(var(--brand-rgb),0.1)' : 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
@@ -2302,6 +2857,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.09)', borderRadius: replyTo ? '0 0 24px 24px' : '24px', padding: '6px 8px 6px 14px' }}>
           <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleImageUpload} />
           <button onClick={() => fileRef.current.click()} style={{ background: 'none', border: 'none', color: '#555', fontSize: '20px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>📎</button>
+          <button onClick={() => setShowPollForm(true)} aria-label="Create a poll" style={{ background: 'none', border: 'none', color: '#555', fontSize: '17px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}>📊</button>
           <textarea
             ref={textareaRef}
             style={{ flex: 1, background: 'none', border: 'none', color: '#fff', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', resize: 'none', lineHeight: 1.5, minHeight: '20px', maxHeight: '120px', padding: '0' }}
@@ -2412,16 +2968,47 @@ function DMGroup({ dmChannels, selected, unread, lastMessages, userId, onSelect,
 }
 
 // ─── NewDmModal — athlete picker to start a DM ───────────────────────────────
-function NewDmModal({ userId, onClose, onCreated }) {
+function NewDmModal({ userId, onClose, onCreated, blockedIds = new Set() }) {
   const [profiles, setProfiles] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState(null) // athlete id being DM'd
+  // M5 — group DM mode: pick 2+ members, optional name.
+  const [groupMode, setGroupMode] = useState(false)
+  const [picked, setPicked] = useState(() => new Set())
+  const [groupName, setGroupName] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
 
   useEffect(() => {
     supabase.from('profiles').select('id, full_name, avatar_color, avatar_url').neq('id', userId).order('full_name')
-      .then(({ data }) => { setProfiles(data || []); setLoading(false) })
+      .then(({ data }) => { setProfiles((data || []).filter(p => !blockedIds.has(p.id))); setLoading(false) })
   }, [])
+
+  function togglePick(id) {
+    setPicked(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else if (next.size < 20) next.add(id)
+      return next
+    })
+  }
+
+  async function createGroup() {
+    if (picked.size < 2) return
+    setCreatingGroup(true)
+    const { data, error } = await supabase.rpc('create_group_dm_channel', {
+      member_ids: [...picked],
+      display_name: groupName.trim(),
+    })
+    if (error) { console.error('create_group_dm_channel error:', error); setCreatingGroup(false); return }
+    const channelId = typeof data === 'string' ? data : (data?.id ?? data)
+    if (!channelId) { setCreatingGroup(false); return }
+    const { data: dmPeers } = await supabase.rpc('get_dm_peers', { p_channel_ids: [channelId] })
+    onCreated({
+      id: channelId, type: 'dm', display_name: groupName.trim() || null,
+      dm_members: (dmPeers || []).map(m => ({ id: m.id, full_name: m.full_name, avatar_color: m.avatar_color, avatar_url: m.avatar_url })).filter(Boolean),
+    })
+  }
 
   const filtered = profiles.filter(p =>
     !query.trim() || p.full_name?.toLowerCase().includes(query.toLowerCase())
@@ -2447,7 +3034,16 @@ function NewDmModal({ userId, onClose, onCreated }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderTop: '3px solid #a78bfa', borderRadius: '10px', padding: '2rem', width: '100%', maxWidth: '400px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#a78bfa', marginBottom: '1.25rem' }}>New Message</div>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '20px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: '#a78bfa', marginBottom: '1rem' }}>New Message</div>
+
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+          {[['direct', 'Direct message'], ['group', 'Group chat']].map(([mode, label]) => (
+            <button key={mode} onClick={() => setGroupMode(mode === 'group')}
+              style={{ flex: 1, padding: '7px 4px', borderRadius: '6px', border: '1px solid', borderColor: (mode === 'group') === groupMode ? '#a78bfa' : 'rgba(255,255,255,0.12)', background: (mode === 'group') === groupMode ? 'rgba(167,139,250,0.12)' : 'transparent', color: (mode === 'group') === groupMode ? '#a78bfa' : '#888', fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.5px' }}>
+              {label}
+            </button>
+          ))}
+        </div>
 
         <input
           autoFocus
@@ -2456,6 +3052,14 @@ function NewDmModal({ userId, onClose, onCreated }) {
           onChange={e => setQuery(e.target.value)}
           style={{ width: '100%', background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', padding: '10px 12px', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }}
         />
+        {groupMode && (
+          <input
+            placeholder="Group name (optional)"
+            value={groupName}
+            onChange={e => setGroupName(e.target.value)}
+            style={{ width: '100%', background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: '#fff', padding: '10px 12px', fontSize: '14px', fontFamily: 'Barlow, sans-serif', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }}
+          />
+        )}
 
         <div style={{ flex: 1, overflow: 'auto' }}>
           {loading ? (
@@ -2465,26 +3069,35 @@ function NewDmModal({ userId, onClose, onCreated }) {
           ) : filtered.map(athlete => (
             <button
               key={athlete.id}
-              onClick={() => startDm(athlete)}
+              onClick={() => groupMode ? togglePick(athlete.id) : startDm(athlete)}
               disabled={!!starting}
-              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 8px', background: starting === athlete.id ? 'rgba(167,139,250,0.1)' : 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', marginBottom: '2px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 8px', background: starting === athlete.id || (groupMode && picked.has(athlete.id)) ? 'rgba(167,139,250,0.1)' : 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', marginBottom: '2px' }}
             >
               <Avatar profile={athlete} size={36} />
               <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', color: '#fff', fontWeight: 600 }}>{athlete.full_name}</span>
               {starting === athlete.id && <span style={{ fontSize: '12px', color: '#a78bfa', marginLeft: 'auto' }}>Opening…</span>}
+              {groupMode && (
+                <span style={{ marginLeft: 'auto', width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${picked.has(athlete.id) ? '#a78bfa' : 'rgba(255,255,255,0.25)'}`, background: picked.has(athlete.id) ? '#a78bfa' : 'transparent', color: '#000', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{picked.has(athlete.id) ? '✓' : ''}</span>
+              )}
             </button>
           ))}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <button onClick={onClose} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase', padding: '10px 20px', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '5px', color: '#999', cursor: 'pointer' }}>Cancel</button>
+          {groupMode && (
+            <button onClick={createGroup} disabled={picked.size < 2 || creatingGroup}
+              style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', padding: '10px 20px', background: '#a78bfa', border: 'none', borderRadius: '5px', color: '#000', cursor: picked.size >= 2 ? 'pointer' : 'default', opacity: picked.size >= 2 ? 1 : 0.45 }}>
+              {creatingGroup ? 'Creating…' : `Create group (${picked.size})`}
+            </button>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function NewChannelModal({ session, onClose, onCreated }) {
+function NewChannelModal({ session, onClose, onCreated, isAdmin = false }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('general')
@@ -2508,8 +3121,13 @@ function NewChannelModal({ session, onClose, onCreated }) {
     // name suffix): the live type CHECK constraint rejects new type values
     // until migration 0003 widens it. See lib/channels.js.
     const channelName = category === 'race' && !n.endsWith('-logistics') ? `${n}-logistics` : n
+    // M5 — member-proposed channels start 'pending': invisible to
+    // everyone but the creator and admins until an admin approves
+    // (migration 0012 gates both the helper and the message policies).
+    const payload = { name: channelName, type, category, description: description.trim() || null, created_by: session.user.id }
+    if (!isAdmin) payload.status = 'pending'
     const { data, error: err } = await supabase.from('channels')
-      .insert({ name: channelName, type, category, description: description.trim() || null, created_by: session.user.id })
+      .insert(payload)
       .select('*, races(name)').single()
     if (err) { setError(err.message); setSaving(false); return }
     onCreated(data)
@@ -2543,10 +3161,15 @@ function NewChannelModal({ session, onClose, onCreated }) {
           <label style={labelStyle}>Description (optional)</label>
           <input style={inputStyle} placeholder="What's this channel about?" value={description} onChange={e => setDescription(e.target.value)} />
         </div>
+        {!isAdmin && (
+          <div style={{ fontSize: '12.5px', color: '#999', lineHeight: 1.5, marginBottom: '12px' }}>
+            New channels are reviewed by an admin before the team can see them. Yours opens for you right away and appears for everyone once approved.
+          </div>
+        )}
         {error && <div style={{ color: 'var(--accent)', fontSize: '13px', marginBottom: '12px' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase', padding: '10px 20px', background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '5px', color: '#999', cursor: 'pointer' }}>Cancel</button>
-          <button onClick={create} disabled={saving} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: 'var(--brand)', border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer' }}>{saving ? 'Creating...' : 'Create'}</button>
+          <button onClick={create} disabled={saving} style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 24px', background: 'var(--brand)', border: 'none', borderRadius: '5px', color: '#000', cursor: 'pointer' }}>{saving ? 'Creating...' : isAdmin ? 'Create' : 'Submit for approval'}</button>
         </div>
       </div>
     </div>
