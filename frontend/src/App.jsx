@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import ErrorBoundary from './components/ErrorBoundary'
 import MemberProfileHost from './components/MemberProfile'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
@@ -17,6 +17,13 @@ import { track, setAnalyticsUser } from './lib/track'
 import Layout from './components/Layout'
 import TeamLocked from './components/TeamLocked'
 import { isTeamTier } from './lib/tier'
+
+// The public website embed (/embed): a standalone, login-free,
+// counts-only race map for the TTL website. Lazy so the public page's
+// map engines stay out of the signed-in app's first paint, and gated
+// by pathname in App() below — it must render for a logged-out
+// visitor, outside the session gate and outside Layout's chrome.
+const EmbedMap = lazy(() => import('./pages/EmbedMap'))
 
 function AppRoutes({ session, profile, setProfile }) {
   const [unreadCount, setUnreadCount] = useState(0)
@@ -118,6 +125,21 @@ export default function App() {
     setHasProfile(!!(data && nameIsReal))
     if (data) setProfile(data)
     setLoading(false)
+  }
+
+  // Public embed route: checked before every session gate so a
+  // logged-out website visitor gets the map, never the login page.
+  // Existing routes and the login flow are untouched.
+  if (typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/embed') {
+    return (
+      <Suspense fallback={
+        <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#05090e' }}>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, letterSpacing: 3, color: '#5c6a68', textTransform: 'uppercase' }}>Loading the team race map…</div>
+        </div>
+      }>
+        <EmbedMap />
+      </Suspense>
+    )
   }
 
   if (loading) return (
