@@ -255,7 +255,7 @@ async function loadActivityItems(supabase) {
 }
 
 async function loadFeedPosts(team, userId) {
-  const { data: chans } = await supabase.from('channels').select('id, name, type, category, audience, race_id')
+  const { data: chans } = await supabase.from('channels').select('id, name, type, category, race_id')
   if (!chans) return []
   const byId = {}
   const allowed = []
