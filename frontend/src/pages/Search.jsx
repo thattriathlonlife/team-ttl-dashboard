@@ -96,6 +96,26 @@ export default function Search({ profile }) {
     })()
   }, [team])
 
+  // Message search (M2b): server-side full-text over messages.content
+  // (content_tsv, migration 0010). RLS scopes results to channels the
+  // signed-in user can actually see. Debounced; independent of the
+  // local index above.
+  const [msgResults, setMsgResults] = useState([])
+  useEffect(() => {
+    if (query.trim().length < 2) { setMsgResults([]); return }
+    let cancelled = false
+    const t = setTimeout(async () => {
+      const { data } = await supabase.from('messages')
+        .select('id, channel_id, content, created_at, profiles(full_name), channels(name, type, category)')
+        .textSearch('content_tsv', query.trim(), { type: 'websearch', config: 'english' })
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (!cancelled) setMsgResults(data || [])
+    }, 250)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [query])
+
   const q = query.trim().toLowerCase()
   const match = (s) => s && s.toLowerCase().includes(q)
   const results = (!index || q.length < 2) ? null : {
@@ -136,7 +156,28 @@ export default function Search({ profile }) {
           <div style={S.empty}>Searches everything in the app: {index.races.length} races, {index.athletes.length} athletes, {index.channels.length} channels, and all TTL podcast episodes, videos, and stories.</div>
         </>
       )}
-      {results && total === 0 && <div style={S.empty}>Nothing matches “{query}”.</div>}
+      {results && total === 0 && msgResults.length === 0 && <div style={S.empty}>Nothing matches “{query}”.</div>}
+
+      {q.length >= 2 && msgResults.length > 0 && (
+        <>
+          <div style={S.h}>Messages</div>
+          {msgResults.map(m => {
+            const chLabel = m.channels?.type === 'dm'
+              ? 'Direct message'
+              : m.channels ? channelDisplayName({ name: m.channels.name, type: m.channels.type, category: m.channels.category }) : 'Chat'
+            const when = new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            return (
+              <button key={m.id} style={S.row} onClick={() => { remember(query); navigate(`/messages?${m.channels?.type === 'dm' ? 'dm' : 'channel'}=${m.channel_id}&highlight=${m.id}`) }}>
+                <span style={S.icon}>💬</span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ ...S.title, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.content}</span>
+                  <span style={{ ...S.meta, display: 'block' }}>{m.profiles?.full_name || 'Athlete'} · {chLabel} · {when}</span>
+                </span>
+              </button>
+            )
+          })}
+        </>
+      )}
 
       {results && results.races.length > 0 && (
         <>
