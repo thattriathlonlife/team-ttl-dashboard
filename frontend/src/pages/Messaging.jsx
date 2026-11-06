@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { isTeamTier } from '../lib/tier'
@@ -9,6 +10,9 @@ import { pageCacheGet, pageCacheSet } from '../lib/pageCache'
 import MemberChips from '../components/MemberChips'
 import { openMember } from '../lib/memberView'
 import { track } from '../lib/track'
+import { readsMap, dmTickState, seenByProfiles } from '../lib/receipts'
+import { getDraft, setDraft, clearDraft } from '../lib/drafts'
+import { subscribeOnline, getOnline } from '../lib/presence'
 
 // Given a DM channel (with dm_members hydrated), return the other person's profile
 function dmOtherProfile(channel, userId) {
@@ -114,6 +118,11 @@ export default function Messaging({ session, profile, onReadChannel }) {
   }, [searchParams, channels, dmChannels])
 
   const [lastMessages, setLastMessages] = useState(() => cachedMsg?.lastMessages || {})
+
+  // Online presence (M2a): DM rows show a green dot for peers who are
+  // in the app right now.
+  const [onlineIds, setOnlineIds] = useState(() => new Set(getOnline().keys()))
+  useEffect(() => subscribeOnline(m => setOnlineIds(new Set(m.keys()))), [])
 
   async function loadChannels() {
     // 3 parallel queries instead of N+1
@@ -341,15 +350,18 @@ export default function Messaging({ session, profile, onReadChannel }) {
             if (item.kind === 'dm') {
               const other = dmOtherProfile(ch, userId)
               const senderPrefix = last ? (last.athlete_id === userId ? 'You: ' : '') : ''
+              const draftText = getDraft(ch.id)
               return (
                 <ChatRow
                   key={ch.id}
                   avatar={<Avatar profile={other} size={52} />}
                   name={other?.full_name || 'Direct message'}
-                  preview={last ? `${senderPrefix}${last.content || '📷 Photo'}` : 'No messages yet'}
+                  preview={draftText.trim() ? `Draft: ${draftText}` : last ? `${senderPrefix}${last.content || '📷 Photo'}` : 'No messages yet'}
                   time={waListTime(last?.created_at)}
                   unread={unread}
                   selected={isSelected}
+                  online={!!other && onlineIds.has(other.id)}
+                  draft={!!draftText.trim()}
                   onClick={() => openChannel(ch)}
                 />
               )
@@ -357,6 +369,7 @@ export default function Messaging({ session, profile, onReadChannel }) {
 
             const locked = !teamView && isTeamOnlyChannel(ch)
             const kind = raceChannelKind(ch)
+            const draftText = locked ? '' : getDraft(ch.id)
             const sender = last ? (last.athlete_id === userId ? 'You' : last.profiles?.full_name?.split(' ')[0]) : null
             const badge = kind === 'discussion'
               ? <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', background: 'rgba(var(--highlight-rgb),0.13)', color: 'var(--highlight)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Public</span>
@@ -368,12 +381,13 @@ export default function Messaging({ session, profile, onReadChannel }) {
                 key={ch.id}
                 avatar={<ChannelDisc ch={ch} />}
                 name={kind ? channelDisplayName(ch) : prettyName(ch.name)}
-                preview={locked ? '🔒 Team only' : last ? `${sender ? `${sender}: ` : ''}${last.content || '📷 Photo'}` : 'No messages yet'}
+                preview={draftText.trim() ? `Draft: ${draftText}` : locked ? '🔒 Team only' : last ? `${sender ? `${sender}: ` : ''}${last.content || '📷 Photo'}` : 'No messages yet'}
                 time={locked ? '' : waListTime(last?.created_at)}
                 unread={locked ? 0 : unread}
                 selected={isSelected}
                 badge={badge}
                 dimmed={locked}
+                draft={!!draftText.trim()}
                 onClick={() => openChannel(ch)}
               />
             )
@@ -689,7 +703,7 @@ export function ChannelDisc({ ch, size = 52 }) {
   )
 }
 
-export function ChatRow({ avatar, name, preview, time, unread = 0, selected = false, onClick, badge = null, dimmed = false }) {
+export function ChatRow({ avatar, name, preview, time, unread = 0, selected = false, onClick, badge = null, dimmed = false, online = false, draft = false }) {
   return (
     <button
       onClick={onClick}
@@ -699,7 +713,10 @@ export function ChatRow({ avatar, name, preview, time, unread = 0, selected = fa
         border: 'none', cursor: 'pointer', textAlign: 'left', alignItems: 'flex-start',
       }}
     >
-      {avatar}
+      <span style={{ position: 'relative', flexShrink: 0 }}>
+        {avatar}
+        {online && <span style={{ position: 'absolute', right: 0, bottom: 1, width: 12, height: 12, borderRadius: '50%', background: '#25d366', border: '2px solid #0b0b0b' }} />}
+      </span>
       <div style={{ flex: 1, minWidth: 0, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '11px' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
           <span style={{ flex: 1, minWidth: 0, fontFamily: 'Barlow, sans-serif', fontSize: '16px', fontWeight: unread > 0 ? 700 : 600, color: dimmed ? '#777' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.25 }}>
@@ -713,7 +730,7 @@ export function ChatRow({ avatar, name, preview, time, unread = 0, selected = fa
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-          <span style={{ flex: 1, minWidth: 0, fontSize: '13.5px', color: dimmed ? '#555' : unread > 0 ? '#bbb' : '#8a8a8a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.35 }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: '13.5px', color: draft ? 'var(--brand)' : dimmed ? '#555' : unread > 0 ? '#bbb' : '#8a8a8a', fontStyle: draft ? 'italic' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.35 }}>
             {preview || ' '}
           </span>
           {unread > 0 && (
@@ -889,7 +906,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   const [messages, setMessages] = useState([])
   const [profiles, setProfiles] = useState([])
   const [reactions, setReactions] = useState({})
-  const [text, setText] = useState('')
+  const [text, setText] = useState(() => getDraft(channel.id))
   const [replyTo, setReplyTo] = useState(null)
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -910,6 +927,53 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   const fileRef = useRef()
   const textareaRef = useRef()
   const userId = session.user.id
+  // M2a — receipts, typing/presence, scroll management
+  const [channelReads, setChannelReads] = useState([])
+  const [typingUsers, setTypingUsers] = useState([])
+  const [peerOnline, setPeerOnline] = useState(false)
+  const [infoMsg, setInfoMsg] = useState(null)
+  const [unseenNew, setUnseenNew] = useState(0)
+  const scrollRef = useRef()
+  const pinnedRef = useRef(true)
+  const prependRef = useRef(null)
+  const presenceRef = useRef(null)
+  const typingTimerRef = useRef(null)
+  const typingSentRef = useRef(0)
+
+  async function loadReads() {
+    const { data } = await supabase.from('channel_reads').select('athlete_id, last_read_at').eq('channel_id', channel.id)
+    if (data) setChannelReads(data)
+  }
+
+  async function markReadNow() {
+    const readAt = new Date(Date.now() + 1000).toISOString()
+    await supabase.from('channel_reads').upsert(
+      { channel_id: channel.id, athlete_id: userId, last_read_at: readAt },
+      { onConflict: 'channel_id,athlete_id' }
+    )
+    onMarkRead?.()
+  }
+
+  function noteTyping() {
+    const now = Date.now()
+    if (now - typingSentRef.current > 2000) {
+      typingSentRef.current = now
+      presenceRef.current?.track({ user_id: userId, name: profile?.full_name || 'Athlete', typing: true }).catch(() => {})
+    }
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+    typingTimerRef.current = setTimeout(() => {
+      presenceRef.current?.track({ user_id: userId, name: profile?.full_name || 'Athlete', typing: false }).catch(() => {})
+      typingSentRef.current = 0
+    }, 3000)
+  }
+
+  function handleThreadScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+    if (pinnedRef.current && unseenNew > 0) setUnseenNew(0)
+    if (el.scrollTop < 120 && hasEarlier && !loadingEarlier) loadEarlier()
+  }
 
   useEffect(() => {
     // Analytics: opening the announcements thread is the suite's
@@ -918,6 +982,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
     if (channel.is_readonly || channel.category === 'announcements') track('announcement_viewed')
     loadMessages()
     loadProfiles()
+    loadReads()
     const sub = supabase.channel(`messages:${channel.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${channel.id}` },
         async (payload) => {
@@ -927,24 +992,103 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
               .then(({ data }) => {
                 if (data) {
                   setMessages(p => p.some(m => m.id === data.id) ? p : [...p, data])
-                  // Only mark read automatically if the message is from the current user
-                  // (they're already looking at it). Other people's messages stay unread
-                  // until the user explicitly opens the channel.
+                  // M2a fix: a message arriving while this thread is
+                  // open IS being read — advance my read marker so the
+                  // unread badge doesn't resurrect it on reload.
                   if (payload.new.athlete_id === userId) onMarkRead()
+                  else {
+                    markReadNow()
+                    if (!pinnedRef.current) setUnseenNew(n => n + 1)
+                  }
                 }
               })
             return prev
           })
         })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `channel_id=eq.${channel.id}` },
+        (payload) => {
+          // Other people's edits (and soft deletes, M2b) land live.
+          setMessages(prev => prev.map(m => m.id === payload.new.id
+            ? { ...m, content: payload.new.content, edited_at: payload.new.edited_at, deleted_at: payload.new.deleted_at }
+            : m))
+        })
       .subscribe()
-    return () => supabase.removeChannel(sub)
+    // Receipts: other members' read markers stream in (0011).
+    const readsSub = supabase.channel(`reads:${channel.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_reads', filter: `channel_id=eq.${channel.id}` },
+        () => loadReads())
+      .subscribe()
+    // Reactions stream live now (0010 put them in the publication and
+    // added channel_id for this filter).
+    const reactSub = supabase.channel(`reactions:${channel.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions', filter: `channel_id=eq.${channel.id}` },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const rid = payload.old?.id
+            if (rid) setReactions(prev => {
+              const next = {}
+              for (const [mid, rows] of Object.entries(prev)) {
+                const kept = rows.filter(r => r.id !== rid)
+                if (kept.length) next[mid] = kept
+              }
+              return next
+            })
+          } else if (payload.new?.message_id) {
+            const row = payload.new
+            setReactions(prev => ({
+              ...prev,
+              [row.message_id]: [...(prev[row.message_id] || []).filter(r => r.id !== row.id), row],
+            }))
+          }
+        })
+      .subscribe()
+    // Typing + in-thread presence: one presence channel per thread.
+    const presence = supabase.channel(`typing:${channel.id}`, { config: { presence: { key: userId } } })
+    presenceRef.current = presence
+    presence
+      .on('presence', { event: 'sync' }, () => {
+        const state = presence.presenceState()
+        const others = []
+        Object.entries(state).forEach(([uid, metas]) => {
+          if (uid !== userId && metas?.length) others.push(metas[0])
+        })
+        setTypingUsers(others.filter(o => o.typing).map(o => o.name || 'Someone'))
+        setPeerOnline(others.length > 0)
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          try { await presence.track({ user_id: userId, name: profile?.full_name || 'Athlete', typing: false }) } catch { /* non-fatal */ }
+        }
+      })
+    return () => {
+      supabase.removeChannel(sub)
+      supabase.removeChannel(readsSub)
+      supabase.removeChannel(reactSub)
+      supabase.removeChannel(presence)
+      presenceRef.current = null
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+    }
   }, [channel.id])
 
   useEffect(() => {
+    // History prepend: restore the reading position after older
+    // messages land above (the container grew by the prepended
+    // height; shift scrollTop by the same amount).
+    if (prependRef.current != null && scrollRef.current) {
+      const el = scrollRef.current
+      el.scrollTop += el.scrollHeight - prependRef.current
+      prependRef.current = null
+      return
+    }
     const lastId = messages[messages.length - 1]?.id
     if (lastId && lastId !== lastMsgIdRef.current) {
+      const isFirstLoad = lastMsgIdRef.current === null
       lastMsgIdRef.current = lastId
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      // Only follow the tail when the reader is pinned to the bottom
+      // (or on first load) — never yank someone reading history.
+      if (isFirstLoad || pinnedRef.current) {
+        bottomRef.current?.scrollIntoView({ behavior: isFirstLoad ? 'auto' : 'smooth' })
+      }
     }
   }, [messages])
 
@@ -986,6 +1130,9 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   async function loadEarlier() {
     if (loadingEarlier || !messages.length) return
     setLoadingEarlier(true)
+    // Capture the height now; the messages effect restores the
+    // reading position once the older page has rendered above.
+    prependRef.current = scrollRef.current?.scrollHeight ?? null
     const { data } = await supabase.from('messages').select(MSG_SELECT)
       .eq('channel_id', channel.id).lt('created_at', messages[0].created_at)
       .order('created_at', { ascending: false }).limit(MSG_PAGE)
@@ -1045,8 +1192,10 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       reply_to: replyTo?.id || null, reply_msg: replyTo ? { id: replyTo.id, content: replyTo.content, profiles: replyTo.profiles } : null,
       created_at: new Date().toISOString(), profiles: profile, optimistic: true,
     }
+    pinnedRef.current = true
     setMessages(prev => [...prev, optimisticMsg])
     setText('')
+    clearDraft(channel.id)
     setReplyTo(null)
     setSending(true)
 
@@ -1108,7 +1257,7 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
       await supabase.from('message_reactions').delete().eq('id', existing.id)
       setReactions(prev => ({ ...prev, [messageId]: (prev[messageId] || []).filter(r => r.id !== existing.id) }))
     } else {
-      const { data, error } = await supabase.from('message_reactions').insert({ message_id: messageId, athlete_id: userId, emoji }).select().single()
+      const { data, error } = await supabase.from('message_reactions').insert({ message_id: messageId, athlete_id: userId, emoji, channel_id: channel.id }).select().single()
       if (!error && data) setReactions(prev => ({ ...prev, [messageId]: [...(prev[messageId] || []), data] }))
     }
   }
@@ -1130,6 +1279,8 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
   function handleTextChange(e) {
     const val = e.target.value
     setText(val)
+    setDraft(channel.id, val)
+    noteTyping()
     const cursor = e.target.selectionStart
     const textUpToCursor = val.slice(0, cursor)
     const atMatch = textUpToCursor.match(/@(\w[\w\s]*)$/)
@@ -1175,6 +1326,12 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
 
   const displayName = channelDisplayName(channel)
   const accessLabel = channelAccessLabel(channel)
+  // M2a receipts derivation (channel_reads → ticks / seen-by)
+  const rMap = readsMap(channelReads)
+  const profilesById = {}
+  profiles.forEach(p => { profilesById[p.id] = p })
+  const dmPeer = channel.type === 'dm' ? dmOtherProfile(channel, userId) : null
+  const dmPeerReadAt = dmPeer ? (channelReads.find(r => r.athlete_id === dmPeer.id)?.last_read_at || null) : null
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
@@ -1190,7 +1347,9 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                 <Avatar profile={other} size={32} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '16px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{other?.full_name || 'DM'}</div>
-                  <div style={{ fontSize: '12px', color: '#555' }}>Direct message</div>
+                  <div style={{ fontSize: '12px', color: typingUsers.length ? 'var(--brand)' : peerOnline ? '#7d7d7d' : '#555' }}>
+                    {typingUsers.length ? 'typing…' : peerOnline ? 'online' : 'Direct message'}
+                  </div>
                 </div>
               </>
             )
@@ -1212,13 +1371,12 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         )}
       </div>
 
-      {/* Messages */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        {hasEarlier && messages.length > 0 && (
-          <div style={{ textAlign: 'center', padding: '6px 0 10px' }}>
-            <button onClick={loadEarlier} disabled={loadingEarlier} style={{ background: '#1f1f1f', border: '1px solid rgba(255,255,255,0.12)', color: '#ccc', borderRadius: 999, padding: '6px 14px', fontSize: 12, fontFamily: 'Barlow, sans-serif', cursor: 'pointer' }}>
-              {loadingEarlier ? 'Loading…' : 'Load earlier messages'}
-            </button>
+      {/* Messages — history loads on scroll-up now (the old button is
+          gone); position is preserved across prepends. */}
+      <div ref={scrollRef} onScroll={handleThreadScroll} style={{ flex: 1, overflow: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        {loadingEarlier && (
+          <div style={{ textAlign: 'center', padding: '6px 0 10px', color: '#666', fontSize: '12px', fontFamily: 'Barlow, sans-serif' }}>
+            Loading earlier messages…
           </div>
         )}
         {messages.length === 0 && (
@@ -1314,8 +1472,19 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
                 {msg.image_url && (
                   <img src={msg.image_url} alt="shared" style={{ maxWidth: '280px', maxHeight: '300px', borderRadius: '8px', marginTop: '4px', display: 'block', cursor: 'pointer', objectFit: 'cover', opacity: msg.optimistic ? 0.5 : 1, transition: 'opacity 0.2s' }} onClick={() => setLightbox(msg.image_url)} />
                 )}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '3px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '3px' }}>
                       <span style={{ fontSize: '10.5px', color: 'rgba(255,255,255,0.52)' }}>{msg.optimistic ? 'Sending…' : waClock(msg.created_at)}</span>
+                      {isOwn && !msg.optimistic && channel.type === 'dm' && (
+                        <span style={{ fontSize: '10px', marginLeft: '4px', letterSpacing: '-2.5px', fontWeight: 700, color: dmTickState(msg.created_at, dmPeerReadAt) === 'read' ? '#53bdeb' : 'rgba(255,255,255,0.45)' }}>
+                          {dmTickState(msg.created_at, dmPeerReadAt) === 'read' ? '✓✓' : '✓'}
+                        </span>
+                      )}
+                      {isOwn && !msg.optimistic && channel.type !== 'dm' && (
+                        <button onClick={() => setInfoMsg(msg)} aria-label="Message info — who has read this"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 700, letterSpacing: '-2.5px', marginLeft: '4px', padding: 0, lineHeight: 1, color: seenByProfiles(msg, rMap, profilesById, userId).length ? '#53bdeb' : 'rgba(255,255,255,0.4)' }}>
+                          {seenByProfiles(msg, rMap, profilesById, userId).length ? '✓✓' : '✓'}
+                        </button>
+                      )}
                     </div>
                   </div>{/* /bubble */}
 
@@ -1364,6 +1533,52 @@ function MessageThread({ channel, session, profile, isMobile, onBack, onMarkRead
         })}
         <div ref={bottomRef} />
       </div>
+
+      {/* New-messages pill: appears instead of yanking the scroll when
+          messages land while reading history. */}
+      {unseenNew > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 0', background: '#111' }}>
+          <button onClick={() => { pinnedRef.current = true; setUnseenNew(0); bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); markReadNow() }}
+            style={{ background: 'var(--brand)', color: '#03292b', border: 'none', borderRadius: '999px', padding: '6px 14px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }}>
+            ↓ {unseenNew} new message{unseenNew > 1 ? 's' : ''}
+          </button>
+        </div>
+      )}
+      {channel.type !== 'dm' && typingUsers.length > 0 && (
+        <div style={{ background: '#111', padding: '6px 16px 0', fontSize: '12.5px', color: 'var(--brand)', fontStyle: 'italic' }}>
+          {typingUsers.length === 1 ? `${typingUsers[0]} is typing…` : typingUsers.length === 2 ? `${typingUsers[0]} and ${typingUsers[1]} are typing…` : 'Several people are typing…'}
+        </div>
+      )}
+
+      {/* Message info sheet (group seen-by) — portal to body so the
+          fixed overlay escapes the scrolling <main> (run-46 rule). */}
+      {infoMsg && createPortal((
+        <div onClick={() => setInfoMsg(null)} style={{ position: 'fixed', inset: 0, zIndex: 230, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '480px', maxHeight: '70vh', overflow: 'auto', padding: '18px 20px calc(18px + env(safe-area-inset-bottom, 0px))' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ flex: 1, fontFamily: 'Barlow Condensed, sans-serif', fontSize: '15px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#fff' }}>Message info</span>
+              <button onClick={() => setInfoMsg(null)} aria-label="Close message info" style={{ background: 'none', border: 'none', color: '#999', fontSize: '18px', cursor: 'pointer', padding: 0 }}>✕</button>
+            </div>
+            <div style={{ fontSize: '13.5px', color: '#bbb', background: 'rgba(var(--brand-rgb),0.14)', borderRadius: '10px', padding: '8px 12px', marginBottom: '14px', wordBreak: 'break-word' }}>
+              {infoMsg.content ? infoMsg.content.slice(0, 140) : '📷 Photo'}
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{waClock(infoMsg.created_at)}</div>
+            </div>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#888', marginBottom: '8px' }}>
+              Read by {seenByProfiles(infoMsg, rMap, profilesById, userId).length}
+            </div>
+            {seenByProfiles(infoMsg, rMap, profilesById, userId).map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0' }}>
+                <Avatar profile={s.profile} size={32} />
+                <span style={{ flex: 1, fontSize: '14px', color: '#ddd' }}>{s.profile?.full_name || 'Athlete'}</span>
+                <span style={{ fontSize: '11.5px', color: '#777' }}>{waClock(new Date(s.readAt).toISOString())}</span>
+              </div>
+            ))}
+            {seenByProfiles(infoMsg, rMap, profilesById, userId).length === 0 && (
+              <div style={{ fontSize: '13px', color: '#666', padding: '4px 0 8px' }}>Not read by anyone else yet.</div>
+            )}
+          </div>
+        </div>
+      ), document.body)}
 
       {/* Input area — hidden for readonly channels unless admin */}
       {channel.is_readonly && profile?.role !== 'admin' ? (

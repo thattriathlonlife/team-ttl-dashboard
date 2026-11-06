@@ -17,6 +17,7 @@ import { track, setAnalyticsUser } from './lib/track'
 import Layout from './components/Layout'
 import TeamLocked from './components/TeamLocked'
 import { isTeamTier } from './lib/tier'
+import { initPresence, stopPresence } from './lib/presence'
 
 // The public website embed (/embed): a standalone, login-free,
 // counts-only race map for the TTL website. Lazy so the public page's
@@ -34,6 +35,13 @@ function AppRoutes({ session, profile, setProfile }) {
   // season's Team TTL kit palette. Switching data-theme swaps every
   // --brand/--accent/--highlight variable app-wide. The demo tier switch
   // reloads the page, so this also fires correctly after a flip.
+  // App-wide presence (messaging M2a): one realtime presence channel
+  // per session powers "online" in chat. Stops when the session ends.
+  useEffect(() => {
+    if (session?.user?.id) initPresence(session.user.id, profile?.full_name)
+    return () => stopPresence()
+  }, [session?.user?.id])
+
   const teamTheme = isTeamTier(profile)
   useEffect(() => {
     document.documentElement.dataset.theme = teamTheme ? 'team' : 'brand'
