@@ -148,14 +148,15 @@ const styles = {
 
 export default function Login() {
   // Multi-method auth (auth amendment, 2026-10-31): password is primary,
-  // email code and magic link are fallbacks. "Continue with Shopify" activates
+  // email code is the fallback (magic-link tab sunset in run 69).
+  // "Continue with Shopify" activates
   // when TTL creates the Customer Account API client (see AUTH-AMENDMENT.md);
   // the button is shown disabled so the target shape is visible in the POC.
   // Installed (Home Screen) app: default to the email code — a magic
   // link opens in the browser and signs you in THERE, never reaching
   // this app (run 66; see lib/display.js).
   const standalone = detectStandalone()
-  const [mode, setMode] = useState(() => defaultAuthMode(standalone)) // 'password' | 'code' | 'link'
+  const [mode, setMode] = useState(() => defaultAuthMode(standalone)) // 'password' | 'code' (magic-link tab sunset in run 69, Zack's call — the sign-in email still carries a backup link)
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -198,17 +199,6 @@ export default function Login() {
     if (error) setError(error.message)
   }
 
-  async function handleLink(e) {
-    e.preventDefault()
-    setLoading(true); setError('')
-    const { error } = await authCall(supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    }))
-    setLoading(false)
-    if (error) setError(error.message); else setSent('link')
-  }
-
   const tabBtn = (m, label) => (
     <button type="button" onClick={() => { setMode(m); setError(''); setCodeSent(false) }}
       style={{ flex: 1, background: mode === m ? '#1f1f1f' : 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: mode === m ? '#fff' : '#888', padding: '9px 4px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', cursor: 'pointer' }}>
@@ -226,7 +216,7 @@ export default function Login() {
 
         {sent ? (
           <div style={styles.success}>
-            {sent === 'link' ? 'Check your email for a magic link to sign in.' : 'Account created — check your email to confirm, then sign in.'}
+            Account created — check your email to confirm, then sign in.
           </div>
         ) : (
           <>
@@ -244,7 +234,6 @@ export default function Login() {
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
               {tabBtn('password', 'Password')}
               {tabBtn('code', 'Email code')}
-              {tabBtn('link', 'Magic link')}
             </div>
 
             {mode === 'password' && (
@@ -268,24 +257,12 @@ export default function Login() {
             )}
             {mode === 'code' && codeSent && (
               <form style={styles.form} onSubmit={handleVerifyCode}>
-                <input style={styles.input} type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" value={code} onChange={e => setCode(e.target.value)} required />
+                <input style={styles.input} type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="8-digit code" value={code} onChange={e => setCode(e.target.value)} required />
                 {error && <div style={styles.error}>{error}</div>}
                 <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Verifying…' : 'Verify Code'}</button>
               </form>
             )}
 
-            {mode === 'link' && (
-              <form style={styles.form} onSubmit={handleLink}>
-                <input style={styles.input} type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
-                {error && <div style={styles.error}>{error}</div>}
-                <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Sending...' : 'Send Magic Link'}</button>
-                {standalone && (
-                  <div style={{ fontSize: 12.5, color: '#999', lineHeight: 1.5, textAlign: 'left' }}>
-                    Heads up: in the installed app, the link opens in your browser and signs you in there — not in this app. The <b>Email code</b> tab keeps sign-in inside the app.
-                  </div>
-                )}
-              </form>
-            )}
           </>
         )}
       </div>
