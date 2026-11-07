@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase'
 import { detectStandalone, defaultAuthMode } from '../lib/display'
 
 // Run 67: race every auth call against a visible timeout — a stalled
-// sign-in must surface an error, never spin on "Working…" forever.
-// (Pairs with the lock bypass in lib/supabase.js.)
+// or throwing sign-in must surface an error, never spin on "Working…"
+// forever. (This catch is what exposed the run-68 root cause.)
 async function authCall(promise) {
   try {
     return await Promise.race([
@@ -168,8 +168,15 @@ export default function Login() {
   async function handlePassword(e) {
     e.preventDefault()
     setLoading(true); setError('')
-    const fn = isSignUp ? supabase.auth.signUp : supabase.auth.signInWithPassword
-    const { error } = await authCall(fn({ email, password }))
+    // Run 68: call these BOUND. The auth client's methods read
+    // this.fetch internally; detaching one into a variable (the old
+    // `const fn = ...` here) makes `this` undefined and throws
+    // "undefined is not an object (evaluating 'this.fetch')" — which,
+    // with no catch around it, left the button on "Working…" forever.
+    // That was the real cause of the Nov 6 sign-in "hang".
+    const { error } = await authCall(isSignUp
+      ? supabase.auth.signUp({ email, password })
+      : supabase.auth.signInWithPassword({ email, password }))
     setLoading(false)
     if (error) setError(error.message)
     else if (isSignUp) setSent('signup')
