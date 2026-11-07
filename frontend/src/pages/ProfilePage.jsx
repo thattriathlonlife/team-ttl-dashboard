@@ -114,6 +114,26 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
   // Web Push (M4): notifications state mirrors lib/push.
   const [pushState, setPushState] = useState('off') // unsupported | denied | off | on
   const [pushBusy, setPushBusy] = useState(false)
+  // Set/update password (run 66): accounts created via email code or
+  // magic link have no password; a signed-in user can attach one with
+  // updateUser — Supabase has no username sign-in, the email is the id.
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwMsg, setPwMsg] = useState(null) // { ok } | { err }
+
+  async function savePassword() {
+    setPwMsg(null)
+    if (newPassword.length < 6) { setPwMsg({ err: 'Use at least 6 characters.' }); return }
+    if (newPassword !== confirmPassword) { setPwMsg({ err: "The two passwords don't match." }); return }
+    setPwBusy(true)
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setPwBusy(false)
+    if (error) { setPwMsg({ err: error.message }); return }
+    setPwMsg({ ok: 'Password saved — from now on the Password tab signs you in anywhere, including the installed app.' })
+    setNewPassword('')
+    setConfirmPassword('')
+  }
 
   useEffect(() => { loadMyRaces(); loadBadges() }, [])
   useEffect(() => { getPushState().then(setPushState).catch(() => {}) }, [])
@@ -389,6 +409,22 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
           </button>
         )}
         {pushState === 'on' && <div style={{ fontSize: 12, color: '#7ac74f', marginTop: 8 }}>🔔 On for this device — each phone or computer you use enables separately.</div>}
+      </div>
+      <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Password</div>
+        <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#888', marginBottom: 10 }}>
+          Set a password for {email}. Especially handy in the installed app: sign-in links open in your browser, but a password keeps sign-in inside the app. If you signed up with an email code, this attaches a password to the same account.
+        </div>
+        <input type="password" autoComplete="new-password" placeholder="New password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '10px 12px', fontSize: 14, fontFamily: 'Barlow, sans-serif', outline: 'none', marginBottom: 8 }} />
+        <input type="password" autoComplete="new-password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') savePassword() }}
+          style={{ width: '100%', boxSizing: 'border-box', background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '10px 12px', fontSize: 14, fontFamily: 'Barlow, sans-serif', outline: 'none', marginBottom: 10 }} />
+        <button onClick={savePassword} disabled={pwBusy || !newPassword || !confirmPassword} style={{ width: '100%', background: 'var(--brand)', color: '#06282a', border: 'none', borderRadius: 6, padding: '9px 4px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', cursor: 'pointer', opacity: pwBusy || !newPassword || !confirmPassword ? 0.55 : 1 }}>
+          {pwBusy ? 'Saving…' : 'Set password'}
+        </button>
+        {pwMsg?.err && <div style={{ fontSize: 12.5, color: '#ff8a7a', marginTop: 8 }}>{pwMsg.err}</div>}
+        {pwMsg?.ok && <div style={{ fontSize: 12.5, color: '#7ac74f', marginTop: 8 }}>{pwMsg.ok}</div>}
       </div>
       <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Demo view (proof of concept)</div>

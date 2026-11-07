@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { detectStandalone, defaultAuthMode } from '../lib/display'
 
 const styles = {
   page: {
@@ -135,7 +136,11 @@ export default function Login() {
   // email code and magic link are fallbacks. "Continue with Shopify" activates
   // when TTL creates the Customer Account API client (see AUTH-AMENDMENT.md);
   // the button is shown disabled so the target shape is visible in the POC.
-  const [mode, setMode] = useState('password') // 'password' | 'code' | 'link'
+  // Installed (Home Screen) app: default to the email code — a magic
+  // link opens in the browser and signs you in THERE, never reaching
+  // this app (run 66; see lib/display.js).
+  const standalone = detectStandalone()
+  const [mode, setMode] = useState(() => defaultAuthMode(standalone)) // 'password' | 'code' | 'link'
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -252,6 +257,11 @@ export default function Login() {
                 <input style={styles.input} type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
                 {error && <div style={styles.error}>{error}</div>}
                 <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Sending...' : 'Send Magic Link'}</button>
+                {standalone && (
+                  <div style={{ fontSize: 12.5, color: '#999', lineHeight: 1.5, textAlign: 'left' }}>
+                    Heads up: in the installed app, the link opens in your browser and signs you in there — not in this app. The <b>Email code</b> tab keeps sign-in inside the app.
+                  </div>
+                )}
               </form>
             )}
           </>
