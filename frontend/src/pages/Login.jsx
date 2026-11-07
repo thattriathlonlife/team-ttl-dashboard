@@ -2,6 +2,21 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { detectStandalone, defaultAuthMode } from '../lib/display'
 
+// Run 67: race every auth call against a visible timeout — a stalled
+// sign-in must surface an error, never spin on "Working…" forever.
+// (Pairs with the lock bypass in lib/supabase.js.)
+async function authCall(promise) {
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error('Sign-in timed out — check your connection and try again.')), 15000)),
+    ])
+  } catch (err) {
+    return { error: err }
+  }
+}
+
 const styles = {
   page: {
     minHeight: '100vh',
@@ -154,7 +169,7 @@ export default function Login() {
     e.preventDefault()
     setLoading(true); setError('')
     const fn = isSignUp ? supabase.auth.signUp : supabase.auth.signInWithPassword
-    const { error } = await fn({ email, password })
+    const { error } = await authCall(fn({ email, password }))
     setLoading(false)
     if (error) setError(error.message)
     else if (isSignUp) setSent('signup')
@@ -163,7 +178,7 @@ export default function Login() {
   async function handleSendCode(e) {
     e.preventDefault()
     setLoading(true); setError('')
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
+    const { error } = await authCall(supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } }))
     setLoading(false)
     if (error) setError(error.message); else setCodeSent(true)
   }
@@ -171,7 +186,7 @@ export default function Login() {
   async function handleVerifyCode(e) {
     e.preventDefault()
     setLoading(true); setError('')
-    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' })
+    const { error } = await authCall(supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' }))
     setLoading(false)
     if (error) setError(error.message)
   }
@@ -179,10 +194,10 @@ export default function Login() {
   async function handleLink(e) {
     e.preventDefault()
     setLoading(true); setError('')
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await authCall(supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: window.location.origin },
-    })
+    }))
     setLoading(false)
     if (error) setError(error.message); else setSent('link')
   }
