@@ -8,6 +8,7 @@ import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import Messaging from './pages/Messaging'
 import ProfilePage from './pages/ProfilePage'
+import Ops from './pages/Ops'
 import CompleteProfile from './pages/CompleteProfile'
 import Team from './pages/Team'
 import Content from './pages/Content'
@@ -88,6 +89,7 @@ function AppRoutes({ session, profile, setProfile }) {
         <Route path="/training" element={<Navigate to="/team?tab=training" replace />} />
         <Route path="/discounts" element={<Navigate to="/team?tab=deals" replace />} />
         <Route path="/profile" element={<ProfilePage session={session} profile={profile} onSave={handleProfileSave} />} />
+        <Route path="/ops" element={profile?.role === 'admin' ? <Ops profile={profile} /> : <Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
       </ErrorBoundary>

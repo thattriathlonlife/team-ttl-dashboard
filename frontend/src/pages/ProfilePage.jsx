@@ -2,6 +2,7 @@ import { getDemoTier, setDemoTier, isTeamTier } from '../lib/tier'
 import MemberChips from '../components/MemberChips'
 import { BRAND_THEME, TEAM_THEME } from '../lib/theme'
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getPushState, enablePush, disablePush } from '../lib/push'
 
@@ -410,6 +411,17 @@ export default function ProfilePage({ session, profile: initialProfile, onSave }
         )}
         {pushState === 'on' && <div style={{ fontSize: 12, color: '#7ac74f', marginTop: 8 }}>🔔 On for this device — each phone or computer you use enables separately.</div>}
       </div>
+      {profile?.role === 'admin' && (
+        <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(var(--brand-rgb),0.35)', borderRadius: 16 }}>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Team Ops</div>
+          <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#888', marginBottom: 10 }}>
+            Staff view: biggest team races, regional density, recent signups, and start-line import.
+          </div>
+          <Link to="/ops" style={{ display: 'block', textAlign: 'center', background: 'var(--brand)', color: '#06282a', borderRadius: 6, padding: '9px 4px', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', textDecoration: 'none' }}>
+            Open Team Ops
+          </Link>
+        </div>
+      )}
       <div style={{ marginTop: 18, padding: '14px', background: '#161616', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#fff', marginBottom: 4 }}>Password</div>
         <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#888', marginBottom: 10 }}>
